@@ -17,10 +17,11 @@ vendored `vendor/growth-engine` content is already present in this copy.
 
 ## First run
 
-This file was written against the original workspace, where a database was already attached.
-**A copy brought in from GitHub does not inherit that.** It gets a fresh, empty database and
-no connection to the original, so the first step below is a real step and not a formality.
-The same was true of a remix, which is how founders used to take their copy.
+This copy has its own Replit Postgres database attached, and the app has already applied and
+verified its migrations. A future copy brought in from GitHub does not inherit that database:
+open the Database pane first so Replit supplies `DATABASE_URL`. It gets a fresh, empty
+database and no connection to the original, so that step is real and not a formality.
+The same is true of a remix, which is how founders used to take their copy.
 
 The app starts safely with all of this missing. It serves a page headed "Start here" that
 names whatever is not done yet and what to do about each one, so nothing here has to be
