@@ -185,9 +185,13 @@ type Expects = "an answer" | "nothing";
 
 async function request<T>(path: string, expects: Expects, init?: RequestInit): Promise<Result<T>> {
   try {
+    // A FormData body sets its own content type, boundary included. Naming one by hand here
+    // would send a boundary that does not match the one actually written into the body, and
+    // the upload would fail on every attempt.
+    const isForm = init?.body instanceof FormData;
     const res = await fetch(path, {
       credentials: "same-origin",
-      headers: { accept: "application/json", ...(init?.body ? { "content-type": "application/json" } : {}) },
+      headers: { accept: "application/json", ...(init?.body && !isForm ? { "content-type": "application/json" } : {}) },
       ...init,
     });
     return await toResult<T>(res, expects);
@@ -242,6 +246,11 @@ function post<T>(path: string, body?: unknown): Promise<Result<T>> {
 /** A write with nothing to read back. It worked or it did not. */
 function postVoid(path: string, body?: unknown): Promise<Result<void>> {
   return request<void>(path, "nothing", { method: "POST", body: JSON.stringify(body ?? {}) });
+}
+
+/** A write whose body is a file rather than JSON, and whose answer is read. */
+function postForm<T>(path: string, form: FormData): Promise<Result<T>> {
+  return request<T>(path, "an answer", { method: "POST", body: form });
 }
 
 // ---------------------------------------------------------------------------------------
@@ -688,6 +697,34 @@ export function saveVoiceSample(name: string, text: string): Promise<Result<{ re
   return post<{ readonly path: string }>("/api/files/voice-samples", { name, text });
 }
 
+/**
+ * A document a founder attaches to a message, mid conversation.
+ *
+ * `POST /api/uploads`, one file, field name `file`. This is the built version of the same
+ * idea the paste cap above is built on: a founder's own material becomes a file the engine
+ * reads with the Read tool, rather than text stuffed into the context window. The difference
+ * is that here the founder chose the file themselves, instead of pasting something too long.
+ *
+ * `warnings` and `truncated` are read off a 201 and are the server's own account of what it
+ * could not keep: a hidden sheet it skipped, speaker notes it did not read, text it cut
+ * short. Both are rendered, because a founder who is about to ask the engine about a file
+ * needs to know what is missing from it before they ask.
+ */
+export interface UploadedDocument {
+  readonly name: string;
+  readonly sizeBytes: number;
+  readonly chars: number;
+  readonly warnings: readonly string[];
+  readonly truncated: boolean;
+}
+
+/** ASSUMED path, named in full above `UploadedDocument`. */
+export function uploadDocument(file: File): Promise<Result<UploadedDocument>> {
+  const form = new FormData();
+  form.append("file", file);
+  return postForm<UploadedDocument>("/api/uploads", form);
+}
+
 // ---------------------------------------------------------------------------------------
 // Files, which is rule 4
 // ---------------------------------------------------------------------------------------
@@ -717,6 +754,13 @@ export interface FilesState {
   readonly rows: readonly FileRow[];
   /** `.state/` sits behind a disclosure labelled in plain words, not hidden. */
   readonly stateRows: readonly FileRow[];
+  /**
+   * What the founder attached themselves, mid chat, through `uploadDocument`.
+   *
+   * A row here is first class, the same as `rows`: it is not the app's own work, so it is
+   * shown apart from it, and it is never behind a disclosure the way `.state/` is.
+   */
+  readonly uploadRows: readonly FileRow[];
 }
 
 /** ASSUMED path. */

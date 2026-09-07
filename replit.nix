@@ -16,6 +16,7 @@
 
 { pkgs }: {
   deps = [
+    pkgs.fltk14
     # Node 22, matching the `modules` entry in .replit. Built with full ICU in nixpkgs,
     # which is what makes America/New_York resolve. Verified at boot, not assumed.
     pkgs.nodejs_22

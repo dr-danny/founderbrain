@@ -165,6 +165,14 @@ export class TurnRefused extends Error {
   }
 }
 
+/**
+ * Where a founder's own uploaded documents live. Kept here, next to the check
+ * that uses it, rather than in storage/paths.ts: this is a rule about verbs,
+ * not a rule about paths, and paths.ts must stay the file that never learns
+ * what a verb is.
+ */
+const UPLOADS_PREFIX = 'uploads/';
+
 /** What the work function is handed. Everything it needs, nothing it does not. */
 export interface TurnContext {
   founderId: string;
@@ -469,6 +477,28 @@ export function founderGateCount(): number {
   return founderGates.size;
 }
 
+/**
+ * Does this founder have a turn in flight right now, in this process?
+ *
+ * FOR THE UPLOAD ROUTE. `agent/queue.ts` tracks a founder as "running" too,
+ * in `runningByFounder`, but that set is scoped to the queue's own admission
+ * and does not cover every caller of `runTurn` (a `ge` verb spawned outside
+ * the queue, for one), and the queue is not a file this task owns. This map
+ * is: it is the exact thing that would make the upload's own call to
+ * `runTurn` wait, because `withFounderGate` above is built from it. So this
+ * is the least invasive check available, not a second one added beside it.
+ *
+ * It answers the question at the moment it is asked. A turn can start in the
+ * gap between this returning false and the caller's own `runTurn` call, and
+ * that call then waits out the turn in front rather than hanging forever —
+ * the same wait `withFounderGate` always gave. What this buys is the common
+ * case: a founder typing mid-answer gets 409 in milliseconds instead of
+ * discovering the wait at the end of an HTTP timeout.
+ */
+export function founderIsBusy(founderId: string): boolean {
+  return founderGates.has(founderId);
+}
+
 /* -------------------------------------------------------------------------- */
 /* The handle the work function is given                                       */
 /* -------------------------------------------------------------------------- */
@@ -699,6 +729,26 @@ async function commitTurn<T>(
 
       const plan = await planHarvest(tx, { founderId, materialised, version: versionAfter });
 
+      // THE OTHER HALF OF THE UPLOADS/ EXEMPTION, AND IT LIVES HERE RATHER
+      // THAN IN THE GATE. `rules/harvest-gate.ts` answers "may this file be
+      // exempt", keyed on `verb`; this is "did the ROUTE THAT CLAIMED verb
+      // 'upload' actually keep its promise". The upload route (routes/uploads.ts)
+      // writes exactly one file, under `uploads/`, in its `work` callback, and
+      // nothing else. If a harvested change this turn sits anywhere else, that
+      // promise was broken — a bug in that route, not a founder's choice — and
+      // the whole turn is refused rather than silently narrowed to the uploads/
+      // subset and applied anyway.
+      if (verb === 'upload') {
+        const outside = plan.changes.filter((c) => !c.path.startsWith(UPLOADS_PREFIX));
+        if (outside.length > 0) {
+          throw new TurnRefused(
+            'upload_outside_uploads',
+            `an upload turn tried to write outside uploads/: ${outside.map((c) => c.path).join(', ')}. ` +
+              'Refusing the whole turn rather than saving part of it.',
+          );
+        }
+      }
+
       const gate = await gateHarvest({
         founderId,
         changes: plan.changes.map((c) => ({
@@ -713,6 +763,9 @@ async function commitTurn<T>(
         brain: brain?.text ?? null,
         grounding: founderSaidAsGrounding(options.founderSaid),
         readPrevious: (path) => previousText(tx, founderId, dataKey, path),
+        // THE UPLOADS/ EXEMPTION IS KEYED HERE, on the turn's own verb, and
+        // nowhere path-based. See rules/harvest-gate.ts for the full argument.
+        verb,
       });
 
       // NOTHING ABOVE THIS LINE HAS TOUCHED ge_file, and nothing below it can be

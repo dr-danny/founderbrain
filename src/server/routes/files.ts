@@ -192,7 +192,17 @@ export function readmeFor(files: readonly FileRow[], today: string): string {
 export function listRowsFor(
   held: readonly FileRow[],
   mayShow: (path: string) => boolean,
-): { rows: readonly FileListRow[]; stateRows: readonly FileListRow[] } {
+): {
+  rows: readonly FileListRow[];
+  stateRows: readonly FileListRow[];
+  /**
+   * A founder's own uploaded documents, split out exactly as `.state/` already
+   * is. Additive: `rows` and `stateRows` keep the shape and the meaning they
+   * had before this existed, because the files screen is being built against
+   * both of those in parallel with this change.
+   */
+  uploadRows: readonly FileListRow[];
+} {
   const visible = held.filter((r) => mayShow(r.path));
   const byPath = new Map(visible.map((r) => [r.path, r]));
   const named = new Set<string>();
@@ -237,6 +247,7 @@ export function listRowsFor(
   }
 
   const stateRows: FileListRow[] = [];
+  const uploadRows: FileListRow[] = [];
   for (const r of visible) {
     if (named.has(r.path)) continue;
     const row: FileListRow = {
@@ -250,11 +261,14 @@ export function listRowsFor(
     };
     // `.state/` is the toolkit's own bookkeeping. Shown rather than hidden,
     // behind a disclosure, because a folder we hide is a folder they do not own.
-    if (r.path.startsWith('.state/')) stateRows.push(row);
+    // `uploads/` is a founder's own document, clearly distinguishable from
+    // everything the app generated, which is `rows` and `stateRows` both.
+    if (r.path.startsWith('uploads/')) uploadRows.push(row);
+    else if (r.path.startsWith('.state/')) stateRows.push(row);
     else rows.push(row);
   }
 
-  return { rows, stateRows };
+  return { rows, stateRows, uploadRows };
 }
 
 export async function registerFileRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {

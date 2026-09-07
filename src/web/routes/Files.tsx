@@ -17,6 +17,11 @@
  * rather than hidden, behind a disclosure labelled in plain words, because a folder we hide
  * is a folder they do not own.
  *
+ * A FOURTH THING FOLLOWS NOW: what a founder attached to a message from inside the chat,
+ * via the Composer, is not the app's own work and is shown as its own section, not folded
+ * into the list the app wrote. It is first class, the same as everything else here, so it
+ * is never behind a disclosure the way `.state/` is.
+ *
  * THE LINE ABOUT THE CHECK IS DELIBERATE, AND SO IS ITS PLACE. `src/server/rules/` reads
  * every file before it is saved and holds one that breaks a rule. It is a word matcher, so
  * it misses things, and a founder who believes it is a guarantee will send something without
@@ -94,6 +99,7 @@ export function Files({ founder }: { readonly founder: Founder }): ReactElement 
 
   const rows = visibleFileRows(state.rows, founder.track);
   const stateRows = visibleFileRows(state.stateRows, founder.track);
+  const uploadRows = visibleFileRows(state.uploadRows, founder.track);
 
   return (
     <div className="page">
@@ -113,6 +119,27 @@ export function Files({ founder }: { readonly founder: Founder }): ReactElement 
         timezone={founder.timezone}
         emptyMessage="You have not made anything yet. Start with your Founder Brain."
       />
+
+      {/*
+        A FIRST CLASS SECTION, NOT A DISCLOSURE. The `.state/` folder below is the app's own
+        notes and is folded shut because a founder in session 1 does not need to read it. A
+        file a founder attached themselves is the opposite of that: it is theirs, they chose
+        it, and hiding it behind a summary they have to click would tell them it is less
+        theirs than what the app wrote. So it gets a heading and stays open, next to the work
+        the app made rather than under it.
+      */}
+      <section className="uploads">
+        <h2>What you brought in yourself</h2>
+        <p className="quiet">
+          These are the files you attached to a message. The app did not write them, so they are kept apart
+          from what it made for you.
+        </p>
+        <FileList
+          rows={uploadRows}
+          timezone={founder.timezone}
+          emptyMessage="You have not attached anything yet."
+        />
+      </section>
 
       <section className="download-all">
         <h2>Take everything</h2>
@@ -224,7 +251,11 @@ function useAllowedFileNames(founder: Founder): readonly string[] | null {
     let live = true;
     void fetchFiles().then((result) => {
       if (!live || !result.ok) return;
-      const rows = [...visibleFileRows(result.value.rows, founder.track), ...visibleFileRows(result.value.stateRows, founder.track)];
+      const rows = [
+        ...visibleFileRows(result.value.rows, founder.track),
+        ...visibleFileRows(result.value.stateRows, founder.track),
+        ...visibleFileRows(result.value.uploadRows, founder.track),
+      ];
       setNames(rows.map((r) => r.name));
     });
     return () => {

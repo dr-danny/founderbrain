@@ -136,6 +136,7 @@ const env = loadEnv();
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
+import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import { sql } from 'drizzle-orm';
@@ -638,6 +639,19 @@ export async function buildServer(options: BuildOptions): Promise<BuiltServer> {
   });
 
   const executor = new QueueTurnExecutor(queue, events, appStore, systemClock, logger, runTurn);
+
+  /**
+   * `POST /api/uploads` is the one route on this instance that reads a
+   * multipart body. Registered with no fixed `limits` here on purpose: the
+   * plugin's own default for `limits.fileSize` is `fastify.initialConfig.bodyLimit`,
+   * which is this instance's GLOBAL 1,000,000 bytes, sized for a founder's typed
+   * message rather than a document. Fixing a bigger number here would raise
+   * that default for every multipart request this instance will ever accept,
+   * which is the same mistake as raising `bodyLimit` itself. So the route sets
+   * its own `limits.fileSize` per request, from the host-detected
+   * `storageLimits().fileBytes`, and this registration supplies none.
+   */
+  await app.register(fastifyMultipart);
 
   const routes = await registerApiRoutes(app, {
     store: appStore,

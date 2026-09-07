@@ -46,6 +46,7 @@ import {
   saveVoiceSample,
   sendMessage,
   streamUrl,
+  uploadDocument,
 } from "../lib/api.ts";
 import type { Founder, Problem } from "../lib/api.ts";
 import { openStream } from "../lib/stream.ts";
@@ -136,12 +137,23 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
     );
   }
 
-  const send = (text: string): void => {
+  /**
+   * The composer already waited for the upload to finish before this runs at all, so
+   * `attachedName` is always a file the server already has. This is the one line that
+   * names it to the engine: the turn opens against whatever text the server stores, and a
+   * message that only says "look at the file I attached" without saying which one is a
+   * message the engine cannot act on.
+   */
+  const withAttachment = (text: string, attachedName: string | null): string =>
+    attachedName === null ? text : `${text}\n\n(The attached file is ${attachedName}.)`;
+
+  const send = (text: string, attachedName: string | null): void => {
     const threadId = view.threadId;
     if (threadId === null) return;
     const clientMsgId = newClientMsgId();
-    dispatch({ type: "sending", clientMsgId, text });
-    void sendMessage(threadId, text, clientMsgId).then((result) => {
+    const fullText = withAttachment(text, attachedName);
+    dispatch({ type: "sending", clientMsgId, text: fullText });
+    void sendMessage(threadId, fullText, clientMsgId).then((result) => {
       if (!result.ok) dispatch({ type: "send-failed", clientMsgId, text: result.problem.text });
     });
   };
@@ -331,6 +343,7 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
           }
           onSend={send}
           onSaveAsFile={saveAsFile}
+          onUpload={uploadDocument}
         />
       </div>
     </div>

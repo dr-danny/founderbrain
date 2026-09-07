@@ -30,6 +30,8 @@
  */
 
 import { posix as posixPath, resolve, sep } from 'node:path';
+import { statfsSync } from 'node:fs';
+import { totalmem } from 'node:os';
 import { lateSettings } from '../env.ts';
 
 /** ULID. 26 characters of Crockford base32: no I, L, O or U, so no digit lookalikes. */
@@ -55,10 +57,163 @@ export const GE_FOLDER = 'growth-engine';
  */
 export const EPOCH_FILE = '.ge-epoch';
 
-/** Section 5, size limits and failure. Refused politely, before the write. */
-export const LIMIT_TOTAL_BYTES = 50 * 1024 * 1024;
-export const LIMIT_FILE_BYTES = 2 * 1024 * 1024;
-export const LIMIT_FILE_COUNT = 400;
+// -----------------------------------------------------------------------------------------
+// Section 5, size limits and failure. Refused politely, before the write.
+//
+// WHY THESE ARE DETECTED RATHER THAN PRESET. This app is self-hosted: every founder runs
+// their own copy, on their own machine or their own Replit plan, and a number picked for us
+// means nothing about the box it lands on. So the limit is worked out from what the host
+// actually has — free disk, total memory — at the first call, cached from then on because a
+// limit that moves mid-process is a bug (a turn refused at byte 40M and accepted at byte
+// 60M with nothing else having changed is not a limit, it is a coin flip). An operator who
+// knows better overrides it through GE_LIMIT_FILE_BYTES, GE_LIMIT_TOTAL_BYTES and
+// GE_LIMIT_FILE_COUNT in src/server/env.ts, and an explicit override always wins.
+//
+// THE FLOORS ARE THE THREE NUMBERS THIS FILE USED TO HARD-CODE, and detection may only ever
+// raise a limit above them, never lower one. A founder whose growth-engine/ folder already
+// holds 40 MB, running on a host that happens to report little free disk that day, would
+// otherwise have a detected total-bytes limit below what is already on disk, and every save
+// after that — including one that deletes nothing and adds one small file — would be
+// refused forever. The floor is the guarantee that detection can only make room, never take
+// it away.
+// -----------------------------------------------------------------------------------------
+
+const MiB = 1024 * 1024;
+const GiB = 1024 * MiB;
+
+/** The three limits in force today, unchanged. See the section header for why they floor. */
+const FLOOR_FILE_BYTES = 2 * MiB;
+const FLOOR_TOTAL_BYTES = 50 * MiB;
+const FLOOR_FILE_COUNT = 400;
+
+/** A ceiling on detection only. An explicit override is not bound by this. */
+const CEIL_FILE_BYTES = 256 * MiB;
+const CEIL_TOTAL_BYTES = 5 * GiB;
+const CEIL_FILE_COUNT = 10_000;
+
+function clamp(n: number, floor: number, ceil: number): number {
+  return Math.min(Math.max(n, floor), ceil);
+}
+
+interface DetectedLimits {
+  fileBytes: number;
+  totalBytes: number;
+  fileCount: number;
+}
+
+/**
+ * The two host facts detection is built from.
+ *
+ * TEST SEAM. statfsSync and totalmem are facts about the real machine a test does not
+ * control and should not have to reproduce (a test asserting "the floor applies on a
+ * machine with 1 GB free" should not need a container with 1 GB free). This interface is
+ * how limits.test.ts swaps them for fakes, through __setStorageDetectionForTest below.
+ * Nothing in production code ever supplies anything but the real ones.
+ */
+export interface StorageDetectionInputs {
+  /** Bytes free on the filesystem under the workspace root. */
+  freeDiskBytes: () => number;
+  /** Total system memory, in bytes. */
+  totalMemoryBytes: () => number;
+}
+
+const realDetectionInputs: StorageDetectionInputs = {
+  freeDiskBytes: () => {
+    const stats = statfsSync(workspaceRoot());
+    return stats.bavail * stats.bsize;
+  },
+  totalMemoryBytes: () => totalmem(),
+};
+
+let detectionInputs: StorageDetectionInputs = realDetectionInputs;
+
+/**
+ * TEST SEAM, not for production use. Swaps the host facts detection reads for fakes, and
+ * clears the cached limits so the next storageLimits() call runs detection again against
+ * the new inputs. Pass undefined to restore the real ones (also clearing the cache, so a
+ * test that runs after does not inherit a fake-derived value).
+ */
+export function __setStorageDetectionForTest(inputs: StorageDetectionInputs | undefined): void {
+  detectionInputs = inputs ?? realDetectionInputs;
+  cachedLimits = undefined;
+}
+
+/**
+ * Read the host and turn it into the three limits, unclamped by any config override.
+ *
+ * NEVER THROWS. statfsSync is not guaranteed on every host (an exotic filesystem, a
+ * sandbox that refuses the syscall, a workspace root that does not exist yet because
+ * nothing has booted there before), and a storage limit is on the critical path of every
+ * turn. A detection failure returns exactly the floors — the behaviour every founder
+ * already has today — rather than crashing the boot or the first save.
+ */
+function detectLimits(): DetectedLimits {
+  try {
+    const freeDisk = detectionInputs.freeDiskBytes();
+    const totalMem = detectionInputs.totalMemoryBytes();
+    const fileBytes = clamp(Math.min(totalMem / 32, freeDisk / 50), FLOOR_FILE_BYTES, CEIL_FILE_BYTES);
+    const totalBytes = clamp(freeDisk / 20, FLOOR_TOTAL_BYTES, CEIL_TOTAL_BYTES);
+    const fileCount = clamp(Math.round(totalBytes / (128 * 1024)), FLOOR_FILE_COUNT, CEIL_FILE_COUNT);
+    return {
+      fileBytes: Math.floor(fileBytes),
+      totalBytes: Math.floor(totalBytes),
+      fileCount: Math.round(fileCount),
+    };
+  } catch {
+    return { fileBytes: FLOOR_FILE_BYTES, totalBytes: FLOOR_TOTAL_BYTES, fileCount: FLOOR_FILE_COUNT };
+  }
+}
+
+/** Where one limit's effective value came from. */
+export type LimitSource = 'config' | 'detection';
+
+export interface StorageLimits {
+  /** The limit harvest.ts enforces. A config override when one is set, detection otherwise. */
+  fileBytes: number;
+  totalBytes: number;
+  fileCount: number;
+  /**
+   * What detection alone would have produced, config override or not. Kept alongside the
+   * effective values so a settings screen can show both: what an operator chose and what
+   * the host would give them if they hadn't.
+   */
+  detected: DetectedLimits;
+  /** 'config' when GE_LIMIT_* was set for that limit, 'detection' otherwise. */
+  source: { fileBytes: LimitSource; totalBytes: LimitSource; fileCount: LimitSource };
+}
+
+let cachedLimits: StorageLimits | undefined;
+
+/**
+ * The three storage limits harvest.ts enforces, detected from the host at first call and
+ * cached for the life of the process. An explicit GE_LIMIT_* override wins outright,
+ * including when it is set below the floor: an operator who types a small number has
+ * decided that, and this file does not second-guess it. Detection alone never goes below
+ * the floor — see the section header above for why.
+ */
+export function storageLimits(): StorageLimits {
+  if (cachedLimits) return cachedLimits;
+
+  const detected = detectLimits();
+  const config = lateSettings();
+
+  const fileBytes = config.limitFileBytes ?? detected.fileBytes;
+  const totalBytes = config.limitTotalBytes ?? detected.totalBytes;
+  const fileCount = config.limitFileCount ?? detected.fileCount;
+
+  cachedLimits = Object.freeze({
+    fileBytes,
+    totalBytes,
+    fileCount,
+    detected: Object.freeze({ ...detected }),
+    source: Object.freeze({
+      fileBytes: (config.limitFileBytes !== undefined ? 'config' : 'detection') as LimitSource,
+      totalBytes: (config.limitTotalBytes !== undefined ? 'config' : 'detection') as LimitSource,
+      fileCount: (config.limitFileCount !== undefined ? 'config' : 'detection') as LimitSource,
+    }),
+  });
+  return cachedLimits;
+}
 
 /** A single path segment. Space is allowed; nothing else outside this set is. */
 const SEGMENT_RE = /^[A-Za-z0-9._][A-Za-z0-9._ -]*$/;

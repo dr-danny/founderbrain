@@ -25,7 +25,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 import { markup, screenText } from "../test-fixtures.ts";
-import type { FileRow } from "../lib/api.ts";
+import type { FileRow, Result, UploadedDocument } from "../lib/api.ts";
 import { parseMarkdown } from "../lib/markdown.ts";
 import { Working } from "./Working.tsx";
 import { QueuedNotice } from "./QueuedNotice.tsx";
@@ -33,9 +33,26 @@ import { StopButton } from "./StopButton.tsx";
 import { FileList, STATUS_WORDS } from "./FileList.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
 import { StepProgress } from "./StepProgress.tsx";
-import { Composer } from "./Composer.tsx";
+import {
+  ACCEPTED_UPLOAD_EXTENSIONS,
+  ATTACH_HINT,
+  ATTACH_LABEL,
+  Composer,
+  TRUNCATED_NOTE,
+  TRY_AGAIN,
+  WRONG_FILE_TYPE,
+  attachedLine,
+  canSend,
+  hasAcceptedExtension,
+  uploadingLine,
+} from "./Composer.tsx";
+import type { UploadState } from "./Composer.tsx";
+import { checkProseText } from "../../server/rules/prose.ts";
 
 const noop = (): void => undefined;
+
+/** An upload call the render only tests need but never expect to resolve. */
+const noopUpload = (): Promise<Result<UploadedDocument>> => new Promise(() => undefined);
 
 test("waiting always says what it is waiting for", () => {
   const text = screenText(createElement(Working, { what: "Reading your Founder Brain." }));
@@ -140,14 +157,115 @@ test("the step counter is announced to a screen reader as well as drawn", () => 
 
 test("the composer says which key sends, because that is the one keyboard rule here", () => {
   const text = screenText(
-    createElement(Composer, { disabled: false, placeholder: "Type your answer", onSend: noop, onSaveAsFile: noop }),
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
   );
   assert.ok(text.includes("Enter sends. Shift and Enter starts a new line."));
 });
 
 test("the composer is shut while an answer is arriving, so nobody sends twice", () => {
   const html = markup(
-    createElement(Composer, { disabled: true, placeholder: "Waiting", onSend: noop, onSaveAsFile: noop }),
+    createElement(Composer, {
+      disabled: true,
+      placeholder: "Waiting",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
   );
   assert.ok(html.includes("disabled"));
+});
+
+// -----------------------------------------------------------------------------------------
+// The attach control
+//
+// A found file blocking Send while it uploads is the one rule the header comment on
+// Composer.tsx calls load bearing: the engine builds its file list when a turn opens, so a
+// message must never reach the server before the file it names does. `canSend` is the one
+// function that decides this, used by both the button's own `disabled` attribute and by
+// `send` itself, so it is tested directly here rather than through a click nothing in this
+// harness can simulate. Static markup has no event loop, so the render tests below can only
+// prove the idle state; the state machine itself is proven against the pure function it
+// shares with the component.
+// -----------------------------------------------------------------------------------------
+test("every extension the attach control offers is accepted, and nothing else is", () => {
+  for (const ext of ACCEPTED_UPLOAD_EXTENSIONS) {
+    assert.ok(hasAcceptedExtension(`sample${ext}`), `${ext} should be accepted`);
+    assert.ok(hasAcceptedExtension(`SAMPLE${ext.toUpperCase()}`), `${ext} should be accepted in any case`);
+  }
+  for (const bad of [".exe", ".zip", ".png", ".mp4", ""]) {
+    assert.ok(!hasAcceptedExtension(`sample${bad}`), `${bad || "no extension"} should be refused`);
+  }
+});
+
+test("the attach control is on the screen from the start, not behind anything", () => {
+  const text = screenText(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
+  );
+  assert.ok(text.includes(ATTACH_LABEL));
+  assert.ok(text.includes(ATTACH_HINT));
+});
+
+test("Send is blocked for exactly as long as a file is uploading, and for no other reason", () => {
+  const idle: UploadState = { kind: "idle" };
+  const uploading: UploadState = { kind: "uploading", fileName: "notes.docx" };
+  const attached: UploadState = {
+    kind: "attached",
+    doc: { name: "notes.docx", sizeBytes: 100, chars: 50, warnings: [], truncated: false },
+  };
+  const failed: UploadState = { kind: "failed", fileName: "notes.docx", text: "We could not read that file." };
+  const rejected: UploadState = { kind: "rejected", fileName: "notes.exe" };
+
+  assert.equal(canSend("Hello", false, idle), true);
+  assert.equal(canSend("Hello", false, uploading), false, "an upload in flight must block Send");
+  // A failed or rejected attempt, or one that finished, leaves the composer exactly as
+  // usable as if nothing had ever been attached: this is what "a failed upload leaves the
+  // composer usable" actually means, and the guard has to say so for every state but one.
+  assert.equal(canSend("Hello", false, attached), true);
+  assert.equal(canSend("Hello", false, failed), true, "a failed upload must not lock the box");
+  assert.equal(canSend("Hello", false, rejected), true, "a rejected file must not lock the box");
+  // The ordinary reasons still apply on top of all of this.
+  assert.equal(canSend("", false, idle), false);
+  assert.equal(canSend("Hello", true, idle), false);
+});
+
+test("the sentence during an upload names the file and says why Send is off", () => {
+  const line = uploadingLine("last-newsletter.docx");
+  assert.ok(line.includes("last-newsletter.docx"));
+  assert.ok(line.toLowerCase().includes("send"));
+});
+
+test("the sentence after a successful attach names the stored file", () => {
+  assert.ok(attachedLine("last-newsletter.docx").includes("last-newsletter.docx"));
+});
+
+test("a founder is told plainly when a file was cut short, not left to read a boolean", () => {
+  assert.ok(TRUNCATED_NOTE.toLowerCase().includes("cut"));
+});
+
+test("every sentence the attach control can show passes the house style rules", () => {
+  const strings = [
+    ATTACH_LABEL,
+    ATTACH_HINT,
+    WRONG_FILE_TYPE,
+    TRY_AGAIN,
+    TRUNCATED_NOTE,
+    uploadingLine("last-newsletter.docx"),
+    attachedLine("last-newsletter.docx"),
+  ];
+  for (const text of strings) {
+    const result = checkProseText("composer attach copy", text);
+    assert.equal(result.ok, true, `"${text}": ${result.violations.map((v) => v.code).join(", ")}`);
+  }
 });

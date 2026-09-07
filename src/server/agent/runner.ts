@@ -27,11 +27,15 @@
  *   `disallowedTools`  Bash, WebSearch, WebFetch, Task and Skill, removed from
  *                      the model's context even if something above let them in.
  * Any one of the three would probably do. All three are set because
- * `permissionMode: 'bypassPermissions'` is only safe BECAUSE there is no shell
- * and cwd is a per founder scratch directory. If either of those ever changes,
- * the permission mode has to change with it. A default is not a decision, and
- * the failure this prevents is a model with a shell inside a folder holding
- * 3,000 real people's contact details.
+ * `permissionMode: 'bypassPermissions'` is only safe BECAUSE of three things
+ * together: there is no shell, cwd is a per founder scratch directory, and a
+ * PreToolUse hook (hooks.ts, preToolUse) refuses any Read, Write, Edit, Glob
+ * or Grep whose path resolves outside that founder's own folder. cwd alone
+ * does not stop a tool being handed an absolute path, which is why the third
+ * thing exists. If any of the three ever changes, the permission mode has to
+ * change with it. A default is not a decision, and the failure this prevents
+ * is a model with a shell, or an unfenced absolute path, inside a folder
+ * holding 3,000 real people's contact details.
  *
  * WHY `tools` IS SET AT ALL, MEASURED RATHER THAN ASSUMED. Asked for nothing,
  * CLI 2.1.250 hands the model 29 tools, and that list contains Bash, Task,
@@ -52,7 +56,7 @@ import type {
 import { anthropicKeyFor } from './anthropic-key.js';
 import { assemble, reAnchor, type AssembledPrompt } from './assemble.js';
 import { CostMeter, cacheReadTokensOf, type Budget } from './budget.js';
-import { postToolUse, preCompact, type HookDeps } from './hooks.js';
+import { postToolUse, preCompact, preToolUse, type HookDeps } from './hooks.js';
 import { endLabel, startLabel } from './labels.js';
 import type { Clock, FactsSource, Logger, SkillBodies } from './ports.js';
 import { Pushable } from './pushable.js';
@@ -350,6 +354,7 @@ export class AgentRun {
       onCompactStarting: () => {
         this.reAnchorNeeded = true;
       },
+      founderRoot: this.ctx.workdir,
     };
 
     const options: Options = {
@@ -390,7 +395,8 @@ export class AgentRun {
       disallowedTools: [...FORBIDDEN_TOOLS],
       permissionMode: 'bypassPermissions',
       // Required by the SDK whenever bypassPermissions is used. Safe here only
-      // because of the tool surface above and the per founder cwd.
+      // because of the tool surface above, the per founder cwd, and the
+      // PreToolUse fence registered below.
       allowDangerouslySkipPermissions: true,
       mcpServers: ge.servers,
       resume: opts?.resumeSessionId,
@@ -399,6 +405,7 @@ export class AgentRun {
       hooks: {
         PostToolUse: [{ hooks: [postToolUse(hookDeps) as never] }],
         PreCompact: [{ hooks: [preCompact(hookDeps) as never] }],
+        PreToolUse: [{ hooks: [preToolUse(hookDeps) as never] }],
       },
       // env REPLACES the subprocess environment rather than merging with it,
       // which is the point: nothing on the VM leaks in.

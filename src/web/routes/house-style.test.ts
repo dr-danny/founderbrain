@@ -304,6 +304,17 @@ const FILES: FilesState = {
       track: "both",
     },
   ],
+  uploadRows: [
+    {
+      name: "uploads/last-newsletter.docx",
+      gateLabel: "-",
+      status: "ok",
+      sizeBytes: 22140,
+      changedAt: "2026-09-20T10:00:00Z",
+      kind: "other",
+      track: "both",
+    },
+  ],
 };
 
 /**
@@ -399,7 +410,13 @@ test("THE LOADED SCREENS REALLY ARE LOADED, so the two tests above are reading t
   // above still claims the screen is checked. Each phrase below exists only in the branch
   // that renders after the data has arrived.
   const mustCarry: Readonly<Record<string, readonly string[]>> = {
-    "files, with files in it": ["Take everything", "Download everything", "founder-brain.md"],
+    "files, with files in it": [
+      "Take everything",
+      "Download everything",
+      "founder-brain.md",
+      "What you brought in yourself",
+      "last-newsletter.docx",
+    ],
     "gates, B2C, with progress on it": ["Open the form", "You sent this one on", "Next:"],
     "gates, B2B, with progress on it": ["Open the form", "Next:"],
     "gates, no track yet": ["Two of the three are the same for everybody", "Next:"],

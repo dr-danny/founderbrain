@@ -47,14 +47,7 @@ import { geFile, geFileVersion } from '../db/schema.ts';
 import { putBlob } from './blobs.ts';
 import { sha256Hex, type DataKey } from './crypto.ts';
 import type { MaterialisedSet } from './materialise.ts';
-import {
-  geHome,
-  isExcludedPath,
-  LIMIT_FILE_BYTES,
-  LIMIT_FILE_COUNT,
-  LIMIT_TOTAL_BYTES,
-  relFromGeHome,
-} from './paths.ts';
+import { geHome, isExcludedPath, relFromGeHome, storageLimits } from './paths.ts';
 
 /** How deep the walk goes. growth-engine/ is two levels; ten is a runaway guard. */
 const MAX_DEPTH = 10;
@@ -146,6 +139,7 @@ interface DiskFile {
 async function walk(founderId: string): Promise<DiskFile[]> {
   const home = geHome(founderId);
   const found: DiskFile[] = [];
+  const limits = storageLimits();
 
   async function descend(dir: string, depth: number): Promise<void> {
     if (depth > MAX_DEPTH) return;
@@ -191,11 +185,11 @@ async function walk(founderId: string): Promise<DiskFile[]> {
         );
       }
       if (isExcludedPath(rel)) continue;
-      if (info.size > LIMIT_FILE_BYTES) {
+      if (info.size > limits.fileBytes) {
         throw new HarvestRefused(
           'file_too_large',
           rel,
-          `${rel} is ${info.size} bytes and the limit is ${LIMIT_FILE_BYTES}.`,
+          `${rel} is ${info.size} bytes and the limit is ${limits.fileBytes}.`,
         );
       }
       const bytes = await readFile(abs);
@@ -292,20 +286,21 @@ export async function planHarvest(
   const { founderId, materialised, version } = args;
 
   const onDisk = await walk(founderId);
+  const limits = storageLimits();
 
-  if (onDisk.length > LIMIT_FILE_COUNT) {
+  if (onDisk.length > limits.fileCount) {
     throw new HarvestRefused(
       'too_many_files',
       String(onDisk.length),
-      `the folder holds ${onDisk.length} files and the limit is ${LIMIT_FILE_COUNT}.`,
+      `the folder holds ${onDisk.length} files and the limit is ${limits.fileCount}.`,
     );
   }
   const totalBytes = onDisk.reduce((n, f) => n + f.size, 0);
-  if (totalBytes > LIMIT_TOTAL_BYTES) {
+  if (totalBytes > limits.totalBytes) {
     throw new HarvestRefused(
       'folder_too_large',
       String(totalBytes),
-      `the folder holds ${totalBytes} bytes and the limit is ${LIMIT_TOTAL_BYTES}.`,
+      `the folder holds ${totalBytes} bytes and the limit is ${limits.totalBytes}.`,
     );
   }
 
