@@ -28,11 +28,16 @@
  * there, so their columns are derived from what sections 4, 6 and 7 say they hold.
  * Each of those carries a comment naming the section it came from.
  *
- * ONE TABLE IS IN NEITHER LIST, and it is named here rather than left to be found.
+ * TWO TABLES ARE IN NEITHER LIST, and both are named here rather than left to be found.
  * `mentor_requests` is not in the build document. Section 6 describes the screen it
  * serves ("The second writes into a mentor queue") and never says where that queue
  * lives, and the answer it was given was a log line. The table is what makes the
  * sentence on that screen true. Its own comment carries the reasoning.
+ *
+ * `storage_limit_overrides` is also not in the build document: it is what lets the
+ * owner set their own three storage limits from the Setup screen, in front of
+ * `storage/paths.ts`'s `storageLimits()`, which predates it. Its own comment carries
+ * the reasoning.
  *
  * NAMING NOTE. Section 5's DDL says `create table founder` (singular) and its prose
  * says `founders.track`. The SQL wins, because it is the part that has to compile.
@@ -785,6 +790,52 @@ export const publishBatches = pgTable(
   (t) => [index('publish_batches_founder_idx').on(t.founderId, t.createdAt)],
 );
 
+// ---------------------------------------------------------------------------
+// Storage limits. Not in the build doc: added for the Setup screen that lets
+// the owner set their own three storage limits, in front of storage/paths.ts.
+// ---------------------------------------------------------------------------
+
+/**
+ * One settings row, for the whole app, never one per founder.
+ *
+ * This is app configuration, not founder data. `storage/paths.ts`'s `storageLimits()`
+ * already resolves these three numbers from an env override or from what the host
+ * detects; this table adds a third, higher-precedence source — the owner's own choice
+ * on the Setup screen — and it is a property of the deployment, not of any one founder
+ * in it. Reusing `founder_id` here the way every other table does would say the
+ * opposite: that a second founder could set their own separate ceiling on the one disk
+ * they all share.
+ *
+ * `id` is pinned to the single literal `'owner'` by a CHECK in the migration, so a
+ * fresh row can never be inserted under a different key. A settings module that reads
+ * "the" row by primary key must never find two, and a broken upsert target is exactly
+ * the kind of bug a CHECK turns into a failed write instead of a row nobody reads.
+ *
+ * EACH LIMIT IS INDEPENDENTLY NULLABLE. Null means "the owner has not set this one",
+ * which falls through to GE_LIMIT_* or to detection exactly as if this row did not
+ * exist. Bytes are stored in the same units `storageLimits()` already returns them in
+ * — plain bytes, not MiB or GiB — so nothing here or in limits-store.ts ever converts.
+ *
+ * bigint, NOT integer: Postgres's `integer` tops out at about 2.1 GB, and this app's
+ * own detection ceiling for total-bytes is 5 GiB (see `CEIL_TOTAL_BYTES` in paths.ts).
+ * An owner asking for more than that gets clamped by limits-store.ts before this row
+ * is ever written, but the raw, unclamped number the owner typed is what is stored —
+ * see limits-store.ts for why — and that number must never overflow the column.
+ *
+ * NO founder_id, AND NO ROW LEVEL SECURITY POLICY, for the same reason `mentor_requests`
+ * carries neither: a policy filters on `app.founder_id` and there is nothing here to
+ * filter on. The guard is the same one that table relies on: nothing a founder reaches
+ * through the ordinary app surface ever queries this table for anyone else's data,
+ * because there is no one else's data in it.
+ */
+export const storageLimitOverrides = pgTable('storage_limit_overrides', {
+  id: text('id').primaryKey().default('owner'),
+  fileBytes: bigint('file_bytes', { mode: 'number' }),
+  totalBytes: bigint('total_bytes', { mode: 'number' }),
+  fileCount: bigint('file_count', { mode: 'number' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Every table, for the migration runner and for tests that truncate. */
 export const allTables = {
   founders,
@@ -807,6 +858,7 @@ export const allTables = {
   connections,
   vendorCalls,
   publishBatches,
+  storageLimitOverrides,
 } as const;
 
 export type Founder = typeof founders.$inferSelect;
@@ -814,4 +866,5 @@ export type NewFounder = typeof founders.$inferInsert;
 export type GeFileRow = typeof geFile.$inferSelect;
 export type GeBlobRow = typeof geBlob.$inferSelect;
 export type GeEventRow = typeof geEvent.$inferSelect;
+export type StorageLimitOverridesRow = typeof storageLimitOverrides.$inferSelect;
 export type MentorRequestRow = typeof mentorRequests.$inferSelect;

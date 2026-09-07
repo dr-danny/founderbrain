@@ -813,3 +813,70 @@ export interface GatesState {
 export function fetchGates(): Promise<Result<GatesState>> {
   return get<GatesState>("/api/gates");
 }
+
+// ---------------------------------------------------------------------------------------
+// Storage limits
+// ---------------------------------------------------------------------------------------
+
+/** Which of `owner`, `config` or `detection` produced the limit actually in force. */
+export type LimitSource = "owner" | "config" | "detection";
+
+/**
+ * One of the three storage limits, as the Setup screen needs to read and explain it.
+ *
+ * `value` is what is enforced right now. `detected` is what this machine would give a
+ * founder who had never touched this screen, kept alongside `value` so the panel can still
+ * say "this machine can hold up to X" after the founder has set their own number. `requested`
+ * and `clamped` exist because a limit that got quietly reduced to something smaller than what
+ * was typed is the single most confusing thing this screen could show without explaining
+ * itself: see Setup.tsx's storage limits panel for where that sentence is written.
+ * `shadowedConfig` is an environment variable's own value, non null only when one exists and
+ * is being overruled by the founder's own choice, so an ignored setting never sits there
+ * invisibly.
+ */
+export interface LimitView {
+  readonly value: number;
+  readonly detected: number;
+  readonly source: LimitSource;
+  readonly requested: number | null;
+  readonly clamped: boolean;
+  readonly shadowedConfig: number | null;
+}
+
+export interface StorageLimits {
+  /** The largest single file the folder will accept, in bytes. */
+  readonly fileBytes: LimitView;
+  /** The largest the whole folder may grow to, in bytes. */
+  readonly totalBytes: LimitView;
+  /** The most files the folder may hold. */
+  readonly fileCount: LimitView;
+}
+
+/**
+ * What the founder is asking to change. Each field is optional: a field left out is left
+ * exactly as it is, and a field sent as `null` clears the founder's own number and returns
+ * that one limit to whatever the environment or this machine would give on its own. Never
+ * send `undefined` for a field the founder just cleared: that is silently a no-op on the
+ * server, and the box would look emptied while the old number kept working underneath it.
+ */
+export interface StorageLimitsInput {
+  readonly fileBytes?: number | null;
+  readonly totalBytes?: number | null;
+  readonly fileCount?: number | null;
+}
+
+/** ASSUMED path. What is enforced right now, for all three limits, and where each came from. */
+export function getLimits(): Promise<Result<StorageLimits>> {
+  return get<StorageLimits>("/api/limits");
+}
+
+/**
+ * ASSUMED path. Saves one or more limits and answers with the true, already clamped result.
+ *
+ * There is never a second request after this one. The server clamps a number this machine
+ * cannot actually honour before it answers, so what comes back is what is really in force,
+ * and the screen renders that rather than the number the founder typed.
+ */
+export function saveLimits(input: StorageLimitsInput): Promise<Result<StorageLimits>> {
+  return post<StorageLimits>("/api/limits", input);
+}

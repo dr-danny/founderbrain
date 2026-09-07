@@ -33,7 +33,9 @@
  *
  * WHAT IT READS AND WRITES
  * Opens the thread, sends messages, interrupts, and holds the SSE connection open. All of
- * it through lib/api.ts and lib/stream.ts.
+ * it through lib/api.ts and lib/stream.ts. It also reads the storage limits, once, to tell
+ * the composer's paperclip how big a file it can accept; a failed read of that leaves the
+ * hover line out rather than touching anything else on the screen.
  */
 
 import { useEffect, useReducer, useRef, useState } from "react";
@@ -41,6 +43,7 @@ import type { ReactElement } from "react";
 import { routeById } from "../../../app/content/routes.ts";
 import {
   fetchThread,
+  getLimits,
   interruptThread,
   openThread,
   saveVoiceSample,
@@ -78,9 +81,27 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
     See `Problem.needs` in lib/api.ts.
   */
   const [openProblem, setOpenProblem] = useState<Problem | null>(null);
+  /*
+    THIS FAILING NEVER TAKES THE COMPOSER DOWN WITH IT. `maxAttachmentBytes` only decorates
+    the paperclip's hover with a size, and a founder who cannot send a message because a
+    second, unrelated read failed would be exactly the kind of screen this app exists to
+    never show. So a failed fetch leaves this null, forever, and the composer simply omits
+    the line rather than showing a stale or wrong number.
+  */
+  const [maxAttachmentBytes, setMaxAttachmentBytes] = useState<number | null>(null);
   const streamRef = useRef<StreamHandle | null>(null);
   const row = routeById(routeId);
   const allowed = mayOpenRoute(routeId, founder.track);
+
+  useEffect(() => {
+    let live = true;
+    void getLimits().then((result) => {
+      if (live && result.ok) setMaxAttachmentBytes(result.value.fileBytes.value);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!allowed) {
@@ -344,6 +365,7 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
           onSend={send}
           onSaveAsFile={saveAsFile}
           onUpload={uploadDocument}
+          maxAttachmentBytes={maxAttachmentBytes}
         />
       </div>
     </div>

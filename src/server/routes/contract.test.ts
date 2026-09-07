@@ -98,11 +98,14 @@ export function callsIn(source: string): readonly Call[] {
   const flat = source.replace(/\$\{[^{}]*\}/g, HOLE);
   const found: Call[] = [];
 
-  // get<T>("/api/x"), getText("/api/x"), post<T>(`/api/x/${y}`), postVoid("/api/x").
-  // getText comes first in the alternation, because `get` would otherwise match
-  // the front of it and then fail on the bracket, and a helper that silently
-  // matches nothing is a call this test cannot see.
-  const viaHelper = /\b(getText|get|post|postVoid)\s*(?:<[^()]*?>)?\(\s*([`"'])([^`"']+)\2/g;
+  // get<T>("/api/x"), getText("/api/x"), post<T>(`/api/x/${y}`), postVoid("/api/x"),
+  // postForm<T>("/api/x", form). getText comes before get, and postForm comes
+  // before post, in the alternation, because each shorter name would otherwise
+  // match the front of the longer one and then fail on the character right
+  // after it — `get` on the bracket that follows `getT`, `post` on the `F` that
+  // follows `post` in `postForm` — and a helper that silently matches nothing
+  // is a call this test cannot see.
+  const viaHelper = /\b(getText|get|postForm|post|postVoid)\s*(?:<[^()]*?>)?\(\s*([`"'])([^`"']+)\2/g;
   for (const m of flat.matchAll(viaHelper)) {
     const helper = m[1] ?? '';
     const raw = m[3] ?? '';

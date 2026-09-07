@@ -215,14 +215,14 @@ function explainTurnRefused(err: TurnRefused): FounderError | null {
 export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
   app.post(
     '/api/uploads',
-    // THE ROUTE'S OWN BODY LIMIT. src/server/index.ts's global `bodyLimit` is
-    // sized for a founder's typed message, not a document, and this route
-    // must not raise that global number for every other route to get a
-    // sensible size here. `storageLimits().fileBytes` is the number that
-    // actually governs what gets saved; the slack on top is multipart's own
-    // framing (boundaries, headers, the field name), which is never more than
-    // a few kilobytes but is real.
-    { bodyLimit: storageLimits().fileBytes + 64 * 1024 },
+    // NOT A REAL LIMIT ON THE UPLOAD, WHICH IS WHY THERE IS NO bodyLimit HERE.
+    // @fastify/multipart registers its own raw-stream content type parser, and
+    // Fastify only enforces bodyLimit inside rawBody(), which runs solely for
+    // parsers with asString or asBuffer set (content-type-parser.js:207-218). A
+    // multipart body never takes that branch, so a bodyLimit set here was never
+    // checked against this route's actual payload: it looked load-bearing and was
+    // not. The real ceiling is `request.file({ limits: { fileSize } })` below,
+    // read fresh on every request rather than fixed once at boot.
     async (request, reply) => {
       if (!(await deps.auth.requireFounder(request, reply))) return reply;
       const founder = deps.auth.founderOf(request);

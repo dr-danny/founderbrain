@@ -103,6 +103,24 @@ a {
   outline-offset: 2px;
 }
 
+/*
+ * Off screen, not off the accessibility tree. `display:none` and `visibility:hidden` both
+ * take an element out of what a screen reader or the tab order can find; this keeps it in
+ * both while leaving nothing for a sighted founder to look at. Used to hide the raw
+ * `<input type="file">` under the attach button that is styled to stand in for it.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 code,
 pre,
 .field-mono {
@@ -434,15 +452,50 @@ pre,
   margin-bottom: 0.35rem;
 }
 
-.composer-text {
-  width: 100%;
-  font: inherit;
-  padding: 0.7rem 0.8rem;
+/*
+ * The border, radius and background used to live on `.composer-text` itself. They moved here
+ * so the paperclip can sit inside the same box as the text rather than beside it: a flex
+ * column with the textarea on top and the attach strip as a second row underneath, which is
+ * what reserves the strip's own space without a magic padding number the textarea has to
+ * remember. `position: relative` lives here, not on the attach control itself, so the
+ * popover anchors to the whole box and always opens above the entire thing, never over text
+ * still being typed a few lines up.
+ */
+.composer-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--paper);
+}
+
+/*
+ * Lights the whole box the moment anything inside it, the textarea or the attach control, is
+ * focused, using the same outline the rest of the app already uses for `:focus-visible`. The
+ * textarea's own native ring is switched off below so a founder sees one box light up rather
+ * than two overlapping rings that do not quite line up.
+ */
+.composer-box:focus-within {
+  border-color: var(--accent);
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer-text {
+  width: 100%;
+  font: inherit;
+  padding: 0.7rem 0.8rem 0.45rem;
+  border: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
   color: var(--ink);
   resize: vertical;
+}
+
+.composer-text:focus-visible {
+  /* The box around it is the visible ring now; see `.composer-box:focus-within` above. */
+  outline: none;
 }
 
 .composer-row {
@@ -468,6 +521,181 @@ pre,
 
 .composer-cap-title {
   font-weight: 700;
+}
+
+/*
+ * The five upload states (uploadingLine, attachedLine, its warnings, TRUNCATED_NOTE,
+ * WRONG_FILE_TYPE) render here, above the box, exactly as before. They stay outside the
+ * popover on purpose: a founder must be able to read "Attached: x.md" without hovering or
+ * tapping anything, and the disabled attach button during an upload fires no mouse events
+ * at all, so the popover would be unreachable at the one moment a founder most wants status.
+ */
+.composer-attach-status-area {
+  margin-bottom: 0.75rem;
+}
+
+.composer-attach-status {
+  margin: 0;
+  color: var(--ink-quiet);
+  font-size: 0.9rem;
+}
+
+.composer-attach-done {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.8rem;
+  background: var(--paper-sunk);
+}
+
+.composer-attach-done p {
+  margin: 0 0 0.4rem;
+}
+
+.composer-attach-warning {
+  color: var(--problem);
+  font-size: 0.85rem;
+}
+
+.composer-attach-failed {
+  border: 1px solid var(--problem);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.8rem;
+  background: var(--problem-bg);
+  color: var(--problem);
+}
+
+.composer-attach-failed p {
+  margin: 0 0 0.5rem;
+}
+
+.composer-attach-failed p:last-child,
+.composer-attach-done p:last-child {
+  margin-bottom: 0;
+}
+
+/*
+ * A row of its own under the textarea, inside the same box, so the strip's height is real
+ * layout space and typed text can never end up underneath the paperclip. Left aligned, which
+ * is where every chat app already puts this.
+ */
+.composer-attach-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.5rem 0.5rem 0.55rem;
+}
+
+.composer-attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.composer-attach-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  color: var(--ink-quiet);
+  cursor: pointer;
+}
+
+.composer-attach-button:hover {
+  color: var(--ink);
+  background: var(--paper-sunk);
+}
+
+.composer-attach-button.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/*
+ * The label itself is not the focused element; the visually hidden input is. This is what
+ * gives the paperclip its own visible ring, distinct from the box glowing via
+ * `:focus-within`, whenever that hidden input is the one actually focused.
+ */
+.composer-attach-input:focus-visible + .composer-attach-button {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer-attach-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.composer-attach-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-quiet);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.composer-attach-info[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.composer-attach-info:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/*
+ * Opens upward and anchors to `.composer-box`, not to the attach control itself, because the
+ * paperclip now sits at the bottom of a box a founder may be typing several lines into. Fixed
+ * to the box means the popover always clears the whole box and everything being typed inside
+ * it, rather than opening a short distance above the paperclip's own position and covering
+ * the text a few lines up in a tall box. Left aligned near the paperclip, so it grows into
+ * the box's own width rather than off the edge of a narrow phone. Hidden with opacity and
+ * `pointer-events: none` rather than `display:none`, so a screen reader can still read it
+ * through `aria-describedby` whether or not it is visually shown.
+ */
+.composer-attach-popover {
+  position: absolute;
+  left: 0.5rem;
+  bottom: calc(100% + 0.5rem);
+  z-index: 20;
+  width: max-content;
+  max-width: 18rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.composer-attach-popover.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.composer-attach-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.composer-attach-popover-list li {
+  font-size: 0.85rem;
+  color: var(--ink-quiet);
 }
 
 .written {
@@ -729,6 +957,21 @@ th {
 .tier-meta {
   color: var(--ink-quiet);
   font-size: 0.9rem;
+}
+
+.limit-row {
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.limit-row:first-of-type {
+  border-top: none;
+  padding-top: 0.5rem;
+}
+
+.limit-row-title {
+  margin: 0 0 0.3rem;
+  font-size: 1.05rem;
 }
 
 .rail-row {

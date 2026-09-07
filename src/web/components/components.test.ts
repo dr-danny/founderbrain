@@ -34,9 +34,13 @@ import { FileList, STATUS_WORDS } from "./FileList.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
 import { StepProgress } from "./StepProgress.tsx";
 import {
+  ACCEPTED_EXTENSIONS_LINE,
   ACCEPTED_UPLOAD_EXTENSIONS,
   ATTACH_HINT,
+  ATTACH_INFO_LABEL,
   ATTACH_LABEL,
+  ATTACH_STORAGE_NOTE,
+  ATTACH_TRIM_NOTE,
   Composer,
   TRUNCATED_NOTE,
   TRY_AGAIN,
@@ -44,6 +48,7 @@ import {
   attachedLine,
   canSend,
   hasAcceptedExtension,
+  maxAttachSizeLine,
   uploadingLine,
 } from "./Composer.tsx";
 import type { UploadState } from "./Composer.tsx";
@@ -203,7 +208,15 @@ test("every extension the attach control offers is accepted, and nothing else is
   }
 });
 
-test("the attach control is on the screen from the start, not behind anything", () => {
+test("the attach button's name survives going icon only, and its popover rides along even though nothing has hovered it yet", () => {
+  // Static markup has no event loop, so "hover" cannot be simulated here. What this proves
+  // instead is the property a screen reader depends on: the popover's words, and the
+  // paperclip's own name, are already in the document the moment the composer renders, not
+  // injected only once something is hovered or focused. ATTACH_LABEL is never drawn on
+  // screen now that the button lives inside the box as a bare icon, so its only appearance
+  // is the visually hidden span carrying its accessible name; screenText finds it there
+  // because it reads text nodes, not the CSS that clips them out of sight. That CSS is a
+  // different layer, and styles.css is not read by this test.
   const text = screenText(
     createElement(Composer, {
       disabled: false,
@@ -213,8 +226,118 @@ test("the attach control is on the screen from the start, not behind anything", 
       onUpload: noopUpload,
     }),
   );
-  assert.ok(text.includes(ATTACH_LABEL));
+  assert.ok(text.includes(ATTACH_LABEL), "an icon only button still needs a name a screen reader can read");
   assert.ok(text.includes(ATTACH_HINT));
+  assert.ok(text.includes(ACCEPTED_EXTENSIONS_LINE), "the popover should list every accepted extension");
+});
+
+test("the attach control lives inside the message box, in a strip under the text, not beside Send", () => {
+  const html = markup(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
+  );
+  const boxAt = html.indexOf('class="composer-box"');
+  const textareaAt = html.indexOf('id="composer-text"', boxAt);
+  const stripAt = html.indexOf('class="composer-attach-strip"', boxAt);
+  const attachAt = html.indexOf("composer-attach-button", boxAt);
+  const rowAt = html.indexOf('class="composer-row"');
+  const sendAt = html.indexOf(">Send<");
+  assert.ok(boxAt > -1, "the message box should exist");
+  assert.ok(
+    textareaAt > boxAt && stripAt > textareaAt,
+    "the text comes first inside the box, the attach strip second, so a long message grows the box rather than running under the paperclip",
+  );
+  assert.ok(
+    attachAt > stripAt && attachAt < rowAt,
+    "the paperclip belongs to the strip inside the box, not to the row Send lives in",
+  );
+  assert.ok(sendAt > rowAt, "Send stays exactly where it was, in its own row below the box");
+});
+
+test("the file input is hidden from view but not from a keyboard or a screen reader", () => {
+  const html = markup(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
+  );
+  // `display:none` and `visibility:hidden` both take an element out of the accessibility
+  // tree; a class that only clips it out of view does not, so the input is styled off
+  // screen with a class rather than either of those.
+  assert.ok(!html.includes("display:none") && !html.includes("display: none"));
+  assert.ok(!html.includes("visibility:hidden") && !html.includes("visibility: hidden"));
+  assert.ok(html.includes('class="composer-attach-input visually-hidden"'));
+  assert.ok(html.includes('type="file"'));
+});
+
+test("the popover is associated with the attach control so a screen reader announces it, and reads as a description rather than a dialog", () => {
+  const html = markup(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
+  );
+  assert.ok(html.includes('id="composer-attach-popover"'));
+  assert.ok(html.includes('aria-describedby="composer-attach-popover"'));
+  assert.ok(html.includes('role="tooltip"'), "a tooltip describes the control next to it; it must not read as a dialog with its own task");
+  assert.ok(html.includes(ATTACH_INFO_LABEL), "a touchscreen has no hover, so a labelled toggle must open the same popover on a tap");
+});
+
+test("the popover explains what happens to an attached file, not only what it accepts", () => {
+  // A founder who does not know an attached file becomes their own saved document, still
+  // readable in a later message, cannot use the feature properly; nothing else on screen
+  // says this, so it has to be here.
+  const text = screenText(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
+  );
+  assert.ok(text.includes(ATTACH_STORAGE_NOTE));
+  assert.ok(text.includes(ATTACH_TRIM_NOTE));
+});
+
+test("the size limit line only appears once the server has actually said what it is", () => {
+  assert.equal(maxAttachSizeLine(null), null, "nothing should be shown before the limit is known");
+  assert.equal(maxAttachSizeLine(20 * 1024 * 1024), "Up to 20 MB.");
+  assert.equal(maxAttachSizeLine(2.5 * 1024 * 1024), "Up to 2.5 MB.", "bytes are never shown; a founder thinks in megabytes");
+
+  const withoutLimit = screenText(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+    }),
+  );
+  assert.ok(!withoutLimit.includes("MB"), "a null limit means the line is left out, not shown as a blank or a zero");
+
+  const withLimit = screenText(
+    createElement(Composer, {
+      disabled: false,
+      placeholder: "Type your answer",
+      onSend: noop,
+      onSaveAsFile: noop,
+      onUpload: noopUpload,
+      maxAttachmentBytes: 25 * 1024 * 1024,
+    }),
+  );
+  assert.ok(withLimit.includes("Up to 25 MB."));
 });
 
 test("Send is blocked for exactly as long as a file is uploading, and for no other reason", () => {
@@ -258,6 +381,11 @@ test("every sentence the attach control can show passes the house style rules", 
   const strings = [
     ATTACH_LABEL,
     ATTACH_HINT,
+    ATTACH_INFO_LABEL,
+    ATTACH_STORAGE_NOTE,
+    ATTACH_TRIM_NOTE,
+    `Files ending in ${ACCEPTED_EXTENSIONS_LINE}.`,
+    maxAttachSizeLine(20 * 1024 * 1024) ?? "",
     WRONG_FILE_TYPE,
     TRY_AGAIN,
     TRUNCATED_NOTE,

@@ -67,7 +67,15 @@ export const EPOCH_FILE = '.ge-epoch';
 // limit that moves mid-process is a bug (a turn refused at byte 40M and accepted at byte
 // 60M with nothing else having changed is not a limit, it is a coin flip). An operator who
 // knows better overrides it through GE_LIMIT_FILE_BYTES, GE_LIMIT_TOTAL_BYTES and
-// GE_LIMIT_FILE_COUNT in src/server/env.ts, and an explicit override always wins.
+// GE_LIMIT_FILE_COUNT in src/server/env.ts.
+//
+// THREE SOURCES NOW, AND THE ORDER IS OWNER, THEN CONFIG, THEN DETECTION. The Setup screen
+// lets the founder who owns this deployment set their own three numbers, and that value
+// beats GE_LIMIT_*, not the other way round. GE_LIMIT_* is how an operator seeds a fresh
+// deployment before anybody has opened it; once the owner changes a limit on a screen inside
+// their own app, a Secret they cannot see or edit from that screen must not go on quietly
+// winning. See applyStoredLimits below for where the owner's value enters, and
+// limits-store.ts for where it is read from and written to Postgres.
 //
 // THE FLOORS ARE THE THREE NUMBERS THIS FILE USED TO HARD-CODE, and detection may only ever
 // raise a limit above them, never lower one. A founder whose growth-engine/ folder already
@@ -76,15 +84,29 @@ export const EPOCH_FILE = '.ge-epoch';
 // after that — including one that deletes nothing and adds one small file — would be
 // refused forever. The floor is the guarantee that detection can only make room, never take
 // it away.
+//
+// THE OWNER DOES NOT GET GE_LIMIT_*'S FREEDOM TO GO BELOW THE FLOOR. An operator who types a
+// number below the floor into a Secret has read the number and decided that. A non-technical
+// owner typing "0" into a form field on the Setup screen has made a mistake, not a decision,
+// and a mistake there must not turn into a folder that refuses its own next save forever.
+// So an owner-set value is clamped on both sides: never below its floor (limits-store.ts may
+// raise that floor above the constant below, to the founder's current usage, so the owner
+// also cannot set a ceiling under what is already on disk), never above what detection says
+// this machine can actually hold.
 // -----------------------------------------------------------------------------------------
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;
 
-/** The three limits in force today, unchanged. See the section header for why they floor. */
-const FLOOR_FILE_BYTES = 2 * MiB;
-const FLOOR_TOTAL_BYTES = 50 * MiB;
-const FLOOR_FILE_COUNT = 400;
+/**
+ * The three limits in force today, unchanged. See the section header for why they floor.
+ *
+ * EXPORTED so limits-store.ts can use the same numbers as the absolute bottom under an
+ * owner-set value, rather than a second copy of "2 MiB" living in two files and drifting.
+ */
+export const FLOOR_FILE_BYTES = 2 * MiB;
+export const FLOOR_TOTAL_BYTES = 50 * MiB;
+export const FLOOR_FILE_COUNT = 400;
 
 /** A ceiling on detection only. An explicit override is not bound by this. */
 const CEIL_FILE_BYTES = 256 * MiB;
@@ -164,32 +186,112 @@ function detectLimits(): DetectedLimits {
   }
 }
 
-/** Where one limit's effective value came from. */
-export type LimitSource = 'config' | 'detection';
+/** Where one limit's effective value came from. 'owner' beats 'config' beats 'detection'. */
+export type LimitSource = 'owner' | 'config' | 'detection';
+
+/**
+ * One limit as the owner asked for it, before it is weighed against this machine.
+ *
+ * `floor` is deliberately not always one of the FLOOR_* constants above. limits-store.ts
+ * raises it to the founder's current usage when it can read that cheaply — see its own
+ * header for why — so this is the floor for THIS write, not the fixed one for every write.
+ * resolveOwnerLimit below still clamps it to at most `ceiling`, so a floor that has itself
+ * drifted above what this machine now detects can never produce an inverted range.
+ */
+export interface StoredLimitRequest {
+  /** What the owner typed, unclamped, kept even when it makes no sense. */
+  readonly requested: number;
+  readonly floor: number;
+}
+
+/**
+ * What a settings screen needs to say "we set this to X, which is as high as this machine
+ * goes" rather than silently substituting a number the owner never sees.
+ */
+export interface LimitOverride {
+  /** What the owner typed. Reported as-is even when `value` below had to move away from it. */
+  readonly requested: number;
+  /** What is actually enforced, after clamping to this machine's floor and ceiling. */
+  readonly value: number;
+  /** True when `value` differs from `requested`. */
+  readonly clamped: boolean;
+}
 
 export interface StorageLimits {
-  /** The limit harvest.ts enforces. A config override when one is set, detection otherwise. */
+  /** The limit harvest.ts enforces. The owner's value when one is set, then config, then detection. */
   fileBytes: number;
   totalBytes: number;
   fileCount: number;
   /**
-   * What detection alone would have produced, config override or not. Kept alongside the
-   * effective values so a settings screen can show both: what an operator chose and what
-   * the host would give them if they hadn't.
+   * What detection alone would have produced, whatever else is in force. Kept alongside the
+   * effective values so a settings screen can show both: what is enforced and what the host
+   * would give a founder who had never touched either setting.
    */
   detected: DetectedLimits;
-  /** 'config' when GE_LIMIT_* was set for that limit, 'detection' otherwise. */
+  /** Which of the three sources actually won for that limit. */
   source: { fileBytes: LimitSource; totalBytes: LimitSource; fileCount: LimitSource };
+  /** Non-null exactly when that limit's source is 'owner'. What was asked for versus what is enforced. */
+  owner: {
+    fileBytes: LimitOverride | null;
+    totalBytes: LimitOverride | null;
+    fileCount: LimitOverride | null;
+  };
+  /**
+   * The GE_LIMIT_* value for that limit, ONLY when it is set and is being overridden by the
+   * owner's own choice. Null otherwise, including when no GE_LIMIT_* was ever set. Without
+   * this a Secret that is being silently ignored is indistinguishable, from the settings
+   * screen, from a Secret that was never set at all — and an env var that silently does
+   * nothing is the same invisible-surprise failure as one that silently wins.
+   */
+  shadowedConfig: {
+    fileBytes: number | null;
+    totalBytes: number | null;
+    fileCount: number | null;
+  };
 }
+
+/** No owner override for any of the three. The state before the owner has ever saved one. */
+const NO_STORED_LIMITS: {
+  fileBytes: StoredLimitRequest | null;
+  totalBytes: StoredLimitRequest | null;
+  fileCount: StoredLimitRequest | null;
+} = { fileBytes: null, totalBytes: null, fileCount: null };
+
+let storedLimitInputs = NO_STORED_LIMITS;
 
 let cachedLimits: StorageLimits | undefined;
 
 /**
+ * Turn one owner-requested value into what actually governs a turn, against this machine's
+ * detected ceiling for that limit.
+ *
+ * NEVER THROWS ON A BAD NUMBER, matching detectLimits()'s own contract: a non-finite,
+ * negative or zero value — a corrupt row, a bug upstream, a hand-edited database — becomes
+ * the floor rather than propagating NaN into every size check that reads this limit
+ * afterwards. `requested` still reports the raw value exactly as it came in, so a settings
+ * screen can show what was actually typed even when it made no sense.
+ */
+function resolveOwnerLimit(input: StoredLimitRequest | null, ceiling: number): LimitOverride | null {
+  if (input === null) return null;
+  const { requested } = input;
+  // min, not the raw floor: a floor limits-store.ts raised to current usage could in
+  // principle sit above what this machine detects right now, and clamp() below requires
+  // floor <= ceiling to mean anything.
+  const floor = Math.min(input.floor, ceiling);
+  const safeRequested = Number.isFinite(requested) && requested > 0 ? requested : floor;
+  const value = Math.round(clamp(safeRequested, floor, ceiling));
+  return Object.freeze({ requested, value, clamped: value !== requested });
+}
+
+/**
  * The three storage limits harvest.ts enforces, detected from the host at first call and
- * cached for the life of the process. An explicit GE_LIMIT_* override wins outright,
- * including when it is set below the floor: an operator who types a small number has
- * decided that, and this file does not second-guess it. Detection alone never goes below
- * the floor — see the section header above for why.
+ * cached for the life of the process. Precedence is owner, then GE_LIMIT_*, then detection.
+ *
+ * A GE_LIMIT_* override wins over detection outright, including when it is set below the
+ * floor: an operator who types a small number into a Secret has decided that, and this file
+ * does not second-guess it. An owner-set value gets no such freedom — see the section header
+ * above for why — and is clamped by resolveOwnerLimit instead. Detection alone never goes
+ * below the floor either way.
  */
 export function storageLimits(): StorageLimits {
   if (cachedLimits) return cachedLimits;
@@ -197,9 +299,16 @@ export function storageLimits(): StorageLimits {
   const detected = detectLimits();
   const config = lateSettings();
 
-  const fileBytes = config.limitFileBytes ?? detected.fileBytes;
-  const totalBytes = config.limitTotalBytes ?? detected.totalBytes;
-  const fileCount = config.limitFileCount ?? detected.fileCount;
+  const ownerFileBytes = resolveOwnerLimit(storedLimitInputs.fileBytes, detected.fileBytes);
+  const ownerTotalBytes = resolveOwnerLimit(storedLimitInputs.totalBytes, detected.totalBytes);
+  const ownerFileCount = resolveOwnerLimit(storedLimitInputs.fileCount, detected.fileCount);
+
+  const fileBytes = ownerFileBytes?.value ?? config.limitFileBytes ?? detected.fileBytes;
+  const totalBytes = ownerTotalBytes?.value ?? config.limitTotalBytes ?? detected.totalBytes;
+  const fileCount = ownerFileCount?.value ?? config.limitFileCount ?? detected.fileCount;
+
+  const sourceOf = (owner: LimitOverride | null, configValue: number | undefined): LimitSource =>
+    owner !== null ? 'owner' : configValue !== undefined ? 'config' : 'detection';
 
   cachedLimits = Object.freeze({
     fileBytes,
@@ -207,12 +316,44 @@ export function storageLimits(): StorageLimits {
     fileCount,
     detected: Object.freeze({ ...detected }),
     source: Object.freeze({
-      fileBytes: (config.limitFileBytes !== undefined ? 'config' : 'detection') as LimitSource,
-      totalBytes: (config.limitTotalBytes !== undefined ? 'config' : 'detection') as LimitSource,
-      fileCount: (config.limitFileCount !== undefined ? 'config' : 'detection') as LimitSource,
+      fileBytes: sourceOf(ownerFileBytes, config.limitFileBytes),
+      totalBytes: sourceOf(ownerTotalBytes, config.limitTotalBytes),
+      fileCount: sourceOf(ownerFileCount, config.limitFileCount),
+    }),
+    owner: Object.freeze({ fileBytes: ownerFileBytes, totalBytes: ownerTotalBytes, fileCount: ownerFileCount }),
+    shadowedConfig: Object.freeze({
+      fileBytes: ownerFileBytes !== null && config.limitFileBytes !== undefined ? config.limitFileBytes : null,
+      totalBytes: ownerTotalBytes !== null && config.limitTotalBytes !== undefined ? config.limitTotalBytes : null,
+      fileCount: ownerFileCount !== null && config.limitFileCount !== undefined ? config.limitFileCount : null,
     }),
   });
   return cachedLimits;
+}
+
+/**
+ * PRODUCTION SEAM for the owner's own stored choice. `__setStorageDetectionForTest` above
+ * exists to swap what the HOST looks like, for a test; this exists to swap what the OWNER
+ * asked for, for real, and the two must stay separate or a test that only meant to fake the
+ * disk would also silently carry a stale owner override into the next one.
+ *
+ * limits-store.ts calls this after every write to the settings row, and once at boot to
+ * restore whatever was chosen before the last restart. Setting the override AND clearing
+ * cachedLimits happen in the same call, deliberately: the entire feature this exists for is
+ * "the very next storageLimits() call sees the new value", and a caller that could set the
+ * input without also invalidating, or invalidate without supplying the new input, is a
+ * caller that can forget the half that matters. There is no separate invalidate-only export
+ * for exactly that reason.
+ *
+ * Pass null for a limit to clear its override, falling back to GE_LIMIT_* or detection
+ * exactly as if the owner had never set one.
+ */
+export function applyStoredLimits(overrides: {
+  fileBytes: StoredLimitRequest | null;
+  totalBytes: StoredLimitRequest | null;
+  fileCount: StoredLimitRequest | null;
+}): void {
+  storedLimitInputs = { ...overrides };
+  cachedLimits = undefined;
 }
 
 /** A single path segment. Space is allowed; nothing else outside this set is. */
