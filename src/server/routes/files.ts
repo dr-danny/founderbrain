@@ -184,6 +184,12 @@ export function listRowsFor(
    * both of those in parallel with this change.
    */
   uploadRows: readonly FileListRow[];
+  /**
+   * The founder's own writing, kept apart from `uploadRows` because the two
+   * folders mean different things to them: this one taught the Brain their
+   * voice, `uploadRows` never did.
+   */
+  voiceRows: readonly FileListRow[];
 } {
   const visible = held.filter((r) => mayShow(r.path));
   const byPath = new Map(visible.map((r) => [r.path, r]));
@@ -230,6 +236,7 @@ export function listRowsFor(
 
   const stateRows: FileListRow[] = [];
   const uploadRows: FileListRow[] = [];
+  const voiceRows: FileListRow[] = [];
   for (const r of visible) {
     if (named.has(r.path)) continue;
     const row: FileListRow = {
@@ -243,14 +250,17 @@ export function listRowsFor(
     };
     // `.state/` is the toolkit's own bookkeeping. Shown rather than hidden,
     // behind a disclosure, because a folder we hide is a folder they do not own.
-    // `uploads/` is a founder's own document, clearly distinguishable from
-    // everything the app generated, which is `rows` and `stateRows` both.
+    // `uploads/` is a founder's own reference document, and `voice-samples/`
+    // is their own writing: both are clearly distinguishable from everything
+    // the app generated, which is `rows` and `stateRows` both, and from each
+    // other, because one taught the Brain their voice and the other did not.
     if (r.path.startsWith('uploads/')) uploadRows.push(row);
+    else if (r.path.startsWith('voice-samples/')) voiceRows.push(row);
     else if (r.path.startsWith('.state/')) stateRows.push(row);
     else rows.push(row);
   }
 
-  return { rows, stateRows, uploadRows };
+  return { rows, stateRows, uploadRows, voiceRows };
 }
 
 export async function registerFileRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {

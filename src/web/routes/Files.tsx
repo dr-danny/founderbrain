@@ -22,6 +22,11 @@
  * into the list the app wrote. It is first class, the same as everything else here, so it
  * is never behind a disclosure the way `.state/` is.
  *
+ * A FIFTH THING: the Composer lets a founder pick one of two folders when they attach a
+ * file, and the two mean different things. `voice-samples/` is writing that taught the
+ * Brain their voice; `uploads/` is reference material that never did. They get separate
+ * sections here for the same reason they get separate folders on disk.
+ *
  * THE LINE ABOUT THE CHECK IS DELIBERATE, AND SO IS ITS PLACE. `src/server/rules/` reads
  * every file before it is saved and holds one that breaks a rule. It is a word matcher, so
  * it misses things, and a founder who believes it is a guarantee will send something without
@@ -100,6 +105,7 @@ export function Files({ founder }: { readonly founder: Founder }): ReactElement 
   const rows = visibleFileRows(state.rows, founder.track);
   const stateRows = visibleFileRows(state.stateRows, founder.track);
   const uploadRows = visibleFileRows(state.uploadRows, founder.track);
+  const voiceRows = visibleFileRows(state.voiceRows, founder.track);
 
   return (
     <div className="page">
@@ -138,6 +144,26 @@ export function Files({ founder }: { readonly founder: Founder }): ReactElement 
           rows={uploadRows}
           timezone={founder.timezone}
           emptyMessage="You have not attached anything yet."
+        />
+      </section>
+
+      {/*
+        ITS OWN SECTION, SEPARATE FROM "WHAT YOU BROUGHT IN YOURSELF". The two folders mean
+        different things to a founder even though both start as an attachment: a writing
+        sample taught the Brain how they sound, and an upload never did. Mixing the two rows
+        together would tell a founder both did the same job, which is exactly the mistake
+        this split exists to prevent.
+      */}
+      <section className="voice-samples">
+        <h2>Your writing samples</h2>
+        <p className="quiet">
+          These are samples of your own writing you gave us to teach the Brain your voice. They are never
+          treated as reference material, only as an example of how you write.
+        </p>
+        <FileList
+          rows={voiceRows}
+          timezone={founder.timezone}
+          emptyMessage="You have not added any writing samples yet."
         />
       </section>
 
@@ -267,6 +293,7 @@ function useAllowedFileNames(founder: Founder): readonly string[] | null {
         ...visibleFileRows(result.value.rows, founder.track),
         ...visibleFileRows(result.value.stateRows, founder.track),
         ...visibleFileRows(result.value.uploadRows, founder.track),
+        ...visibleFileRows(result.value.voiceRows, founder.track),
       ];
       setNames(rows.map((r) => r.name));
     });

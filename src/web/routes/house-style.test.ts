@@ -315,6 +315,17 @@ const FILES: FilesState = {
       track: "both",
     },
   ],
+  voiceRows: [
+    {
+      name: "voice-samples/onboarding-email.md",
+      gateLabel: "-",
+      status: "ok",
+      sizeBytes: 3120,
+      changedAt: "2026-09-20T10:05:00Z",
+      kind: "markdown",
+      track: "both",
+    },
+  ],
 };
 
 /**
@@ -463,6 +474,8 @@ test("THE LOADED SCREENS REALLY ARE LOADED, so the two tests above are reading t
       "founder-brain.md",
       "What you brought in yourself",
       "last-newsletter.docx",
+      "Your writing samples",
+      "onboarding-email.md",
     ],
     "gates, B2C, with progress on it": ["Open the form", "You sent this one on", "Next:"],
     "gates, B2B, with progress on it": ["Open the form", "Next:"],

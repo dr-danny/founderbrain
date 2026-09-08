@@ -775,6 +775,14 @@ export interface FilesState {
    * shown apart from it, and it is never behind a disclosure the way `.state/` is.
    */
   readonly uploadRows: readonly FileRow[];
+  /**
+   * The founder's own writing samples, uploaded through `uploadVoiceSample`.
+   *
+   * Kept apart from `uploadRows` because the two folders mean different things
+   * to the founder: this one taught the Brain their voice, `uploadRows` never
+   * did, and the screen should say so rather than mix them into one list.
+   */
+  readonly voiceRows: readonly FileRow[];
 }
 
 /** ASSUMED path. */

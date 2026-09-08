@@ -55,6 +55,7 @@ export function friendlyFile(rawPath: unknown): string | null {
   if (known) return known;
   if (afterRoot.startsWith('people/')) return 'one of your people files';
   if (afterRoot.startsWith('voice-samples/')) return 'one of your writing samples';
+  if (afterRoot.startsWith('uploads/')) return 'one of your documents';
   if (afterRoot.startsWith('.state/')) return 'your working notes';
   return null;
 }

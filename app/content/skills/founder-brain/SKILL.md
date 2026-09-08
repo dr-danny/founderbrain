@@ -132,6 +132,8 @@ Three paths. Pick based on what they have. Nobody gets stuck here.
 
 Ask for 10 to 20 samples of anything they have written in their own voice. Posts, emails, newsletters, even long messages. Pasted in, or a file path.
 
+Two folders hold what a founder gives you. `growth-engine/voice-samples/` holds their own writing. Read these for voice, and you may add to this folder yourself. `growth-engine/uploads/` holds reference documents they supplied. Read them for facts, topics and context, never for voice, because they may be AI-generated or written by somebody else.
+
 Read them and extract:
 - Sentence length and rhythm
 - Vocabulary level and any recurring words or phrases
