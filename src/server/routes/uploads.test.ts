@@ -41,46 +41,76 @@ import { assertSafeRelPath } from '../storage/paths.ts';
 // slugForUpload: the name on disk, never the founder's own filename
 // ---------------------------------------------------------------------------
 
-test('AN ORDINARY MESSY FILENAME BECOMES A CLEAN SLUG WITH THE EXTENSION SWAPPED FOR .md', () => {
-  assert.equal(slugForUpload("Sam's Résumé (final!).pdf"), 'sam-s-r-sum-final.md');
+test('AN ORDINARY MESSY FILENAME BECOMES A CLEAN SLUG, WITH THE SOURCE EXTENSION FOLDED IN BEFORE .md', () => {
+  // Folded, not dropped: see slugForUpload's own header for why (notes.docx and
+  // notes.pdf must not both land on notes.md).
+  assert.equal(slugForUpload("Sam's Résumé (final!).pdf", '.md'), 'sam-s-r-sum-final-pdf.md');
 });
 
-test('A NAME WITH NO EXTENSION IS SLUGGED WHOLE, BECAUSE THERE IS NOTHING TO STRIP', () => {
-  assert.equal(slugForUpload('quarterly plan'), 'quarterly-plan.md');
+test('A NAME WITH NO EXTENSION IS SLUGGED WHOLE, BECAUSE THERE IS NOTHING TO STRIP OR FOLD', () => {
+  assert.equal(slugForUpload('quarterly plan', '.md'), 'quarterly-plan.md');
 });
 
 test('A NAME THAT IS ONLY PUNCTUATION OR EMOJI FALLS BACK TO upload.md, NOT AN EMPTY NAME', () => {
-  assert.equal(slugForUpload('😀🎉'), 'upload.md');
-  assert.equal(slugForUpload('...---...'), 'upload.md');
-  assert.equal(slugForUpload(''), 'upload.md');
+  assert.equal(slugForUpload('😀🎉', '.md'), 'upload.md');
+  assert.equal(slugForUpload('...---...', '.md'), 'upload.md');
+  assert.equal(slugForUpload('', '.md'), 'upload.md');
 });
 
 test('A NAME THAT IS ONLY ".." FALLS BACK TO upload.md RATHER THAN NAMING A PARENT DIRECTORY', () => {
-  assert.equal(slugForUpload('..'), 'upload.md');
+  assert.equal(slugForUpload('..', '.md'), 'upload.md');
 });
 
-test('A VERY LONG NAME IS CUT TO 60 CHARACTERS OF SLUG AND STILL ENDS IN .md', () => {
+test('A VERY LONG NAME IS CUT TO 60 CHARACTERS OF SLUG, THEN THE FOLDED EXTENSION, AND STILL ENDS IN .md', () => {
   const name = `${'a'.repeat(500)}.pdf`;
-  const slug = slugForUpload(name);
-  assert.equal(slug, `${'a'.repeat(60)}.md`);
+  const slug = slugForUpload(name, '.md');
+  assert.equal(slug, `${'a'.repeat(60)}-pdf.md`);
+  assert.ok(slug.startsWith('a'.repeat(60)));
   assert.ok(slug.endsWith('.md'));
 });
 
 test('PATH SEPARATORS AND .. INSIDE THE NAME ARE DASHED AWAY, NOT PRESERVED AS STRUCTURE', () => {
-  const slug = slugForUpload('../../etc/passwd.txt');
-  assert.equal(slug, 'etc-passwd.md');
+  const slug = slugForUpload('../../etc/passwd.txt', '.md');
+  assert.equal(slug, 'etc-passwd-txt.md');
   assert.ok(!slug.includes('/'), 'no path separator survives the slug');
   assert.ok(!slug.includes('..'), 'no parent reference survives the slug');
 });
 
-test('A NAME THAT ALREADY ENDS .md IS NOT GIVEN A SECOND EXTENSION', () => {
-  assert.equal(slugForUpload('notes.md'), 'notes.md');
+test('A NAME THAT ALREADY ENDS .md IS NOT GIVEN A SECOND EXTENSION, BECAUSE THE FOLD IS SKIPPED WHEN IT WOULD BE REDUNDANT', () => {
+  assert.equal(slugForUpload('notes.md', '.md'), 'notes.md');
 });
 
 test('A WINDOWS STYLE PATH IN THE NAME IS DASHED AWAY THE SAME AS A POSIX ONE', () => {
-  const slug = slugForUpload('C:\\Users\\sam\\secrets.docx');
-  assert.equal(slug, 'c-users-sam-secrets.md');
+  const slug = slugForUpload('C:\\Users\\sam\\secrets.docx', '.md');
+  assert.equal(slug, 'c-users-sam-secrets-docx.md');
   assert.ok(!slug.includes('\\'));
+});
+
+// ---------------------------------------------------------------------------
+// slugForUpload: the notes.docx / notes.pdf collision that used to overwrite silently
+// ---------------------------------------------------------------------------
+
+test('TWO DIFFERENT SOURCE FORMATS WITH THE SAME NAME NO LONGER COLLIDE AT THE SAME .md FILE', () => {
+  // Before the fold, both of these produced 'notes.md' and the second upload silently
+  // overwrote the first — the exact data loss this fix exists to close.
+  const docxSlug = slugForUpload('notes.docx', '.md');
+  const pdfSlug = slugForUpload('notes.pdf', '.md');
+  assert.notEqual(docxSlug, pdfSlug);
+  assert.equal(docxSlug, 'notes-docx.md');
+  assert.equal(pdfSlug, 'notes-pdf.md');
+});
+
+// ---------------------------------------------------------------------------
+// slugForUpload: passthrough files keep their own extension
+// ---------------------------------------------------------------------------
+
+test('A PASSTHROUGH FILE IS STORED UNDER ITS OWN EXTENSION, LOWER-CASED, NOT .md', () => {
+  assert.equal(slugForUpload('photo.PNG', '.png'), 'photo.png');
+  assert.equal(slugForUpload('scan.pdf', '.pdf'), 'scan.pdf');
+});
+
+test('A PASSTHROUGH FILE STILL GETS A MESSY NAME CLEANED UP, THE SAME AS AN EXTRACTED ONE', () => {
+  assert.equal(slugForUpload('Photo Op!.PNG', '.png'), 'photo-op.png');
 });
 
 /**
@@ -114,7 +144,7 @@ test('EVERY STORED NAME CLEARS assertSafeRelPath UNDER uploads/, FOR THE NASTIES
     'a'.repeat(1000),
   ];
   for (const name of nastyNames) {
-    const stored = slugForUpload(name);
+    const stored = slugForUpload(name, '.md');
     assert.doesNotThrow(
       () => assertSafeRelPath(`uploads/${stored}`),
       `slugForUpload(${JSON.stringify(name)}) produced ${JSON.stringify(stored)}, which assertSafeRelPath refused`,

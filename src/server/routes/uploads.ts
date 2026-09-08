@@ -53,7 +53,7 @@ import type { FastifyInstance } from 'fastify';
 // once, in src/server/index.ts.
 import '@fastify/multipart';
 
-import { extractText, ExtractRefused, type ExtractLimits } from '../uploads/extract.ts';
+import { extractText, ExtractRefused, extensionOf, type ExtractLimits } from '../uploads/extract.ts';
 import { HarvestRefused } from '../storage/harvest.ts';
 import { personSlug, resolveInGeHome, storageLimits } from '../storage/paths.ts';
 import { founderIsBusy, runTurn, TurnRefused } from '../storage/turn.ts';
@@ -112,7 +112,9 @@ const UPLOAD_ERRORS = {
 
 /**
  * The founder's own filename, turned into a name `assertSafeRelPath`'s
- * `SEGMENT_RE` will always accept, and always ending in `.md`.
+ * `SEGMENT_RE` will always accept, and stored under `storedExt` — `.md` for
+ * anything `extractText` extracted, or the founder's own extension (`.png`,
+ * `.pdf`, ...) for anything it passed through instead.
  *
  * `personSlug` is the exact rule `paths.ts` already uses for a person's key:
  * lower case, every character that is not a letter or a digit becomes a dash,
@@ -125,13 +127,35 @@ const UPLOAD_ERRORS = {
  * fallback rather than a refusal, because a weird filename is not a reason to
  * lose an otherwise good upload.
  *
- * The original name is not lost: it goes in the provenance header inside the
- * file, not in the path.
+ * THE SOURCE EXTENSION IS FOLDED INTO THE STEM WHENEVER IT DIFFERS FROM
+ * storedExt, AND THIS IS A DELIBERATE FIX, NOT DECORATION. Every extracted
+ * format collapses to the same `storedExt`, `.md`, regardless of what the
+ * founder uploaded, so `notes.docx` and `notes.pdf` used to both slug to
+ * `notes.md` — the second upload silently overwrote the first, with no error
+ * and no warning anywhere a founder would see it, which is exactly the data
+ * loss `uploads/` exists to prevent. Folding the source extension into the
+ * stem (`notes-docx.md`, `notes-pdf.md`) keeps them apart without adding a
+ * counter or a timestamp, either of which would also turn a founder
+ * re-attaching a corrected version of the SAME file into a second file
+ * instead of a replacement — replacing is the behaviour they actually want
+ * there. When `storedExt` already matches the source extension (an .md
+ * upload staying .md, or any passthrough file, which always keeps its own
+ * extension), the fold is skipped: the extension already appears once in the
+ * final name, and repeating it would only be noise.
+ *
+ * The original name is not lost either way: it goes in the provenance header
+ * inside an extracted file (passthrough files carry no header — see
+ * registerUploadRoutes), not in the path.
  */
-export function slugForUpload(originalName: string): string {
-  const withoutExtension = originalName.replace(/\.[^./\\]+$/, '');
-  const slug = personSlug(withoutExtension);
-  return `${slug.length > 0 ? slug : 'upload'}.md`;
+export function slugForUpload(originalName: string, storedExt: string): string {
+  const sourceExt = extensionOf(originalName);
+  const stemSource = sourceExt.length > 0 ? originalName.slice(0, -sourceExt.length) : originalName;
+  const baseSlug = personSlug(stemSource);
+  const stem = baseSlug.length > 0 ? baseSlug : 'upload';
+  const sourceLabel = sourceExt.slice(1); // 'docx', 'pdf', ... — the dot dropped, already lower-cased by extensionOf
+  const needsFold = sourceLabel.length > 0 && sourceExt !== storedExt;
+  const finalStem = needsFold ? `${stem}-${sourceLabel}` : stem;
+  return `${finalStem}${storedExt}`;
 }
 
 /**
@@ -278,12 +302,10 @@ export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps
       }
 
       const originalName = part.filename;
-      const storedName = slugForUpload(originalName);
-      const path = `${UPLOADS_PREFIX}${storedName}`;
 
-      let extracted;
+      let outcome;
       try {
-        extracted = await extractText({ filename: originalName, bytes, limits: EXTRACT_LIMITS });
+        outcome = await extractText({ filename: originalName, bytes, limits: EXTRACT_LIMITS });
       } catch (err) {
         if (err instanceof ExtractRefused) {
           const refused: FounderError = { status: 422, code: `extract_${err.reason}`, message: err.founderText };
@@ -292,9 +314,36 @@ export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps
         throw err;
       }
 
-      const uploadedOn = deps.clock.now().toISOString().slice(0, 10);
-      const header = provenanceHeader({ originalName, uploadedOn, warnings: extracted.warnings });
-      const finalText = `${header}${extracted.text}`;
+      // The stored extension is the one place the three-way decision reaches this
+      // route: '.md' for anything extracted, the founder's own extension for anything
+      // passed through. `slugForUpload` folds the source extension into the stem when
+      // (and only when) that differs from storedExt — see its own header for why.
+      const storedExt = outcome.action === 'extract' ? '.md' : outcome.ext;
+      const storedName = slugForUpload(originalName, storedExt);
+      const path = `${UPLOADS_PREFIX}${storedName}`;
+
+      // What gets written to disk, and what the founder reads back in the response,
+      // decided once here from `outcome` alone. PASSTHROUGH writes the founder's own
+      // bytes untouched — no provenance header, because there is nowhere to put one
+      // inside a PNG, and no extraction, because there is nothing in an image or a
+      // scanned PDF for this route to have extracted.
+      let fileContents: Buffer | string;
+      let responseBody: { sizeBytes: number; chars: number; warnings: readonly string[]; truncated: boolean };
+      if (outcome.action === 'extract') {
+        const uploadedOn = deps.clock.now().toISOString().slice(0, 10);
+        const header = provenanceHeader({ originalName, uploadedOn, warnings: outcome.result.warnings });
+        const finalText = `${header}${outcome.result.text}`;
+        fileContents = finalText;
+        responseBody = {
+          sizeBytes: Buffer.byteLength(finalText, 'utf8'),
+          chars: outcome.result.text.length,
+          warnings: outcome.result.warnings,
+          truncated: outcome.result.truncated,
+        };
+      } else {
+        fileContents = bytes;
+        responseBody = { sizeBytes: bytes.byteLength, chars: 0, warnings: [], truncated: false };
+      }
 
       let committed;
       try {
@@ -312,7 +361,11 @@ export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps
           async (turn) => {
             const abs = resolveInGeHome(turn.founderId, path);
             await mkdir(dirname(abs), { recursive: true });
-            await writeFile(abs, finalText, 'utf8');
+            if (typeof fileContents === 'string') {
+              await writeFile(abs, fileContents, 'utf8');
+            } else {
+              await writeFile(abs, fileContents);
+            }
           },
         );
       } catch (err) {
@@ -350,13 +403,7 @@ export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps
         return reply.code(UPLOAD_ERRORS.heldByGate.status).send(errorBody(UPLOAD_ERRORS.heldByGate));
       }
 
-      return reply.code(201).send({
-        name: path,
-        sizeBytes: Buffer.byteLength(finalText, 'utf8'),
-        chars: extracted.text.length,
-        warnings: extracted.warnings,
-        truncated: extracted.truncated,
-      });
+      return reply.code(201).send({ name: path, ...responseBody });
     },
   );
 }

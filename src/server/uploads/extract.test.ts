@@ -18,7 +18,21 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { strToU8, zipSync } from 'fflate';
-import { ExtractRefused, extractText, type ExtractLimits } from './extract.ts';
+import { ExtractRefused, extractText, type ExtractLimits, type ExtractOutcome, type ExtractResult } from './extract.ts';
+
+/** Unwraps an `extract` outcome, failing loudly if extractText decided to pass the bytes through instead. */
+function extractedOf(outcome: ExtractOutcome): ExtractResult {
+  assert.equal(outcome.action, 'extract', `expected an extracted result, got action "${outcome.action}"`);
+  if (outcome.action !== 'extract') throw new Error('unreachable');
+  return outcome.result;
+}
+
+/** Unwraps a `passthrough` outcome's extension, failing loudly if extractText decided to extract text instead. */
+function passthroughExtOf(outcome: ExtractOutcome): string {
+  assert.equal(outcome.action, 'passthrough', `expected a passthrough result, got action "${outcome.action}"`);
+  if (outcome.action !== 'passthrough') throw new Error('unreachable');
+  return outcome.ext;
+}
 
 /** Generous enough that nothing here trips a bound by accident, unless the test says so. */
 const LIMITS: ExtractLimits = {
@@ -112,11 +126,12 @@ async function refusalOf(promise: Promise<unknown>): Promise<ExtractRefused> {
 
 describe('extractText: plain text formats', () => {
   it('reads a .md file as markdown', async () => {
-    const result = await extractText({
+    const outcome = await extractText({
       filename: 'notes.md',
       bytes: Buffer.from('# Hello\n\nWorld', 'utf8'),
       limits: LIMITS,
     });
+    const result = extractedOf(outcome);
     assert.equal(result.kind, 'markdown');
     assert.equal(result.text, '# Hello\n\nWorld');
     assert.equal(result.truncated, false);
@@ -124,31 +139,37 @@ describe('extractText: plain text formats', () => {
   });
 
   it('reads a .txt file as text', async () => {
-    const result = await extractText({
+    const outcome = await extractText({
       filename: 'notes.txt',
       bytes: Buffer.from('plain text', 'utf8'),
       limits: LIMITS,
     });
+    const result = extractedOf(outcome);
     assert.equal(result.kind, 'text');
     assert.equal(result.text, 'plain text');
   });
 
   it('reads a .csv file unchanged', async () => {
-    const result = await extractText({
+    const outcome = await extractText({
       filename: 'leads.csv',
       bytes: Buffer.from('name,email\nAda,ada@example.com', 'utf8'),
       limits: LIMITS,
     });
+    const result = extractedOf(outcome);
     assert.equal(result.kind, 'csv');
     assert.equal(result.text, 'name,email\nAda,ada@example.com');
   });
 
-  it('refuses invalid UTF-8 in a .txt file', async () => {
-    const refused = await refusalOf(
-      extractText({ filename: 'bad.txt', bytes: Buffer.from([0xff, 0xfe, 0xfd]), limits: LIMITS }),
-    );
-    assert.equal(refused.reason, 'invalid-utf8');
-    assert.match(refused.founderText, /utf-8/i);
+  it('falls back to windows-1252 for a .txt file with Word smart quotes, instead of refusing it', async () => {
+    // 0x93/0x94 are the left and right curly double quotes and 0x96 an en dash in
+    // windows-1252 — invalid as UTF-8, but exactly the bytes Word on Windows writes for
+    // "smart quotes" in a plain .txt save. This used to be refused as invalid-utf8; a
+    // founder's real writing sample must not be turned away for it.
+    const bytes = Buffer.from([
+      0x93, 0x53, 0x6d, 0x61, 0x72, 0x74, 0x94, 0x20, 0x96, 0x20, 0x51, 0x75, 0x6f, 0x74, 0x65, 0x73,
+    ]);
+    const result = extractedOf(await extractText({ filename: 'memo.txt', bytes, limits: LIMITS }));
+    assert.equal(result.text, '“Smart” – Quotes');
   });
 
   it('refuses an unknown extension, naming the supported kinds', async () => {
@@ -158,14 +179,17 @@ describe('extractText: plain text formats', () => {
     assert.equal(refused.reason, 'unsupported-extension');
     assert.match(refused.founderText, /\.docx/);
     assert.match(refused.founderText, /\.pdf/);
+    assert.match(refused.founderText, /\.png/);
   });
 
   it('truncates at maxChars and appends a note, without throwing', async () => {
-    const result = await extractText({
-      filename: 'long.txt',
-      bytes: Buffer.from('abcdefghij', 'utf8'),
-      limits: { ...LIMITS, maxChars: 4 },
-    });
+    const result = extractedOf(
+      await extractText({
+        filename: 'long.txt',
+        bytes: Buffer.from('abcdefghij', 'utf8'),
+        limits: { ...LIMITS, maxChars: 4 },
+      }),
+    );
     assert.equal(result.truncated, true);
     assert.ok(result.text.startsWith('abcd'));
     assert.match(result.text, /cut short/);
@@ -175,7 +199,7 @@ describe('extractText: plain text formats', () => {
 describe('extractText: .docx', () => {
   it('converts a minimal docx to markdown', async () => {
     const bytes = buildDocx('<w:p><w:r><w:t>Hello world</w:t></w:r></w:p>');
-    const result = await extractText({ filename: 'letter.docx', bytes, limits: LIMITS });
+    const result = extractedOf(await extractText({ filename: 'letter.docx', bytes, limits: LIMITS }));
     assert.equal(result.kind, 'docx');
     assert.match(result.text, /Hello world/);
   });
@@ -214,7 +238,7 @@ describe('extractText: .docx', () => {
 describe('extractText: .xlsx', () => {
   it('renders a visible sheet as a markdown pipe table', async () => {
     const bytes = buildXlsx();
-    const result = await extractText({ filename: 'leads.xlsx', bytes, limits: LIMITS });
+    const result = extractedOf(await extractText({ filename: 'leads.xlsx', bytes, limits: LIMITS }));
     assert.equal(result.kind, 'xlsx');
     assert.match(result.text, /## Visible/);
     assert.match(result.text, /\| Name \|/);
@@ -223,7 +247,7 @@ describe('extractText: .xlsx', () => {
 
   it('skips a hidden sheet and warns how many were skipped', async () => {
     const bytes = buildXlsx({ hidden: true });
-    const result = await extractText({ filename: 'leads.xlsx', bytes, limits: LIMITS });
+    const result = extractedOf(await extractText({ filename: 'leads.xlsx', bytes, limits: LIMITS }));
     assert.doesNotMatch(result.text, /Hidden/);
     assert.ok(result.warnings.some((w) => /1 hidden sheet/.test(w)));
   });
@@ -234,7 +258,9 @@ describe('extractText: .xlsx', () => {
       (_unused, i) => `<row r="${i + 3}"><c r="A${i + 3}" t="s"><v>1</v></c></row>`,
     ).join('');
     const bytes = buildXlsx({ extraRows });
-    const result = await extractText({ filename: 'leads.xlsx', bytes, limits: { ...LIMITS, maxRows: 2 } });
+    const result = extractedOf(
+      await extractText({ filename: 'leads.xlsx', bytes, limits: { ...LIMITS, maxRows: 2 } }),
+    );
     assert.equal(result.truncated, true);
     assert.ok(result.warnings.some((w) => /cut off after 2 rows/.test(w)));
     assert.match(result.text, /cut off/);
@@ -244,7 +270,7 @@ describe('extractText: .xlsx', () => {
 describe('extractText: .pptx', () => {
   it('renders one markdown section per slide, in order', async () => {
     const bytes = buildPptx({ slideTexts: ['First slide', 'Second slide'] });
-    const result = await extractText({ filename: 'deck.pptx', bytes, limits: LIMITS });
+    const result = extractedOf(await extractText({ filename: 'deck.pptx', bytes, limits: LIMITS }));
     assert.equal(result.kind, 'pptx');
     const firstAt = result.text.indexOf('First slide');
     const secondAt = result.text.indexOf('Second slide');
@@ -255,7 +281,7 @@ describe('extractText: .pptx', () => {
 
   it('skips speaker notes and warns they were skipped', async () => {
     const bytes = buildPptx({ slideTexts: ['Only slide'], withNotes: true });
-    const result = await extractText({ filename: 'deck.pptx', bytes, limits: LIMITS });
+    const result = extractedOf(await extractText({ filename: 'deck.pptx', bytes, limits: LIMITS }));
     assert.doesNotMatch(result.text, /pricing/);
     assert.ok(result.warnings.some((w) => /speaker notes/.test(w)));
   });
@@ -264,14 +290,14 @@ describe('extractText: .pptx', () => {
 describe('extractText: .pdf', () => {
   it('reads the text layer of a real PDF page', async () => {
     const bytes = buildTextPdf('Hello world');
-    const result = await extractText({ filename: 'memo.pdf', bytes, limits: LIMITS });
+    const result = extractedOf(await extractText({ filename: 'memo.pdf', bytes, limits: LIMITS }));
     assert.equal(result.kind, 'pdf');
     assert.match(result.text, /Hello world/);
     assert.match(result.text, /## Page 1/);
     assert.equal(result.truncated, false);
   });
 
-  it('refuses a PDF with no extractable text as a likely scanned document', async () => {
+  it('passes a PDF with no extractable text through as raw bytes, rather than refusing it', async () => {
     // A syntactically valid, single blank page: a real page dictionary with an empty
     // content stream and no font resources, which is what pdfjs sees for a page that
     // is really just a raster image while still opening as a well-formed PDF. Building
@@ -279,9 +305,75 @@ describe('extractText: .pdf', () => {
     // keeps this fixture in-process, at the cost of only proving the "well-formed but
     // textless" branch and not "PDF that actually embeds a page image".
     const bytes = buildBlankPdf();
-    const refused = await refusalOf(extractText({ filename: 'scan.pdf', bytes, limits: LIMITS }));
-    assert.equal(refused.reason, 'scanned-pdf');
-    assert.match(refused.founderText, /scanned/);
+    const ext = passthroughExtOf(await extractText({ filename: 'scan.pdf', bytes, limits: LIMITS }));
+    assert.equal(ext, '.pdf');
+  });
+});
+
+describe('extractText: images (passthrough)', () => {
+  const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const JPEG_SIGNATURE = [0xff, 0xd8, 0xff, 0xe0];
+  const GIF_SIGNATURE = Buffer.from('GIF89a', 'ascii');
+  const WEBP_SIGNATURE = Buffer.concat([
+    Buffer.from('RIFF', 'ascii'),
+    Buffer.from([0, 0, 0, 0]),
+    Buffer.from('WEBP', 'ascii'),
+  ]);
+  const PADDING = Buffer.from('rest of the file does not matter to the sniff', 'ascii');
+
+  it('passes a real PNG through untouched, under its own extension', async () => {
+    const bytes = Buffer.concat([Buffer.from(PNG_SIGNATURE), PADDING]);
+    const ext = passthroughExtOf(await extractText({ filename: 'logo.png', bytes, limits: LIMITS }));
+    assert.equal(ext, '.png');
+  });
+
+  it('passes a real JPEG through under .jpg or .jpeg, matching whichever the founder used', async () => {
+    const bytes = Buffer.concat([Buffer.from(JPEG_SIGNATURE), PADDING]);
+    assert.equal(passthroughExtOf(await extractText({ filename: 'photo.jpg', bytes, limits: LIMITS })), '.jpg');
+    assert.equal(passthroughExtOf(await extractText({ filename: 'photo.jpeg', bytes, limits: LIMITS })), '.jpeg');
+  });
+
+  it('passes a real GIF and a real WebP through under their own extensions', async () => {
+    const gifExt = passthroughExtOf(
+      await extractText({ filename: 'chart.gif', bytes: Buffer.concat([GIF_SIGNATURE, PADDING]), limits: LIMITS }),
+    );
+    assert.equal(gifExt, '.gif');
+    const webpExt = passthroughExtOf(
+      await extractText({ filename: 'banner.webp', bytes: Buffer.concat([WEBP_SIGNATURE, PADDING]), limits: LIMITS }),
+    );
+    assert.equal(webpExt, '.webp');
+  });
+
+  it('refuses an image whose bytes do not match its claimed extension', async () => {
+    // Real PNG bytes, uploaded under a .gif name — the sniff must go by the bytes, not
+    // by trusting whatever the extension already claims.
+    const bytes = Buffer.concat([Buffer.from(PNG_SIGNATURE), PADDING]);
+    const refused = await refusalOf(extractText({ filename: 'not-really.gif', bytes, limits: LIMITS }));
+    assert.equal(refused.reason, 'image-signature-mismatch');
+  });
+
+  it('refuses a HEIC photo renamed to .jpg, caught by its magic bytes rather than its extension', async () => {
+    // The ISO-BMFF `ftyp` box: a 4 byte size (arbitrary, not read by the sniff), then the
+    // ASCII box name "ftyp", then a 4 byte brand — "heic" is one of the common brands an
+    // iPhone actually writes. This is exactly what "Photos.app > Duplicate > rename to
+    // .jpg" produces: a file that looks like a JPEG by name and nothing else.
+    const bytes = Buffer.concat([
+      Buffer.from([0x00, 0x00, 0x00, 0x18]),
+      Buffer.from('ftypheic', 'ascii'),
+      PADDING,
+    ]);
+    const refused = await refusalOf(extractText({ filename: 'IMG_4213.jpg', bytes, limits: LIMITS }));
+    assert.equal(refused.reason, 'heic-unsupported');
+    assert.match(refused.founderText, /HEIC/);
+    assert.match(refused.founderText, /Most Compatible|email/i);
+  });
+
+  it('refuses a file honestly named .heic before ever reading its bytes', async () => {
+    const refused = await refusalOf(
+      extractText({ filename: 'IMG_4213.heic', bytes: Buffer.from('whatever'), limits: LIMITS }),
+    );
+    assert.equal(refused.reason, 'heic-unsupported');
+    assert.match(refused.founderText, /HEIC/);
   });
 });
 

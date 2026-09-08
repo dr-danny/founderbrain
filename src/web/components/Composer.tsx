@@ -126,6 +126,11 @@ export const ACCEPTED_UPLOAD_EXTENSIONS: readonly string[] = [
   ".xlsx",
   ".pptx",
   ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
 ];
 
 /** True when the file's own name ends in something the server can read. */
@@ -167,7 +172,7 @@ export const ATTACH_STORAGE_NOTE =
 
 export const ATTACH_TRIM_NOTE = "A very long document may be trimmed. You will be told if that happens.";
 
-export const WRONG_FILE_TYPE = "That kind of file cannot be read yet. Send a Word, Excel, PowerPoint, PDF, text or CSV file instead.";
+export const WRONG_FILE_TYPE = "That kind of file cannot be read yet. Send a Word, Excel, PowerPoint, PDF, text, CSV, or image file instead.";
 export const REMOVE_ATTACHMENT = "Remove";
 export const TRY_AGAIN = "Try again";
 

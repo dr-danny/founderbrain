@@ -1,28 +1,50 @@
 /**
  * src/server/uploads/extract.ts
  *
- * WHAT THIS IS. The one function that turns an uploaded document's bytes into plain
- * Markdown text: `extractText({ filename, bytes, limits })`. It is pure — a Buffer in,
- * a string out or a typed refusal thrown. No filesystem, no network, no database, no
- * knowledge of founders, sessions or storage. Where the bytes came from and where the
- * text goes next is entirely somebody else's job.
+ * WHAT THIS IS. The one function that decides what to do with an uploaded file's
+ * bytes: `extractText({ filename, bytes, limits })`. It is pure — a Buffer in, a
+ * typed outcome out or a typed refusal thrown. No filesystem, no network, no
+ * database, no knowledge of founders, sessions or storage. Where the bytes came
+ * from and where they go next is entirely somebody else's job.
  *
- * WHY IT EXISTS. A founder will paste a résumé, a pitch deck, a spreadsheet of leads
- * into the chat, and the model needs the words, not the file. Every format below is
- * also a way to attack the process reading it: a docx/xlsx/pptx is a zip, and a zip
- * with a small declared size on disk can unpack to gigabytes in memory (a "zip bomb"),
- * or can name an internal part `../../etc/passwd` for a careless unzip implementation
- * to write outside its own folder. A spreadsheet can hide a sheet the founder never
- * scrolled to, and a slide deck can carry speaker notes the founder wrote for
- * themselves, never meaning either to be read by anyone else. A giant PDF can hold a
- * request open until somebody notices. None of that is hypothetical for a function
- * that runs on whatever bytes a stranger uploads, so this file is built to refuse all
- * of it: refuse rather than sanitise, refuse loudly with a plain sentence, and never
- * let a parser's own crash become an unhandled stack trace.
+ * THE THREE-WAY DECISION, KEYED ON FILE TYPE ONLY. `.md .txt .csv .docx .xlsx
+ * .pptx`, and any PDF that has a text layer, are EXTRACTED: turned into Markdown
+ * and returned as text, `{ action: 'extract', result }`. `.png .jpg .jpeg .gif
+ * .webp`, and any PDF with no text layer (a scanned document), are PASSED
+ * THROUGH: this module does nothing to their bytes at all, and returns only
+ * `{ action: 'passthrough', ext }` naming the extension the caller should store
+ * them under — the model's Read tool renders an image, or a PDF page image,
+ * natively, so there is nothing for this file to extract and nothing gained by
+ * refusing. Everything else is REFUSED, thrown as `ExtractRefused`.
  *
- * WHAT CALLS IT. The upload route (somebody else's file), which reads the bytes off
- * the request, decides the limits, and owns whatever provenance header goes in front
- * of the returned text. This module adds no header of its own.
+ * A SCANNED PDF USED TO BE A REFUSAL. It no longer is: "no text layer" is an
+ * ordinary, expected outcome for a photographed or scanned document, not a
+ * malformed one, so it is modelled as a value in `ExtractOutcome` rather than an
+ * exception. `ExtractRefused` stays for what is actually wrong with a file: a
+ * zip bomb, a corrupt archive, a format nobody asked this module to read, or an
+ * image whose bytes do not match what it claims to be.
+ *
+ * WHY IT EXISTS. A founder will paste a résumé, a pitch deck, a spreadsheet of
+ * leads, a screenshot of a competitor's page into the chat, and the model needs
+ * to be able to see it, not to have it turned away. Every extracted format below
+ * is also a way to attack the process reading it: a docx/xlsx/pptx is a zip, and
+ * a zip with a small declared size on disk can unpack to gigabytes in memory (a
+ * "zip bomb"), or can name an internal part `../../etc/passwd` for a careless
+ * unzip implementation to write outside its own folder. A spreadsheet can hide a
+ * sheet the founder never scrolled to, and a slide deck can carry speaker notes
+ * the founder wrote for themselves, never meaning either to be read by anyone
+ * else. A giant PDF can hold a request open until somebody notices. An image
+ * claiming to be a JPEG can actually be an iPhone HEIC photo, which the model's
+ * Read tool cannot open. None of that is hypothetical for a function that runs
+ * on whatever bytes a stranger uploads, so this file is built to refuse all of
+ * it: refuse rather than sanitise, refuse loudly with a plain sentence, and
+ * never let a parser's own crash become an unhandled stack trace.
+ *
+ * WHAT CALLS IT. The upload route (somebody else's file), which reads the bytes
+ * off the request, decides the limits, stores an `extract` outcome's text as
+ * Markdown with its own provenance header in front, and stores a `passthrough`
+ * outcome's bytes exactly as they arrived, under the extension named here. This
+ * module adds no header of its own, to either kind of outcome.
  *
  * READS  nothing but the `bytes` and `limits` it is handed.
  * WRITES nothing. It has no side effects; calling it twice on the same input produces
@@ -36,27 +58,33 @@
  * the XML read out of a spreadsheet or slide deck is regular and narrow enough
  * (sharedStrings, worksheets, slide text runs) that a few targeted regular
  * expressions are less risk than a general purpose XML parser with its own history of
- * entity-expansion attacks.
+ * entity-expansion attacks. No image decoding library is used either: passthrough
+ * images are never decoded here, only sniffed by their first few bytes.
  */
 
 import { unzipSync, strFromU8, type UnzipFileInfo } from 'fflate';
 import * as mammoth from 'mammoth';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-/** The kinds of file this module knows how to turn into text. Used for both dispatch and the unknown-extension refusal message. */
-const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.csv', '.docx', '.xlsx', '.pptx', '.pdf'] as const;
+/** The kinds of file this module turns into Markdown text. A PDF is in this list even though a scanned one is passed through instead — see extractPdf. */
+const EXTRACT_EXTENSIONS = ['.md', '.txt', '.csv', '.docx', '.xlsx', '.pptx', '.pdf'] as const;
+
+/** The kinds of image this module stores unread, verbatim, once their claimed extension is checked against their actual bytes. */
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'] as const;
 
 /** Why extractText refused. Each one pairs with a founderText sentence at the throw site, never a generic one. */
 export type ExtractRefusalReason =
   | 'unsupported-extension'
-  | 'invalid-utf8'
   | 'zip-too-many-entries'
   | 'zip-too-large'
   | 'zip-path-escape'
   | 'zip-corrupt'
-  | 'scanned-pdf'
   | 'timeout'
-  | 'parse-failed';
+  | 'parse-failed'
+  /** The claimed extension is an image, but the bytes are an iPhone HEIC/HEIF photo — by real extension or a renamed one. */
+  | 'heic-unsupported'
+  /** The claimed extension is an image, but the bytes match no known signature for it — not necessarily HEIC, just not what it says it is. */
+  | 'image-signature-mismatch';
 
 /**
  * Thrown instead of returning text whenever a document cannot, or must not, be read.
@@ -91,7 +119,7 @@ export interface ExtractLimits {
   readonly timeoutMs: number;
 }
 
-/** What extractText returns on success. */
+/** What extractText returns for the 'extract' outcome: the text it produced from a document's bytes. */
 export interface ExtractResult {
   readonly text: string;
   readonly kind: 'markdown' | 'text' | 'csv' | 'docx' | 'xlsx' | 'pptx' | 'pdf';
@@ -102,44 +130,69 @@ export interface ExtractResult {
 }
 
 /**
- * Turn an uploaded document's bytes into Markdown (or, for .txt/.csv, plain text
- * carried through unchanged). Dispatches on the filename's extension, lower-cased;
- * everything else about the file — its declared MIME type, whatever a founder named
- * it — is not trusted for anything past that one decision.
+ * What extractText decides to do with a file's bytes: turn them into Markdown text
+ * (`extract`), or leave them exactly as uploaded and only name the extension to store
+ * them under (`passthrough`). A discriminated union rather than two separate return
+ * paths, so a caller cannot read `.result` off a passthrough outcome by mistake — the
+ * compiler narrows on `action` first.
+ */
+export type ExtractOutcome =
+  | { readonly action: 'extract'; readonly result: ExtractResult }
+  | { readonly action: 'passthrough'; readonly ext: string };
+
+/**
+ * Decide what to do with an uploaded file's bytes, dispatching on the filename's
+ * extension, lower-cased; everything else about the file — its declared MIME type,
+ * whatever a founder named it — is not trusted for anything past that one decision,
+ * and for images not even the extension is trusted past a check against the bytes
+ * themselves. See the header comment above for the three-way shape of the result.
  */
 export async function extractText(args: {
   readonly filename: string;
   readonly bytes: Buffer;
   readonly limits: ExtractLimits;
-}): Promise<ExtractResult> {
+}): Promise<ExtractOutcome> {
   const { filename, bytes, limits } = args;
   const ext = extensionOf(filename);
 
   switch (ext) {
     case '.md':
-      return withTimeout(extractPlainText(bytes, 'markdown', limits), limits.timeoutMs);
+      return { action: 'extract', result: await withTimeout(extractPlainText(bytes, 'markdown', limits), limits.timeoutMs) };
     case '.txt':
-      return withTimeout(extractPlainText(bytes, 'text', limits), limits.timeoutMs);
+      return { action: 'extract', result: await withTimeout(extractPlainText(bytes, 'text', limits), limits.timeoutMs) };
     case '.csv':
-      return withTimeout(extractPlainText(bytes, 'csv', limits), limits.timeoutMs);
+      return { action: 'extract', result: await withTimeout(extractPlainText(bytes, 'csv', limits), limits.timeoutMs) };
     case '.docx':
-      return withTimeout(extractDocx(bytes, limits), limits.timeoutMs);
+      return { action: 'extract', result: await withTimeout(extractDocx(bytes, limits), limits.timeoutMs) };
     case '.xlsx':
-      return withTimeout(extractXlsx(bytes, limits), limits.timeoutMs);
+      return { action: 'extract', result: await withTimeout(extractXlsx(bytes, limits), limits.timeoutMs) };
     case '.pptx':
-      return withTimeout(extractPptx(bytes, limits), limits.timeoutMs);
+      return { action: 'extract', result: await withTimeout(extractPptx(bytes, limits), limits.timeoutMs) };
     case '.pdf':
+      // extractPdf itself returns an ExtractOutcome: 'extract' when it found a text
+      // layer, 'passthrough' when it did not (a scanned document — see its own header).
       return withTimeout(extractPdf(bytes, limits), limits.timeoutMs);
+    case '.png':
+    case '.jpg':
+    case '.jpeg':
+    case '.gif':
+    case '.webp':
+      return extractImage(filename, ext, bytes);
+    case '.heic':
+    case '.heif':
+      // Refused by extension alone here, with the same sentence a renamed HEIC gets
+      // from the magic-byte sniff inside extractImage below.
+      throw new ExtractRefused('heic-unsupported', heicFounderText(filename, ext, false));
     default:
       throw new ExtractRefused(
         'unsupported-extension',
-        `We can only read ${SUPPORTED_EXTENSIONS.join(', ')} files right now, and "${filename}" is not one of those.`,
+        `We can read ${EXTRACT_EXTENSIONS.join(', ')} files, or store ${IMAGE_EXTENSIONS.join(', ')} images as they are, and "${filename}" is not one of those.`,
       );
   }
 }
 
 /** The filename's extension, lower-cased, dot included. '' when there isn't one. */
-function extensionOf(filename: string): string {
+export function extensionOf(filename: string): string {
   const dot = filename.lastIndexOf('.');
   if (dot === -1) return '';
   return filename.slice(dot).toLowerCase();
@@ -171,19 +224,57 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 /**
- * Decodes bytes as UTF-8, refusing rather than substituting replacement characters.
- * A file that isn't valid UTF-8 is not the plain text document its extension claims,
- * and silently mangling it into one hides that from everyone downstream.
+ * The 32 code points where windows-1252 differs from Latin-1/ISO-8859-1: 0x80-0x9F holds
+ * printable punctuation there (curly quotes, an en dash and an em dash, the euro sign)
+ * where Latin-1 leaves silent C1 control codes instead. Every other byte, 0x00-0x7F and
+ * 0xA0-0xFF, is already the same Unicode code point under both, so only this range needs a
+ * table. The five gaps (0x81, 0x8D, 0x8F, 0x90, 0x9D) are unassigned in windows-1252 too;
+ * they fall through to U+FFFD below, the same as any other byte this module cannot place.
+ *
+ * Written out by hand rather than left to `new TextDecoder('windows-1252')`: on the Node
+ * build this runs under, that decoder does not throw, but it also does not apply this
+ * mapping — it passes 0x80-0x9F straight through as their own C1 control code points, so a
+ * Word smart quote (0x93) silently becomes an invisible control character instead of the
+ * left double quotation mark it actually is. Checked against `iconv -f WINDOWS-1252`, which
+ * decodes the same byte correctly, so this is this Node build's gap, not a spec question. A
+ * hand-written table has no dependency on which legacy-charset data a given Node binary
+ * happens to have linked in, here or wherever this deploys.
  */
-function decodeStrictUtf8(bytes: Buffer): string {
+const WINDOWS_1252_HIGH: Readonly<Record<number, number>> = {
+  0x80: 0x20ac, 0x82: 0x201a, 0x83: 0x0192, 0x84: 0x201e, 0x85: 0x2026, 0x86: 0x2020,
+  0x87: 0x2021, 0x88: 0x02c6, 0x89: 0x2030, 0x8a: 0x0160, 0x8b: 0x2039, 0x8c: 0x0152,
+  0x8e: 0x017d, 0x91: 0x2018, 0x92: 0x2019, 0x93: 0x201c, 0x94: 0x201d, 0x95: 0x2022,
+  0x96: 0x2013, 0x97: 0x2014, 0x98: 0x02dc, 0x99: 0x2122, 0x9a: 0x0161, 0x9b: 0x203a,
+  0x9c: 0x0153, 0x9e: 0x017e, 0x9f: 0x0178,
+};
+
+/** windows-1252, decoded by hand. See the table above for why this does not go through TextDecoder. */
+function decodeWindows1252(bytes: Buffer): string {
+  let out = '';
+  for (const byte of bytes) {
+    out += String.fromCharCode(byte < 0x80 || byte > 0x9f ? byte : (WINDOWS_1252_HIGH[byte] ?? 0xfffd));
+  }
+  return out;
+}
+
+/**
+ * Decodes bytes as UTF-8, falling back to windows-1252 when that fails.
+ *
+ * WHY THE FALLBACK IS SAFE. `decodeWindows1252` assigns some character to every one of the
+ * 256 possible byte values, so it can never itself fail the way the strict UTF-8 decode
+ * above can — there is no byte sequence this function refuses any more. That is fine here
+ * specifically because only the plain-text formats (.md/.txt/.csv) ever call this function;
+ * .docx/.xlsx/.pptx read their text through mammoth or this module's own XML readers, never
+ * through this one, so a genuinely binary file saved under one of those extensions still
+ * cannot be waved through as "text" by this fallback. The realistic case this exists for is
+ * a .txt saved by Word or Notepad on Windows — smart quotes, an en dash — which is real,
+ * legible cp1252 text that happens to be invalid UTF-8, not an attack.
+ */
+function decodeText(bytes: Buffer): string {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch (err) {
-    throw new ExtractRefused(
-      'invalid-utf8',
-      'This file is not valid UTF-8 text, so we could not read it safely. Re-save it as plain UTF-8 text and try again.',
-      { cause: err },
-    );
+  } catch {
+    return decodeWindows1252(bytes);
   }
 }
 
@@ -207,7 +298,7 @@ async function extractPlainText(
   kind: 'markdown' | 'text' | 'csv',
   limits: ExtractLimits,
 ): Promise<ExtractResult> {
-  const text = decodeStrictUtf8(bytes);
+  const text = decodeText(bytes);
   return capChars(text, kind, limits, []);
 }
 
@@ -585,8 +676,10 @@ async function extractPptx(bytes: Buffer, limits: ExtractLimits): Promise<Extrac
 
 // ---------------------------------------------------------------------------------
 // pdf. pdfjs-dist's text layer only — this module has no renderer and never asks for
-// one, so an image-only ("scanned") PDF yields no text from any page, which is
-// refused with a sentence saying so rather than returned as an empty document.
+// one, so an image-only ("scanned") PDF yields no text from any page. That used to be
+// refused; it is not wrong or malformed, it is simply a PDF with nothing for this
+// module's kind of reading, so it is passed through instead — the model's Read tool
+// renders a PDF page as an image and reads a scanned document that way just fine.
 // ---------------------------------------------------------------------------------
 
 function loadPdf(data: Uint8Array) {
@@ -595,7 +688,7 @@ function loadPdf(data: Uint8Array) {
   return getDocument({ data, verbosity: 0 });
 }
 
-async function extractPdf(bytes: Buffer, limits: ExtractLimits): Promise<ExtractResult> {
+async function extractPdf(bytes: Buffer, limits: ExtractLimits): Promise<ExtractOutcome> {
   // pdfjs refuses a Node Buffer outright ("provide binary data as Uint8Array"), so a
   // plain Uint8Array view over the same memory is handed over instead — no copy.
   const data = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -632,17 +725,97 @@ async function extractPdf(bytes: Buffer, limits: ExtractLimits): Promise<Extract
     }
 
     if (!sawText) {
-      throw new ExtractRefused(
-        'scanned-pdf',
-        'This looks like a scanned document made of page images rather than text, and we can only read text, not pictures. A version with a text layer, or a re-keyed copy, would work instead.',
-      );
+      // No text on any page read: a scanned/photographed document, most likely. This is
+      // the normal, expected shape for that kind of PDF, not a failure, so it is a value
+      // in the result rather than a throw — see ExtractOutcome's own header.
+      return { action: 'passthrough', ext: '.pdf' };
     }
 
     const cutNotes = pagesTruncated
       ? [`only the first ${limits.maxPages} of ${doc.numPages} pages were read; the rest were cut off`]
       : [];
-    return finalize(sections, 'pdf', limits, cutNotes, cutNotes);
+    return { action: 'extract', result: finalize(sections, 'pdf', limits, cutNotes, cutNotes) };
   } finally {
     await task.destroy();
   }
+}
+
+// ---------------------------------------------------------------------------------
+// Images. Never decoded, never opened by anything in this module — only sniffed by
+// their first few bytes, because the model's Read tool already renders png/jpg/jpeg/
+// gif/webp natively and there is nothing here for this module to extract from them.
+// The only job left is making sure the bytes really are what the extension claims,
+// so a mismatch fails inside this route with a plain sentence rather than mid turn
+// inside the model's own tool call.
+// ---------------------------------------------------------------------------------
+
+type ImageKind = 'png' | 'jpeg' | 'gif' | 'webp';
+
+const IMAGE_KIND_BY_EXT: Readonly<Record<string, ImageKind>> = {
+  '.png': 'png',
+  '.jpg': 'jpeg',
+  '.jpeg': 'jpeg',
+  '.gif': 'gif',
+  '.webp': 'webp',
+};
+
+/**
+ * True when `bytes` opens with the ISO-BMFF `ftyp` box naming one of HEIC/HEIF's common
+ * brands. An iPhone's default camera format is HEIC, and a photo renamed to `.jpg` —
+ * "Photos.app > Duplicate" without transcoding, or simply typing a new extension — passes
+ * every check that looks only at the filename, then fails inside the model's Read tool mid
+ * turn. Reading the bytes is the only defence that actually catches that: byte 4 through 7
+ * name the box ("ftyp"), and byte 8 through 11 carry a four letter brand.
+ */
+function looksLikeHeic(bytes: Buffer): boolean {
+  if (bytes.length < 12) return false;
+  if (bytes.toString('ascii', 4, 8) !== 'ftyp') return false;
+  const brand = bytes.toString('ascii', 8, 12);
+  return brand === 'heic' || brand === 'heix' || brand === 'hevc' || brand === 'mif1';
+}
+
+/** The real signature bytes for each image kind this module accepts, checked before the claimed extension is trusted for anything. */
+function matchesImageSignature(bytes: Buffer, kind: ImageKind): boolean {
+  switch (kind) {
+    case 'png':
+      return bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    case 'jpeg':
+      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case 'gif':
+      return bytes.length >= 4 && bytes.toString('ascii', 0, 4) === 'GIF8';
+    case 'webp':
+      return bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+  }
+}
+
+/**
+ * The HEIC refusal sentence, said one of two ways: `disguised` is true when the bytes were
+ * caught by the magic-byte sniff under an extension that is not `.heic`/`.heif` at all (the
+ * dangerous case — the founder likely believes this is a real JPEG or PNG), and false for a
+ * file honestly named `.heic`/`.heif`, which is refused by extension alone before any byte
+ * is read.
+ */
+function heicFounderText(filename: string, ext: string, disguised: boolean): string {
+  const what = disguised
+    ? `"${filename}" is actually an iPhone HEIC photo saved under a ${ext} name, not a real ${ext}`
+    : `"${filename}" is an iPhone HEIC photo`;
+  return (
+    `${what}, and we cannot read HEIC files yet. On an iPhone, turn on Settings, then Camera, ` +
+    'then Formats, then Most Compatible, so new photos save as JPEG instead, or email this one ' +
+    'to yourself first, which converts it along the way.'
+  );
+}
+
+function extractImage(filename: string, ext: string, bytes: Buffer): ExtractOutcome {
+  if (looksLikeHeic(bytes)) {
+    throw new ExtractRefused('heic-unsupported', heicFounderText(filename, ext, true));
+  }
+  const kind = IMAGE_KIND_BY_EXT[ext];
+  if (kind === undefined || !matchesImageSignature(bytes, kind)) {
+    throw new ExtractRefused(
+      'image-signature-mismatch',
+      `This file's bytes do not match a real ${ext} image, so we refused it rather than guess what it actually is. Re-export or re-save it as ${ext} and try again.`,
+    );
+  }
+  return { action: 'passthrough', ext };
 }

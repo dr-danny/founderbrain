@@ -203,7 +203,7 @@ test("every extension the attach control offers is accepted, and nothing else is
     assert.ok(hasAcceptedExtension(`sample${ext}`), `${ext} should be accepted`);
     assert.ok(hasAcceptedExtension(`SAMPLE${ext.toUpperCase()}`), `${ext} should be accepted in any case`);
   }
-  for (const bad of [".exe", ".zip", ".png", ".mp4", ""]) {
+  for (const bad of [".exe", ".zip", ".heic", ".mp4", ""]) {
     assert.ok(!hasAcceptedExtension(`sample${bad}`), `${bad || "no extension"} should be refused`);
   }
 });
