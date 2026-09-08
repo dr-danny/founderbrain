@@ -55,7 +55,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 // It adds no module to the boot graph: src/server/index.ts loads auth/plugin.ts
 // which loads this same file, so nothing new evaluates before loadEnv().
 import { escapeHtml, layout } from '../auth/pages.ts';
+import type { HarvestRefused } from '../storage/harvest.ts';
 import type { Logger } from './ports.ts';
+
+/** The subset of `HarvestRefused.code` this file decides how to explain. */
+type HarvestRefusedCode = HarvestRefused['code'];
 
 export interface FounderError {
   readonly status: number;
@@ -155,7 +159,74 @@ export const ERRORS = {
     message:
       'Something on our side went wrong. Nothing you have made is affected. Try again, and tell a mentor if it happens twice.',
   },
+  /**
+   * The folder holds more bytes than the current limit allows. NOT a fault:
+   * the request was understood and the save itself worked right up until the
+   * limit said no, so this is 422, the same status `uploads.ts` already uses
+   * for `extract_*` and `upload_held`. See `explainHarvestRefused` below for
+   * where this is chosen over the generic fault message.
+   */
+  folderTooLarge: {
+    status: 422,
+    code: 'folder_too_large',
+    message:
+      'Your folder has reached its storage limit. Nothing you have made is lost. Delete files you no longer need, or raise the limit on the Setup screen.',
+  },
+  /** Same situation, a count instead of a size. See folderTooLarge above. */
+  tooManyFiles: {
+    status: 422,
+    code: 'too_many_files',
+    message:
+      'Your folder now holds more files than the current limit allows. Nothing you have made is lost. Delete files you no longer need, or raise the limit on the Setup screen.',
+  },
 } as const satisfies Record<string, FounderError>;
+
+/**
+ * The founder facing explanation for a `HarvestRefused`, or null when there
+ * is not a better sentence than whatever the caller already says.
+ *
+ * WHY ONLY TWO CODES GET A SENTENCE HERE, AND IT IS A CHOICE, NOT AN
+ * OVERSIGHT. `folder_too_large` and `too_many_files` are the founder running
+ * into a limit they can see and move, on the Setup screen. Their folder is
+ * exactly what they left it: nothing is lost, and "delete something or raise
+ * the limit" is true, specific advice.
+ *
+ * Every other code means the folder is in a shape the app did not expect,
+ * which the founder did not choose and cannot fix themselves:
+ *   `symlink`, `not_a_file`   something on disk that no code path here writes.
+ *   `unexplained_absence`     a row in the database with nothing to match it.
+ *   `bad_path`                a name the storage layer will not accept.
+ *   `file_too_large`          one file over the per file limit, not the whole
+ *                             folder; today's callers have no branch for it
+ *                             either, and adding one is a separate change.
+ * Those stay a fault worth an incident id, so this returns null for them and
+ * the caller falls back to its own generic message.
+ *
+ * THE SWITCH HAS NO WILDCARD DEFAULT. `HarvestRefused['code']` is a closed
+ * union, every member is listed below by name, and the `never` assignment in
+ * the `default` branch is what makes the compiler refuse to build the day a
+ * new code is added to that union and not to this switch — the alternative,
+ * a `default: return null`, would let a brand new refusal silently read as
+ * "nothing to explain" instead of failing loudly at typecheck time.
+ */
+export function explainHarvestRefused(code: HarvestRefusedCode): FounderError | null {
+  switch (code) {
+    case 'folder_too_large':
+      return ERRORS.folderTooLarge;
+    case 'too_many_files':
+      return ERRORS.tooManyFiles;
+    case 'symlink':
+    case 'not_a_file':
+    case 'unexplained_absence':
+    case 'file_too_large':
+    case 'bad_path':
+      return null;
+    default: {
+      const unhandled: never = code;
+      return unhandled;
+    }
+  }
+}
 
 export type ErrorName = keyof typeof ERRORS;
 

@@ -54,9 +54,10 @@ import type { FastifyInstance } from 'fastify';
 import '@fastify/multipart';
 
 import { extractText, ExtractRefused, type ExtractLimits } from '../uploads/extract.ts';
+import { HarvestRefused } from '../storage/harvest.ts';
 import { personSlug, resolveInGeHome, storageLimits } from '../storage/paths.ts';
 import { founderIsBusy, runTurn, TurnRefused } from '../storage/turn.ts';
-import { ERRORS, errorBody, type FounderError } from './errors.ts';
+import { ERRORS, errorBody, explainHarvestRefused, type FounderError } from './errors.ts';
 import type { RouteDeps } from './deps.ts';
 
 /** The one field name this route reads. Anything else is not a file upload. */
@@ -315,6 +316,21 @@ export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps
           },
         );
       } catch (err) {
+        // CHECKED FIRST, AND SEPARATELY FROM TurnRefused BELOW: `HarvestRefused`
+        // is thrown by the harvest step inside `runTurn`, not by `runTurn` itself,
+        // and it is a different class. Left uncaught it used to fall all the way
+        // through to `installErrorHandler`'s wall, which cannot tell a founder's
+        // own storage limit from a real fault and answers every unmapped throw
+        // with a 500 and an incident id — the wrong status, and the wrong sentence
+        // for a founder whose folder is simply full. `explainHarvestRefused`
+        // decides which of `HarvestRefused`'s codes get a founder sentence here;
+        // the rest (a symlink, a bad path, and so on) are genuinely this app's
+        // problem and are left to fall through to that same 500, which is correct
+        // for them.
+        if (err instanceof HarvestRefused) {
+          const explained = explainHarvestRefused(err.code);
+          if (explained) return reply.code(explained.status).send(errorBody(explained));
+        }
         if (err instanceof TurnRefused) {
           const explained = explainTurnRefused(err);
           if (explained) return reply.code(explained.status).send(errorBody(explained));
