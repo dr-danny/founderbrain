@@ -524,11 +524,12 @@ pre,
 }
 
 /*
- * The five upload states (uploadingLine, attachedLine, its warnings, TRUNCATED_NOTE,
- * WRONG_FILE_TYPE) render here, above the box, exactly as before. They stay outside the
- * popover on purpose: a founder must be able to read "Attached: x.md" without hovering or
- * tapping anything, and the disabled attach button during an upload fires no mouse events
- * at all, so the popover would be unreachable at the one moment a founder most wants status.
+ * The upload states (the destination choice, uploadingLine, attachedLine, its warnings,
+ * TRUNCATED_NOTE, WRONG_FILE_TYPE) render here, above the box, exactly as before. They
+ * stay outside the popover on purpose: a founder must be able to read "Attached: x.md"
+ * without hovering or tapping anything, and the disabled attach button during an upload
+ * fires no mouse events at all, so the popover would be unreachable at the one moment a
+ * founder most wants status.
  */
 .composer-attach-status-area {
   margin-bottom: 0.75rem;
@@ -538,6 +539,61 @@ pre,
   margin: 0;
   color: var(--ink-quiet);
   font-size: 0.9rem;
+}
+
+/*
+ * THE CHOICE, BEFORE ANYTHING UPLOADS. Same panel language as `.composer-attach-done`
+ * below it (border, radius, sunk background) so a founder reads it as the same kind of
+ * thing: a status about the file they just picked, not a form bolted onto the composer.
+ */
+.composer-attach-choice {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.8rem;
+  background: var(--paper-sunk);
+}
+
+.composer-attach-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+
+.composer-attach-selected-name {
+  overflow-wrap: anywhere;
+}
+
+.composer-attach-destination {
+  border: 0;
+  padding: 0;
+  margin: 0 0 0.65rem;
+}
+
+.composer-attach-destination legend {
+  padding: 0;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+/*
+ * A full touch target around the radio and its own words, not just the small circle: the
+ * same reasoning `.composer-attach-button` already applies to the paperclip. `gap` rather
+ * than padding on the input keeps the native control's own size intact.
+ */
+.composer-attach-destination-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  cursor: pointer;
+}
+
+.composer-attach-destination-option input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .composer-attach-done {

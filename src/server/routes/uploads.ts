@@ -1,10 +1,23 @@
 /**
  * src/server/routes/uploads.ts
  *
- * WHAT THIS IS. `POST /api/uploads`. A founder sends one document mid chat, this
+ * WHAT THIS IS. Two routes, one handler. `POST /api/uploads/documents` and
+ * `POST /api/uploads/voice-samples`. A founder sends one file mid chat, this
  * route turns it into Markdown, and saves it as one of their own files under
- * `uploads/`, encrypted like every other file, downloadable, and readable by
- * later turns.
+ * `uploads/` or under `voice-samples/`, encrypted like every other file,
+ * downloadable, and readable by later turns.
+ *
+ * TWO LITERAL ROUTES, NOT A DESTINATION FIELD. `voice-samples/` must hold only
+ * examples of the founder's own writing; most uploads are AI generated business
+ * documents that are not that, and mislabelling one as a voice sample would
+ * teach the Brain to imitate the wrong writer. So the founder chooses at upload
+ * time, in the composer, and that choice is which of these two addresses the
+ * browser calls — never a form field or a path parameter this route would have
+ * to read and validate. Each route closes over its own folder prefix as a
+ * `const`, fixed the moment it is registered, so there is no untrusted string
+ * naming a folder and no path-traversal surface to defend. (There is also no
+ * way to smuggle a destination in as a multipart field: `request.file()` below
+ * is called with `fields: 0`, which is Task 1's other half.)
  *
  * WHY IT EXISTS. `uploads/extract.ts` already turns bytes into text, safely.
  * `storage/turn.ts` already writes a founder's folder into Postgres, durably.
@@ -12,13 +25,14 @@
  * multipart stream under the host's own size limit, hand the bytes to
  * `extractText`, and let a turn — `verb: 'upload'` — do the rest.
  *
- * WHO WROTE THE BYTES, NOT WHERE THEY SIT. `rules/harvest-gate.ts` and
- * `storage/turn.ts` both key the uploads/ exemption on this turn's `verb`
- * being `'upload'`, never on the path alone — a path-keyed exemption would
- * also cover the model, which can `Write` anywhere. This route is the only
- * caller that is allowed to open a turn with that verb, and it writes exactly
- * one file, under `uploads/`, and nothing else. `storage/turn.ts` checks that
- * promise on the way out and refuses the whole turn if it was broken.
+ * WHO WROTE THE BYTES, NOT WHERE THEY SIT. `rules/harvest-gate.ts` keys its
+ * uploads/ exemption on this turn's `verb` being `'upload'`, never on the path
+ * alone — a path-keyed exemption would also cover the model, which can `Write`
+ * anywhere. These two routes are the only callers allowed to open a turn with
+ * that verb, and each writes exactly one file, under its own folder, and
+ * nothing else. `storage/turn.ts` checks that promise on the way out — against
+ * the exact path this route passed as `subject`, not merely against a folder —
+ * and refuses the whole turn if it was broken.
  *
  * `subject` ON THE TURN IS THE SLUG, NEVER THE ORIGINAL FILENAME. A founder's
  * own name for their file can carry anything: a client's name, a deal size, a
@@ -35,19 +49,21 @@
  * `founderIsBusy` in storage/turn.ts for what this checks and the race it does
  * not close.
  *
- * WHAT CALLS IT. routes/index.ts registers it. The chat composer's attach
- * button calls it.
+ * WHAT CALLS IT. routes/index.ts registers both. The chat composer's attach
+ * control calls whichever one the founder's own choice picked; the paste path
+ * (saving a long paste as a file) always calls the voice-samples one, because
+ * a founder's own pasted prose is unambiguously their own writing.
  * WHAT IT READS. `deps.auth`, the session's founder only — never a request body
  * or query parameter names a founder.
- * WHAT IT WRITES. One file under `uploads/`, through `storage/turn.ts runTurn`.
- * Nothing here inserts into `ge_file`, `ge_blob` or `ge_file_version` directly:
- * the harvest inside `runTurn` is the only writer of those, exactly as it is for
- * every other verb.
+ * WHAT IT WRITES. One file, under whichever folder the route it was called on
+ * owns, through `storage/turn.ts runTurn`. Nothing here inserts into `ge_file`,
+ * `ge_blob` or `ge_file_version` directly: the harvest inside `runTurn` is the
+ * only writer of those, exactly as it is for every other verb.
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 // Pulls in @fastify/multipart's ambient augmentation of FastifyRequest
 // (`.file()`, `.isMultipart()`) for this file. The plugin itself is registered
 // once, in src/server/index.ts.
@@ -63,8 +79,17 @@ import type { RouteDeps } from './deps.ts';
 /** The one field name this route reads. Anything else is not a file upload. */
 const FILE_FIELD = 'file';
 
-/** Every file this route writes lives under here. See storage/turn.ts's other half of this check. */
-const UPLOADS_PREFIX = 'uploads/';
+/**
+ * The two folders a founder's own upload can land in, and the two routes that
+ * write them. Each is a `const` closed over at route-registration time — see
+ * this file's own header for why that is load bearing rather than tidiness —
+ * and `storage/turn.ts` checks the promise on the way out against the exact
+ * path built from one of these, not merely against the folder.
+ */
+const UPLOAD_DESTINATIONS = {
+  'voice-samples': { path: '/api/uploads/voice-samples', prefix: 'voice-samples/' },
+  documents: { path: '/api/uploads/documents', prefix: 'uploads/' },
+} as const;
 
 /**
  * Limits for `extractText`, chosen by this route.
@@ -237,173 +262,191 @@ function explainTurnRefused(err: TurnRefused): FounderError | null {
   }
 }
 
-export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
-  app.post(
-    '/api/uploads',
-    // NOT A REAL LIMIT ON THE UPLOAD, WHICH IS WHY THERE IS NO bodyLimit HERE.
-    // @fastify/multipart registers its own raw-stream content type parser, and
-    // Fastify only enforces bodyLimit inside rawBody(), which runs solely for
-    // parsers with asString or asBuffer set (content-type-parser.js:207-218). A
-    // multipart body never takes that branch, so a bodyLimit set here was never
-    // checked against this route's actual payload: it looked load-bearing and was
-    // not. The real ceiling is `request.file({ limits: { fileSize } })` below,
-    // read fresh on every request rather than fixed once at boot.
-    async (request, reply) => {
-      if (!(await deps.auth.requireFounder(request, reply))) return reply;
-      const founder = deps.auth.founderOf(request);
+/**
+ * The one handler both routes share, closed over the folder it alone writes to.
+ *
+ * `prefix` IS THE ONLY DIFFERENCE BETWEEN THE TWO ROUTES, and it is a function
+ * argument fixed at the `app.post` call below, never something read off the
+ * request. That is what makes it safe to build a path from it with no
+ * validation of its own: it is one of two literals this file wrote, not a
+ * string a founder's request supplied.
+ */
+function makeUploadHandler(
+  deps: RouteDeps,
+  prefix: string,
+): (request: FastifyRequest, reply: FastifyReply) => Promise<FastifyReply> {
+  return async (request, reply) => {
+    if (!(await deps.auth.requireFounder(request, reply))) return reply;
+    const founder = deps.auth.founderOf(request);
 
-      // BUSY, ANSWERED BEFORE A SINGLE BYTE OF THE UPLOAD IS READ. See
-      // storage/turn.ts founderIsBusy for exactly what this checks and the
-      // narrow race it does not close.
-      if (founderIsBusy(founder.id)) {
-        return reply.code(UPLOAD_ERRORS.busy.status).send(errorBody(UPLOAD_ERRORS.busy));
+    // BUSY, ANSWERED BEFORE A SINGLE BYTE OF THE UPLOAD IS READ. See
+    // storage/turn.ts founderIsBusy for exactly what this checks and the
+    // narrow race it does not close.
+    if (founderIsBusy(founder.id)) {
+      return reply.code(UPLOAD_ERRORS.busy.status).send(errorBody(UPLOAD_ERRORS.busy));
+    }
+
+    const limits = storageLimits();
+
+    let part;
+    try {
+      // `files: 1`, so a second file part in the same request is refused by
+      // the parser rather than silently read and thrown away. `fileSize`
+      // is enforced by the stream itself: it stops rather than buffering
+      // an oversized file into memory first. See uploads/extract.ts's own
+      // header for the zip bomb defence that runs after this.
+      part = await request.file({ limits: { fileSize: limits.fileBytes, files: 1, fields: 0 } });
+    } catch (err) {
+      if (isMultipartFormatError(err)) {
+        return reply.code(ERRORS.badRequest.status).send(errorBody(ERRORS.badRequest));
       }
+      throw err;
+    }
 
-      const limits = storageLimits();
+    if (part === undefined) {
+      return reply.code(UPLOAD_ERRORS.noFile.status).send(errorBody(UPLOAD_ERRORS.noFile));
+    }
+    if (part.fieldname !== FILE_FIELD) {
+      return reply.code(UPLOAD_ERRORS.wrongField.status).send(errorBody(UPLOAD_ERRORS.wrongField));
+    }
 
-      let part;
-      try {
-        // `files: 1`, so a second file part in the same request is refused by
-        // the parser rather than silently read and thrown away. `fileSize`
-        // is enforced by the stream itself: it stops rather than buffering
-        // an oversized file into memory first. See uploads/extract.ts's own
-        // header for the zip bomb defence that runs after this.
-        part = await request.file({ limits: { fileSize: limits.fileBytes, files: 1, fields: 0 } });
-      } catch (err) {
-        if (isMultipartFormatError(err)) {
-          return reply.code(ERRORS.badRequest.status).send(errorBody(ERRORS.badRequest));
-        }
-        throw err;
-      }
-
-      if (part === undefined) {
-        return reply.code(UPLOAD_ERRORS.noFile.status).send(errorBody(UPLOAD_ERRORS.noFile));
-      }
-      if (part.fieldname !== FILE_FIELD) {
-        return reply.code(UPLOAD_ERRORS.wrongField.status).send(errorBody(UPLOAD_ERRORS.wrongField));
-      }
-
-      let bytes: Buffer;
-      try {
-        bytes = await part.toBuffer();
-      } catch (err) {
-        if (isFileTooLargeError(err)) {
-          const tooLarge: FounderError = {
-            status: 413,
-            code: 'file_too_large',
-            message: `That file is bigger than the ${String(limits.fileBytes)} bytes we can take right now.`,
-          };
-          return reply.code(tooLarge.status).send(errorBody(tooLarge));
-        }
-        if (isMultipartFormatError(err)) {
-          return reply.code(ERRORS.badRequest.status).send(errorBody(ERRORS.badRequest));
-        }
-        throw err;
-      }
-
-      const originalName = part.filename;
-
-      let outcome;
-      try {
-        outcome = await extractText({ filename: originalName, bytes, limits: EXTRACT_LIMITS });
-      } catch (err) {
-        if (err instanceof ExtractRefused) {
-          const refused: FounderError = { status: 422, code: `extract_${err.reason}`, message: err.founderText };
-          return reply.code(refused.status).send(errorBody(refused));
-        }
-        throw err;
-      }
-
-      // The stored extension is the one place the three-way decision reaches this
-      // route: '.md' for anything extracted, the founder's own extension for anything
-      // passed through. `slugForUpload` folds the source extension into the stem when
-      // (and only when) that differs from storedExt — see its own header for why.
-      const storedExt = outcome.action === 'extract' ? '.md' : outcome.ext;
-      const storedName = slugForUpload(originalName, storedExt);
-      const path = `${UPLOADS_PREFIX}${storedName}`;
-
-      // What gets written to disk, and what the founder reads back in the response,
-      // decided once here from `outcome` alone. PASSTHROUGH writes the founder's own
-      // bytes untouched — no provenance header, because there is nowhere to put one
-      // inside a PNG, and no extraction, because there is nothing in an image or a
-      // scanned PDF for this route to have extracted.
-      let fileContents: Buffer | string;
-      let responseBody: { sizeBytes: number; chars: number; warnings: readonly string[]; truncated: boolean };
-      if (outcome.action === 'extract') {
-        const uploadedOn = deps.clock.now().toISOString().slice(0, 10);
-        const header = provenanceHeader({ originalName, uploadedOn, warnings: outcome.result.warnings });
-        const finalText = `${header}${outcome.result.text}`;
-        fileContents = finalText;
-        responseBody = {
-          sizeBytes: Buffer.byteLength(finalText, 'utf8'),
-          chars: outcome.result.text.length,
-          warnings: outcome.result.warnings,
-          truncated: outcome.result.truncated,
+    let bytes: Buffer;
+    try {
+      bytes = await part.toBuffer();
+    } catch (err) {
+      if (isFileTooLargeError(err)) {
+        const tooLarge: FounderError = {
+          status: 413,
+          code: 'file_too_large',
+          message: `That file is bigger than the ${String(limits.fileBytes)} bytes we can take right now.`,
         };
-      } else {
-        fileContents = bytes;
-        responseBody = { sizeBytes: bytes.byteLength, chars: 0, warnings: [], truncated: false };
+        return reply.code(tooLarge.status).send(errorBody(tooLarge));
       }
-
-      let committed;
-      try {
-        committed = await runTurn(
-          {
-            founderId: founder.id,
-            // The founder, through the upload button. Never 'model': the
-            // whole point of verb 'upload' is that the model did not write
-            // these bytes.
-            actor: 'founder',
-            verb: 'upload',
-            // The slug, never the original filename. See the header above.
-            subject: path,
-          },
-          async (turn) => {
-            const abs = resolveInGeHome(turn.founderId, path);
-            await mkdir(dirname(abs), { recursive: true });
-            if (typeof fileContents === 'string') {
-              await writeFile(abs, fileContents, 'utf8');
-            } else {
-              await writeFile(abs, fileContents);
-            }
-          },
-        );
-      } catch (err) {
-        // CHECKED FIRST, AND SEPARATELY FROM TurnRefused BELOW: `HarvestRefused`
-        // is thrown by the harvest step inside `runTurn`, not by `runTurn` itself,
-        // and it is a different class. Left uncaught it used to fall all the way
-        // through to `installErrorHandler`'s wall, which cannot tell a founder's
-        // own storage limit from a real fault and answers every unmapped throw
-        // with a 500 and an incident id — the wrong status, and the wrong sentence
-        // for a founder whose folder is simply full. `explainHarvestRefused`
-        // decides which of `HarvestRefused`'s codes get a founder sentence here;
-        // the rest (a symlink, a bad path, and so on) are genuinely this app's
-        // problem and are left to fall through to that same 500, which is correct
-        // for them.
-        if (err instanceof HarvestRefused) {
-          const explained = explainHarvestRefused(err.code);
-          if (explained) return reply.code(explained.status).send(errorBody(explained));
-        }
-        if (err instanceof TurnRefused) {
-          const explained = explainTurnRefused(err);
-          if (explained) return reply.code(explained.status).send(errorBody(explained));
-        }
-        throw err;
+      if (isMultipartFormatError(err)) {
+        return reply.code(ERRORS.badRequest.status).send(errorBody(ERRORS.badRequest));
       }
+      throw err;
+    }
 
-      // Not expected to ever fire for an upload turn — every uploads/ path is
-      // exempt from the house style by construction — but the gate is the
-      // authority on what was actually saved, not this route's assumption
-      // about it, and a held file must never be reported as saved.
-      if (committed.gate.held.length > 0) {
-        deps.log.error(
-          { founderId: founder.id, path, held: committed.gate.held.map((h) => h.path) },
-          'an upload turn held its own file, which should not be reachable',
-        );
-        return reply.code(UPLOAD_ERRORS.heldByGate.status).send(errorBody(UPLOAD_ERRORS.heldByGate));
+    const originalName = part.filename;
+
+    let outcome;
+    try {
+      outcome = await extractText({ filename: originalName, bytes, limits: EXTRACT_LIMITS });
+    } catch (err) {
+      if (err instanceof ExtractRefused) {
+        const refused: FounderError = { status: 422, code: `extract_${err.reason}`, message: err.founderText };
+        return reply.code(refused.status).send(errorBody(refused));
       }
+      throw err;
+    }
 
-      return reply.code(201).send({ name: path, ...responseBody });
-    },
-  );
+    // The stored extension is the one place the three-way decision reaches this
+    // route: '.md' for anything extracted, the founder's own extension for anything
+    // passed through. `slugForUpload` folds the source extension into the stem when
+    // (and only when) that differs from storedExt — see its own header for why.
+    const storedExt = outcome.action === 'extract' ? '.md' : outcome.ext;
+    const storedName = slugForUpload(originalName, storedExt);
+    const path = `${prefix}${storedName}`;
+
+    // What gets written to disk, and what the founder reads back in the response,
+    // decided once here from `outcome` alone. PASSTHROUGH writes the founder's own
+    // bytes untouched — no provenance header, because there is nowhere to put one
+    // inside a PNG, and no extraction, because there is nothing in an image or a
+    // scanned PDF for this route to have extracted.
+    let fileContents: Buffer | string;
+    let responseBody: { sizeBytes: number; chars: number; warnings: readonly string[]; truncated: boolean };
+    if (outcome.action === 'extract') {
+      const uploadedOn = deps.clock.now().toISOString().slice(0, 10);
+      const header = provenanceHeader({ originalName, uploadedOn, warnings: outcome.result.warnings });
+      const finalText = `${header}${outcome.result.text}`;
+      fileContents = finalText;
+      responseBody = {
+        sizeBytes: Buffer.byteLength(finalText, 'utf8'),
+        chars: outcome.result.text.length,
+        warnings: outcome.result.warnings,
+        truncated: outcome.result.truncated,
+      };
+    } else {
+      fileContents = bytes;
+      responseBody = { sizeBytes: bytes.byteLength, chars: 0, warnings: [], truncated: false };
+    }
+
+    let committed;
+    try {
+      committed = await runTurn(
+        {
+          founderId: founder.id,
+          // The founder, through the upload button. Never 'model': the
+          // whole point of verb 'upload' is that the model did not write
+          // these bytes.
+          actor: 'founder',
+          verb: 'upload',
+          // The slug, never the original filename. See the header above.
+          subject: path,
+        },
+        async (turn) => {
+          const abs = resolveInGeHome(turn.founderId, path);
+          await mkdir(dirname(abs), { recursive: true });
+          if (typeof fileContents === 'string') {
+            await writeFile(abs, fileContents, 'utf8');
+          } else {
+            await writeFile(abs, fileContents);
+          }
+        },
+      );
+    } catch (err) {
+      // CHECKED FIRST, AND SEPARATELY FROM TurnRefused BELOW: `HarvestRefused`
+      // is thrown by the harvest step inside `runTurn`, not by `runTurn` itself,
+      // and it is a different class. Left uncaught it used to fall all the way
+      // through to `installErrorHandler`'s wall, which cannot tell a founder's
+      // own storage limit from a real fault and answers every unmapped throw
+      // with a 500 and an incident id — the wrong status, and the wrong sentence
+      // for a founder whose folder is simply full. `explainHarvestRefused`
+      // decides which of `HarvestRefused`'s codes get a founder sentence here;
+      // the rest (a symlink, a bad path, and so on) are genuinely this app's
+      // problem and are left to fall through to that same 500, which is correct
+      // for them.
+      if (err instanceof HarvestRefused) {
+        const explained = explainHarvestRefused(err.code);
+        if (explained) return reply.code(explained.status).send(errorBody(explained));
+      }
+      if (err instanceof TurnRefused) {
+        const explained = explainTurnRefused(err);
+        if (explained) return reply.code(explained.status).send(errorBody(explained));
+      }
+      throw err;
+    }
+
+    // Not expected to ever fire for an upload turn — every path either route
+    // writes is exempt from the house style by construction — but the gate is
+    // the authority on what was actually saved, not this route's assumption
+    // about it, and a held file must never be reported as saved.
+    if (committed.gate.held.length > 0) {
+      deps.log.error(
+        { founderId: founder.id, path, held: committed.gate.held.map((h) => h.path) },
+        'an upload turn held its own file, which should not be reachable',
+      );
+      return reply.code(UPLOAD_ERRORS.heldByGate.status).send(errorBody(UPLOAD_ERRORS.heldByGate));
+    }
+
+    return reply.code(201).send({ name: path, ...responseBody });
+  };
+}
+
+export async function registerUploadRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
+  for (const { path, prefix } of Object.values(UPLOAD_DESTINATIONS)) {
+    app.post(
+      path,
+      // NOT A REAL LIMIT ON THE UPLOAD, WHICH IS WHY THERE IS NO bodyLimit HERE.
+      // @fastify/multipart registers its own raw-stream content type parser, and
+      // Fastify only enforces bodyLimit inside rawBody(), which runs solely for
+      // parsers with asString or asBuffer set (content-type-parser.js:207-218). A
+      // multipart body never takes that branch, so a bodyLimit set here was never
+      // checked against this route's actual payload: it looked load-bearing and was
+      // not. The real ceiling is `request.file({ limits: { fileSize } })` inside the
+      // handler, read fresh on every request rather than fixed once at boot.
+      makeUploadHandler(deps, prefix),
+    );
+  }
 }

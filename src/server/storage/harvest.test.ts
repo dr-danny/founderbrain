@@ -101,48 +101,28 @@ describe('diffFiles', () => {
   });
 
   /**
-   * THE ONE EXCEPTION TO THE REFUSAL ABOVE, and it exists to protect the thing
-   * the refusal protects.
+   * THE EXCEPTION THAT USED TO LIVE HERE IS GONE, DELIBERATELY, AND THIS TEST
+   * PROVES IT STAYS GONE.
    *
-   * The uploads route writes ge_file outside a turn, so one row can exist that
-   * this turn's materialise ran too early to see: the founder pressed upload
-   * while the model was working. Read as an unexplained absence, that costs them
-   * the entire run they were watching, and the file was never in danger.
-   *
-   * Its absence proves nothing, exactly as an excluded path's does, and the next
-   * rebuild writes it. The row is left alone: not deleted, not refused.
+   * `voice-samples/` used to be waved through this refusal: the old uploads
+   * route wrote `ge_file` directly, outside any turn, so a row could exist that
+   * a turn's materialise ran too early to see. Every upload runs inside a turn
+   * now (`routes/uploads.ts`, both destinations), so that race cannot happen
+   * any more, and treating an unmaterialised voice sample as expected would
+   * silently swallow the exact bug this refusal exists to catch: a row the
+   * database says exists that materialise failed to write, which is a
+   * founder's writing sample lost without a word.
    */
-  it('an upload materialise has not seen yet is expected, not data loss', () => {
-    const { changes } = diffFiles({
-      onDisk: [],
-      stored: storedMap([['voice-samples/sample.md', 'aaa']]),
-      materialisedPaths: new Set(),
-    });
-    assert.deepEqual(changes, [], 'the upload row must not be deleted either');
-  });
-
-  it('and the exception is only for that folder, so the refusal still works', () => {
-    // The whole value of the refusal is that it catches materialise losing a
-    // founder's file. A blanket tolerance would have removed it.
+  it('a voice sample materialise never wrote rolls the turn back too, exactly like anything else', () => {
     assert.throws(
       () =>
         diffFiles({
           onDisk: [],
-          stored: storedMap([['founder-brain.md', 'aaa']]),
+          stored: storedMap([['voice-samples/sample.md', 'aaa']]),
           materialisedPaths: new Set(),
         }),
       HarvestRefused,
-      'the Brain going missing must still roll the turn back',
-    );
-    // And a folder whose name merely starts the same way is not the uploads folder.
-    assert.throws(
-      () =>
-        diffFiles({
-          onDisk: [],
-          stored: storedMap([['voice-samples-old/sample.md', 'aaa']]),
-          materialisedPaths: new Set(),
-        }),
-      HarvestRefused,
+      'a voice sample the database says exists must roll the turn back, not be waved through',
     );
   });
 

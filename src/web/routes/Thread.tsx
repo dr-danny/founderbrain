@@ -46,12 +46,12 @@ import {
   getLimits,
   interruptThread,
   openThread,
-  uploadFile,
+  uploadDocument,
+  uploadVoiceSample,
   sendMessage,
   streamUrl,
-  uploadDocument,
 } from "../lib/api.ts";
-import type { Founder, Problem } from "../lib/api.ts";
+import type { Founder, Problem, Result, UploadedDocument } from "../lib/api.ts";
 import { openStream } from "../lib/stream.ts";
 import type { StreamHandle } from "../lib/stream.ts";
 import { EMPTY_THREAD, FAILURE_COPY, WHILE_IT_RUNS, threadReducer } from "../lib/thread-state.ts";
@@ -59,6 +59,7 @@ import { mayOpenRoute } from "../lib/track.ts";
 import { hrefFor } from "../lib/nav.ts";
 import { plainFileName } from "../lib/format.ts";
 import { Composer } from "../components/Composer.tsx";
+import type { AttachDestination } from "../components/Composer.tsx";
 import { MessageText } from "../components/MessageText.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { StopButton } from "../components/StopButton.tsx";
@@ -69,6 +70,23 @@ import { Working } from "../components/Working.tsx";
 function newClientMsgId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `c_${String(Date.now())}_${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * The name a pasted sample is stored under.
+ *
+ * DOWN TO THE SECOND, NOT JUST THE DAY, and that is a fix, not decoration. This used to
+ * read `sample-<date>.md`, so a founder's second paste on the same day silently replaced
+ * the first: same name, same slug on the server, one file where there should have been
+ * two. The server's own `slugForUpload` keeps whatever name arrives here rather than
+ * inventing one, so the name has to be unique on this side.
+ *
+ * A plain function, exported and not a closure over `new Date()`, so a test can prove two
+ * different times produce two different names without waiting on the clock.
+ */
+export function sampleFileName(now: Date): string {
+  const stamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return `sample-${stamp}.md`;
 }
 
 export function Thread({ founder, routeId }: { readonly founder: Founder; readonly routeId: string }): ReactElement {
@@ -182,16 +200,17 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
   /**
    * A long paste, kept as a file instead of sent as a message.
    *
-   * It goes through the same route an uploaded file does, as a file built out of
-   * the text. One route, one set of limits, one place the refusals are written.
+   * It always lands in voice-samples/, never through a choice: pasted prose is
+   * unambiguously the founder's own writing, the same way a founder attaching a
+   * file gets asked and a founder pasting one does not. One route, one set of
+   * limits, one place the refusals are written.
    */
   const saveAsFile = (text: string): void => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    const file = new File([new TextEncoder().encode(text)], `sample-${stamp}.md`, {
+    const file = new File([new TextEncoder().encode(text)], sampleFileName(new Date()), {
       type: "text/markdown",
     });
     dispatch({ type: "notice", text: "Saving that as a file." });
-    void uploadFile(file).then((result) => {
+    void uploadVoiceSample(file).then((result) => {
       dispatch({
         type: "notice",
         text: result.ok
@@ -202,23 +221,13 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
   };
 
   /**
-   * A file the founder picked off their own machine.
-   *
-   * One at a time on purpose. A founder adding ten writing samples wants to see
-   * each one land, and a batch that half fails is a screen that has to explain
-   * which half, in a room where nobody has time to read it.
+   * The composer's own choice, turned into which of the two upload routes gets
+   * called. The composer decides the destination; this is the one place that
+   * turns that decision into a network call, mirroring the server's own two
+   * literal routes rather than passing the choice through as a field.
    */
-  const attach = (file: File): void => {
-    dispatch({ type: "notice", text: `Adding ${file.name}.` });
-    void uploadFile(file).then((result) => {
-      dispatch({
-        type: "notice",
-        text: result.ok
-          ? `Added ${file.name}. It is in your files, and this engine can read it from there.`
-          : result.problem.text,
-      });
-    });
-  };
+  const upload = (file: File, destination: AttachDestination): Promise<Result<UploadedDocument>> =>
+    destination === "voice-samples" ? uploadVoiceSample(file) : uploadDocument(file);
 
   const stop = (): void => {
     const threadId = view.threadId;
@@ -392,7 +401,7 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
           }
           onSend={send}
           onSaveAsFile={saveAsFile}
-          onUpload={uploadDocument}
+          onUpload={upload}
           maxAttachmentBytes={maxAttachmentBytes}
         />
       </div>

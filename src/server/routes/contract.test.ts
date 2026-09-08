@@ -362,15 +362,7 @@ test('AND THE ROUTER ACTUALLY ANSWERS THEM, WHICH IS A DIFFERENT QUESTION', asyn
     const res = await h.app.inject({
       method: call.method as 'GET',
       url,
-      // The upload route parses one content type and it is not JSON. Probing it
-      // with JSON answers 415 from the parser, which is still not a 404 and so
-      // still proves the route is registered, but the header makes the intent
-      // legible rather than looking like an oversight.
-      ...(call.method === 'POST'
-        ? call.path === '/api/files/voice-samples'
-          ? { headers: { 'content-type': 'application/octet-stream', 'x-upload-name': 'probe.md' }, payload: 'x' }
-          : { headers: { 'content-type': 'application/json' }, payload: {} }
-        : {}),
+      ...(call.method === 'POST' ? { headers: { 'content-type': 'application/json' }, payload: {} } : {}),
     });
     assert.notEqual(res.statusCode, 404, `${call.method} ${url} is not routed: ${res.body}`);
   }

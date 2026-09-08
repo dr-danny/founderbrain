@@ -73,7 +73,7 @@ export { mayStart, visibleRoutes } from './threads.ts';
 export { nextRouteId, progressOf } from './home.ts';
 export { gateFileStatus, presentFiles, trackFilter, trackOf } from './founder-state.ts';
 export { isRealTimezone, looksLikeAToken, SETUP_ERRORS } from './setup.ts';
-export { FILE_ERRORS, listRowsFor, safeDecode } from './files.ts';
+export { listRowsFor, safeDecode } from './files.ts';
 export { limitsView, type LimitView, type LimitsView } from './limits.ts';
 export { provenanceHeader, slugForUpload } from './uploads.ts';
 export { buildZip, crc32, ZipTooLarge } from './zip.ts';

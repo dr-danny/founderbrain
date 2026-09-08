@@ -165,14 +165,6 @@ export class TurnRefused extends Error {
   }
 }
 
-/**
- * Where a founder's own uploaded documents live. Kept here, next to the check
- * that uses it, rather than in storage/paths.ts: this is a rule about verbs,
- * not a rule about paths, and paths.ts must stay the file that never learns
- * what a verb is.
- */
-const UPLOADS_PREFIX = 'uploads/';
-
 /** What the work function is handed. Everything it needs, nothing it does not. */
 export interface TurnContext {
   founderId: string;
@@ -729,22 +721,29 @@ async function commitTurn<T>(
 
       const plan = await planHarvest(tx, { founderId, materialised, version: versionAfter });
 
-      // THE OTHER HALF OF THE UPLOADS/ EXEMPTION, AND IT LIVES HERE RATHER
-      // THAN IN THE GATE. `rules/harvest-gate.ts` answers "may this file be
+      // THE OTHER HALF OF THE UPLOAD PROMISE, AND IT LIVES HERE RATHER THAN
+      // IN THE GATE. `rules/harvest-gate.ts` answers "may this file be
       // exempt", keyed on `verb`; this is "did the ROUTE THAT CLAIMED verb
-      // 'upload' actually keep its promise". The upload route (routes/uploads.ts)
-      // writes exactly one file, under `uploads/`, in its `work` callback, and
-      // nothing else. If a harvested change this turn sits anywhere else, that
-      // promise was broken — a bug in that route, not a founder's choice — and
-      // the whole turn is refused rather than silently narrowed to the uploads/
-      // subset and applied anyway.
+      // 'upload' actually keep its promise". routes/uploads.ts registers two
+      // routes off one shared handler, one for `uploads/` and one for
+      // `voice-samples/`, and each writes exactly one file, in its `work`
+      // callback, at the exact path it also passes as `subject` on this turn
+      // (see `RunTurnOptions.subject` above). So the check is not "somewhere
+      // under an allowed folder" — a founder's choice at upload time decides
+      // which folder that is, and this file does not referee that choice —
+      // it is "the plan's changes are exactly the one path this turn
+      // promised". Anything else — a second file, a different path, changes
+      // with no subject to compare against — means the promise was broken, a
+      // bug in that route rather than a founder's choice, and the whole turn
+      // is refused rather than silently narrowed to the promised path and
+      // applied anyway.
       if (verb === 'upload') {
-        const outside = plan.changes.filter((c) => !c.path.startsWith(UPLOADS_PREFIX));
+        const outside = plan.changes.filter((c) => c.path !== options.subject);
         if (outside.length > 0) {
           throw new TurnRefused(
-            'upload_outside_uploads',
-            `an upload turn tried to write outside uploads/: ${outside.map((c) => c.path).join(', ')}. ` +
-              'Refusing the whole turn rather than saving part of it.',
+            'upload_broke_promise',
+            `an upload turn promised ${String(options.subject)} and tried to write ` +
+              `${outside.map((c) => c.path).join(', ')} instead. Refusing the whole turn rather than saving part of it.`,
           );
         }
       }

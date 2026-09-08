@@ -124,10 +124,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
  *
  * 501 joins it, and the two mean different things that read the same to a
  * founder. 404 is "nobody registered that address". 501 is a route that exists
- * and says it cannot do this yet, which today is the GoHighLevel check and
- * saving a pasted sample as a file. Both of those carry a sentence of their own
- * that wins over the general one, so what a founder reads is written for the
- * thing they were actually trying to do.
+ * and says it cannot do this yet. Whichever routes that is at a given moment
+ * carry a sentence of their own that wins over the general one, so what a
+ * founder reads is written for the thing they were actually trying to do.
  */
 export function kindForStatus(status: number): ProblemKind {
   if (status === 401 || status === 403) return "signed_out";
@@ -241,27 +240,6 @@ async function getText(path: string): Promise<Result<string>> {
 /** A write whose answer is read. */
 function post<T>(path: string, body?: unknown): Promise<Result<T>> {
   return request<T>(path, "an answer", { method: "POST", body: JSON.stringify(body ?? {}) });
-}
-
-/**
- * A write whose body is raw bytes rather than JSON.
- *
- * `accept` and `content-type` are spelled out because request() builds a headers
- * object and then spreads init over it, so a headers key here REPLACES that object
- * rather than merging into it. Without the accept, a refusal comes back as something
- * the parser cannot read.
- *
- * It is a named helper and not an inline request() call so that contract.test.ts can
- * see it. That test reads this file for the addresses the browser asks for, and it
- * knows the helpers by name; a route reached any other way is a route it reports as
- * dead and somebody deletes.
- */
-function postBytes<T>(path: string, body: Blob | string, headers: Record<string, string>): Promise<Result<T>> {
-  return request<T>(path, "an answer", {
-    method: "POST",
-    headers: { accept: "application/json", ...headers },
-    body,
-  });
 }
 
 /** A write with nothing to read back. It worked or it did not. */
@@ -707,47 +685,18 @@ export function streamUrl(threadId: string): string {
 }
 
 /**
- * What a founder may hand the app, and it is shorter than they will expect.
+ * A file a founder attaches to a message, mid conversation, or hands over as a pasted
+ * sample. This is the built version of the same idea the paste cap above is built on: a
+ * founder's own material becomes a file the engine reads with the Read tool, rather than
+ * text stuffed into the context window.
  *
- * MEASURED AGAINST THE MODEL'S OWN Read TOOL rather than chosen. Word documents are
- * refused by Read outright, and `.heic`, which is what an iPhone saves by default, is
- * refused by neither of its lists and is read as text, which is worse than a refusal
- * because nothing says anything. Both are refused here, at the point the founder picks
- * the file, so they find out before the upload rather than after.
- */
-export const UPLOAD_ACCEPT = ".txt,.md,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp";
-
-/** Kept in step with LIMIT_FILE_BYTES on the server, which is the one that decides. */
-export const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
-
-/**
- * One of the founder's own files, saved into `growth-engine/voice-samples/`.
- *
- * RAW BYTES, NOT FormData, and the server side says why: multipart would cost a
- * dependency in a tree 130 people `npm ci`. One file per request needs no envelope, so
- * the body is the file and the name rides in a header.
- *
- * The name is encoded because it is the founder's own, and an apostrophe or an accent in
- * a header is the ordinary case rather than the strange one.
- */
-export function uploadFile(file: File): Promise<Result<{ readonly path: string; readonly sizeBytes: number }>> {
-  return postBytes<{ readonly path: string; readonly sizeBytes: number }>(
-    "/api/files/voice-samples",
-    file,
-    {
-      "content-type": "application/octet-stream",
-      "x-upload-name": encodeURIComponent(file.name),
-    },
-  );
-}
-
-/**
- * A document a founder attaches to a message, mid conversation.
- *
- * `POST /api/uploads`, one file, field name `file`. This is the built version of the same
- * idea the paste cap above is built on: a founder's own material becomes a file the engine
- * reads with the Read tool, rather than text stuffed into the context window. The difference
- * is that here the founder chose the file themselves, instead of pasting something too long.
+ * TWO LITERAL ROUTES, NOT A DESTINATION FIELD, and this file mirrors the server's own
+ * reason for it exactly (see routes/uploads.ts's header): `voice-samples/` must hold only
+ * examples of the founder's own writing, and most uploads are AI generated business
+ * documents that are not that. So the founder's choice in the composer decides which of
+ * these two functions gets called, never a field or a query string riding along on one
+ * shared call — `contract.test.ts` reads this file for the addresses the browser asks
+ * for, and it can only see a literal string, not a destination built at runtime.
  *
  * `warnings` and `truncated` are read off a 201 and are the server's own account of what it
  * could not keep: a hidden sheet it skipped, speaker notes it did not read, text it cut
@@ -762,11 +711,32 @@ export interface UploadedDocument {
   readonly truncated: boolean;
 }
 
-/** ASSUMED path, named in full above `UploadedDocument`. */
+/**
+ * A founder's own writing: an example for the Brain to learn their voice from. The paste
+ * path (Thread.tsx's `saveAsFile`) always calls this one, because pasted prose is
+ * unambiguously the founder's own words; the composer's attach control calls it only when
+ * the founder has said, at upload time, that the file is a writing sample of theirs.
+ *
+ * A LITERAL STRING, NOT A VARIABLE, AND THAT IS NOT STYLE. `contract.test.ts` reads this
+ * file's own text for the addresses the browser calls, by matching a quoted literal
+ * directly inside a `postForm(...)` call; a path built from a shared variable is invisible
+ * to that scan. Duplicating the call rather than sharing one through a `path` argument is
+ * what keeps this function honest with the server's own two-literal-routes rule.
+ */
+export function uploadVoiceSample(file: File): Promise<Result<UploadedDocument>> {
+  const form = new FormData();
+  form.append("file", file);
+  return postForm<UploadedDocument>("/api/uploads/voice-samples", form);
+}
+
+/**
+ * A document for the engine to read: reference material, not a voice to imitate. The
+ * composer's default, and the safer wrong answer — see Composer.tsx's own comment on why.
+ */
 export function uploadDocument(file: File): Promise<Result<UploadedDocument>> {
   const form = new FormData();
   form.append("file", file);
-  return postForm<UploadedDocument>("/api/uploads", form);
+  return postForm<UploadedDocument>("/api/uploads/documents", form);
 }
 
 // ---------------------------------------------------------------------------------------

@@ -94,9 +94,16 @@
  * decision of what the answer means both belong to the caller, in lib/api.ts.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent, FocusEvent, KeyboardEvent, ReactElement } from "react";
 import type { Result, UploadedDocument } from "../lib/api.ts";
+
+/**
+ * Which folder an attached file becomes the founder's own. Two literal values, mirroring
+ * the server's own two literal routes (`routes/uploads.ts`) rather than a free string, so
+ * there is nothing here that needs validating on the way out.
+ */
+export type AttachDestination = "voice-samples" | "documents";
 
 /**
  * Roughly fifty kilobytes, counted in characters.
@@ -177,6 +184,24 @@ export const REMOVE_ATTACHMENT = "Remove";
 export const TRY_AGAIN = "Try again";
 
 /**
+ * The choice a founder makes once a file is picked, and before it uploads. Only some of
+ * what a founder hands over is their own writing: a one page brief or a spreadsheet of
+ * contacts is reference material, not a voice to imitate, and most uploads are that rather
+ * than a writing sample. Nothing about a file's own bytes says which one it is, so the
+ * founder says.
+ */
+export const ATTACH_DESTINATION_PROMPT = "This is…";
+export const ATTACH_DESTINATION_SAMPLE = "a writing sample of mine";
+/**
+ * THE DEFAULT, AND THE SAFER WRONG ANSWER. A business document mistakenly saved as a
+ * writing sample would teach the Brain to imitate AI generated marketing copy in the
+ * founder's own voice; a writing sample mistakenly saved as a document is only less
+ * useful, not actively wrong. When a founder does not choose, this is what happens.
+ */
+export const ATTACH_DESTINATION_DOCUMENT = "a document for the engine";
+export const ATTACH_CONFIRM = "Add file";
+
+/**
  * The largest file the server will take, spelled out in megabytes for a human. Bytes are
  * never shown; nobody thinks in them. Null before the server has said, and the popover
  * simply leaves the line out rather than showing a number it does not have yet.
@@ -201,9 +226,19 @@ export function attachedLine(name: string): string {
 export const TRUNCATED_NOTE =
   "This file was long, so only the first part of it was kept and the rest was cut.";
 
-/** One attempt at attaching a file, and what the founder reads at each stage of it. */
+/**
+ * One attempt at attaching a file, and what the founder reads at each stage of it.
+ *
+ * `selecting` IS NEW, AND IT SITS BETWEEN A FILE BEING PICKED AND THE UPLOAD STARTING.
+ * Every other state here answers a question about the network call; this one exists
+ * because a question has to be answered BEFORE that call is made: which folder does this
+ * file belong in. The file itself is not carried on the state — a `File` is not the kind of
+ * thing a reducer-shaped value should hold across renders comfortably — it sits in a ref
+ * instead, and `fileName` is here only for what the screen has to say while it waits.
+ */
 export type UploadState =
   | { readonly kind: "idle" }
+  | { readonly kind: "selecting"; readonly fileName: string }
   | { readonly kind: "uploading"; readonly fileName: string }
   | { readonly kind: "attached"; readonly doc: UploadedDocument }
   | { readonly kind: "failed"; readonly fileName: string; readonly text: string }
@@ -216,8 +251,10 @@ export type UploadState =
  * so there is exactly one place that decides this rather than two that have to agree. The
  * upload check is the load bearing one: `kind === "uploading"` is the only state that blocks
  * Send on account of the attachment, because it is the only state where the server does not
- * yet have the file a message is about to name. A failed or rejected attempt leaves the
- * composer exactly as usable as if nothing had been attached at all.
+ * yet have the file a message is about to name. `selecting`, a failed attempt, or a rejected
+ * one all leave the composer exactly as usable as if nothing had been attached at all: a
+ * founder who sends without confirming the choice on a selected file simply sends without
+ * that attachment, the same way sending past a failed upload already worked.
  */
 export function canSend(text: string, disabled: boolean, upload: UploadState): boolean {
   if (text.trim() === "" || disabled) return false;
@@ -244,8 +281,11 @@ export function Composer({
    */
   readonly onSend: (text: string, attachedName: string | null) => void;
   readonly onSaveAsFile: (text: string) => void;
-  /** Uploads one file and answers with its stored name, or with the server's own sentence. */
-  readonly onUpload: (file: File) => Promise<Result<UploadedDocument>>;
+  /**
+   * Uploads one file to the folder the founder's own choice named, and answers with its
+   * stored name, or with the server's own sentence.
+   */
+  readonly onUpload: (file: File, destination: AttachDestination) => Promise<Result<UploadedDocument>>;
   /**
    * The server's own ceiling on an upload, in bytes, or null before the caller knows it.
    * Optional, and defaulted to null, so a caller that has not wired this up yet renders a
@@ -255,6 +295,21 @@ export function Composer({
 }): ReactElement {
   const [text, setText] = useState("");
   const [upload, setUpload] = useState<UploadState>({ kind: "idle" });
+  /**
+   * The founder's own choice for the file currently `selecting`, defaulted to the safer
+   * wrong answer. Reset on every new pick, not carried over from a previous attachment: an
+   * earlier "writing sample" choice must never quietly apply to an unrelated later file.
+   */
+  const [destination, setDestination] = useState<AttachDestination>("documents");
+  /**
+   * The `File` a founder picked, held between `selecting` and the moment `beginUpload`
+   * actually sends it. Not on `UploadState` itself: a `File` is a handle onto something
+   * outside React's own render cycle, so it lives in a ref rather than in state that
+   * re-renders around it. Cleared the instant it is no longer needed — after the upload
+   * starts, or the founder removes the file, or sends past it unconfirmed — so a stale file
+   * can never be reused by a later, unrelated call.
+   */
+  const pendingFileRef = useRef<File | null>(null);
   // Two reasons the popover can be open, kept apart on purpose. `hoverOpen` is the transient
   // one: a mouse resting on the button, or a keyboard tabbed onto it, and it goes away the
   // instant that stops being true. `pinnedOpen` is the one a tap on the information toggle
@@ -279,6 +334,9 @@ export function Composer({
     const attachedName = upload.kind === "attached" ? upload.doc.name : null;
     setText("");
     setUpload({ kind: "idle" });
+    // A file left `selecting` (chosen, choice never confirmed) is dropped here rather than
+    // sent, the same way a failed or rejected one already was: the message goes without it.
+    pendingFileRef.current = null;
     onSend(text.trim(), attachedName);
   };
 
@@ -287,6 +345,24 @@ export function Composer({
       event.preventDefault();
       send();
     }
+  };
+
+  /**
+   * The choice confirmed: the file `selecting` in `pendingFileRef` actually goes to the
+   * server now, to whichever folder `destination` currently names.
+   */
+  const beginUpload = (): void => {
+    const file = pendingFileRef.current;
+    if (file === null) return;
+    setUpload({ kind: "uploading", fileName: file.name });
+    void onUpload(file, destination).then((result) => {
+      pendingFileRef.current = null;
+      setUpload(
+        result.ok
+          ? { kind: "attached", doc: result.value }
+          : { kind: "failed", fileName: file.name, text: result.problem.text },
+      );
+    });
   };
 
   const onFileChosen = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -304,17 +380,18 @@ export function Composer({
       setUpload({ kind: "rejected", fileName: file.name });
       return;
     }
-    setUpload({ kind: "uploading", fileName: file.name });
-    void onUpload(file).then((result) => {
-      setUpload(
-        result.ok
-          ? { kind: "attached", doc: result.value }
-          : { kind: "failed", fileName: file.name, text: result.problem.text },
-      );
-    });
+    // Selected, not yet uploading: the choice below decides which folder it goes to, and
+    // nothing is sent to the server until that choice is confirmed. Reset to the default
+    // every time, so an earlier file's choice never quietly carries over onto this one.
+    pendingFileRef.current = file;
+    setDestination("documents");
+    setUpload({ kind: "selecting", fileName: file.name });
   };
 
-  const clearAttachment = (): void => setUpload({ kind: "idle" });
+  const clearAttachment = (): void => {
+    pendingFileRef.current = null;
+    setUpload({ kind: "idle" });
+  };
 
   const closePopoverIfFocusLeft = (event: FocusEvent<HTMLDivElement>): void => {
     // React reports blur before it reports where focus landed, so the popover would flash
@@ -364,6 +441,52 @@ export function Composer({
       */}
       {upload.kind === "idle" ? null : (
         <div className="composer-attach-status-area">
+          {/*
+            THE CHOICE, SHOWN ONCE A FILE IS PICKED AND BEFORE ANY BYTE OF IT UPLOADS. A
+            real radio group, not two buttons that happen to look like one: `<fieldset>`
+            and `<legend>` name the question for a screen reader the way the visible "This
+            is…" names it for everyone else, and native radio semantics give arrow-key
+            movement between the two options for free. Removing the file here goes through
+            the same `clearAttachment` the "attached" state below uses, so there is one
+            way to back out of an attachment rather than two that have to agree.
+          */}
+          {upload.kind === "selecting" ? (
+            <div className="composer-attach-choice">
+              <p className="composer-attach-selected">
+                <span className="composer-attach-selected-name">{upload.fileName}</span>
+                <button type="button" className="button button-quiet" onClick={clearAttachment}>
+                  {REMOVE_ATTACHMENT}
+                </button>
+              </p>
+              <fieldset className="composer-attach-destination">
+                <legend>{ATTACH_DESTINATION_PROMPT}</legend>
+                <label className="composer-attach-destination-option">
+                  <input
+                    type="radio"
+                    name="composer-attach-destination"
+                    value="voice-samples"
+                    checked={destination === "voice-samples"}
+                    onChange={() => setDestination("voice-samples")}
+                  />
+                  {ATTACH_DESTINATION_SAMPLE}
+                </label>
+                <label className="composer-attach-destination-option">
+                  <input
+                    type="radio"
+                    name="composer-attach-destination"
+                    value="documents"
+                    checked={destination === "documents"}
+                    onChange={() => setDestination("documents")}
+                  />
+                  {ATTACH_DESTINATION_DOCUMENT}
+                </label>
+              </fieldset>
+              <button type="button" className="button" onClick={beginUpload}>
+                {ATTACH_CONFIRM}
+              </button>
+            </div>
+          ) : null}
+
           {upload.kind === "uploading" ? (
             <p className="composer-attach-status" role="status" aria-live="polite">
               {uploadingLine(upload.fileName)}

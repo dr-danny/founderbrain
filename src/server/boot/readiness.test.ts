@@ -356,7 +356,8 @@ describe('which requests start a turn', () => {
       ['POST', '/api/setup/ghl/location'],
       ['POST', '/api/threads/th_1/interrupt'],
       ['POST', '/api/auth/sign-out'],
-      ['POST', '/api/files/voice-samples'],
+      ['POST', '/api/uploads/voice-samples'],
+      ['POST', '/api/uploads/documents'],
     ] as const) {
       assert.ok(!startsATurn(method, url), `${method} ${url} does not start a turn`);
     }
