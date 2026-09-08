@@ -36,7 +36,7 @@ export type PortGroup =
   | "B"
   /** C: the working folder rule. Replaced with the app's own promise. */
   | "C"
-  /** E: the four additions the port forces. */
+  /** E: the five additions the port forces. */
   | "E"
   /** T: the track markers section 4 requires around both tracks' prose. */
   | "T";
@@ -281,6 +281,18 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     added: [
       "## Numbers",
       "Labelled lines the 90 day plan projects from. Customers now, average monthly value, target in 90 days. Write unknown where they do not know yet.",
+      "",
+    ],
+  },
+  {
+    skill: "founder-brain",
+    group: "E",
+    why:
+      "Group E5. The app stores founder uploads in two folders, voice-samples/ and uploads/, that do not exist in the public content repo, so nothing told the model which one carries voice. Uploads/ is often AI-generated business material and must never be read for voice",
+    times: 1,
+    removed: [],
+    added: [
+      "Two folders hold what a founder gives you. `growth-engine/voice-samples/` holds their own writing. Read these for voice, and you may add to this folder yourself. `growth-engine/uploads/` holds reference documents they supplied. Read them for facts, topics and context, never for voice, because they may be AI-generated or written by somebody else.",
       "",
     ],
   },

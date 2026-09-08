@@ -24,10 +24,12 @@ import type { FastifyInstance } from 'fastify';
 import { registerFileRoutes } from './files.ts';
 import { registerGateRoutes } from './gates.ts';
 import { registerHomeRoute } from './home.ts';
+import { registerLimitsRoutes } from './limits.ts';
 import { registerSetupRoutes } from './setup.ts';
 import { registerMessageRoutes } from './messages.ts';
 import { registerStreamRoute, OpenStreams } from './stream.ts';
 import { registerThreadRoutes } from './threads.ts';
+import { registerUploadRoutes } from './uploads.ts';
 import type { RouteDeps } from './deps.ts';
 
 export interface RegisteredRoutes {
@@ -53,11 +55,13 @@ export async function registerApiRoutes(app: FastifyInstance, deps: RouteDeps): 
    */
   await registerHomeRoute(app, deps);
   await registerSetupRoutes(app, deps);
+  await registerLimitsRoutes(app, deps);
   await registerGateRoutes(app, deps);
   await registerThreadRoutes(app, deps);
   await registerMessageRoutes(app, deps);
   await registerStreamRoute(app, deps, streams);
   await registerFileRoutes(app, deps);
+  await registerUploadRoutes(app, deps);
   return { streams };
 }
 
@@ -69,7 +73,9 @@ export { mayStart, visibleRoutes } from './threads.ts';
 export { nextRouteId, progressOf } from './home.ts';
 export { gateFileStatus, presentFiles, trackFilter, trackOf } from './founder-state.ts';
 export { isRealTimezone, looksLikeAToken, SETUP_ERRORS } from './setup.ts';
-export { FILE_ERRORS, listRowsFor, safeDecode } from './files.ts';
+export { listRowsFor, safeDecode } from './files.ts';
+export { limitsView, type LimitView, type LimitsView } from './limits.ts';
+export { provenanceHeader, slugForUpload } from './uploads.ts';
 export { buildZip, crc32, ZipTooLarge } from './zip.ts';
 export { SSE_HEADERS, SseStream, formatFrame, parseLastEventId } from './sse.ts';
 export { ERRORS, errorBody } from './errors.ts';

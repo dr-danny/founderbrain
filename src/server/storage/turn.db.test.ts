@@ -45,7 +45,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { claimTheDatabase, type DatabaseClaim, dbTest, NO_DATABASE } from '../../../tests/db/setup.ts';
 import { closeDb, getDb, setFounderScope } from '../db/client.ts';
@@ -280,6 +280,114 @@ describe('the turn, against a real Postgres', () => {
       }),
     );
     assert.deepEqual(seen.value, await pathsInRecord());
+  });
+
+  /**
+   * COMMIT 2: routes/uploads.ts is one handler shared by two routes, each
+   * writing exactly the path it promised as `subject`. This is the end to end
+   * proof, at the layer that actually enforces it: an upload turn commits when
+   * it writes only the one path it named, whichever folder a founder's own
+   * choice picked.
+   */
+  it('an upload turn writes exactly the path it promised, in either folder a founder chose', dbTest, async () => {
+    const before = await pathsInRecord();
+
+    for (const path of ['uploads/report-docx.md', 'voice-samples/sample.md']) {
+      const outcome = await runTurn(
+        { founderId: FOUNDER, actor: 'founder', verb: 'upload', subject: path },
+        async (ctx) => {
+          const [folder] = path.split('/');
+          await mkdir(join(ctx.home, folder ?? ''), { recursive: true });
+          await writeFile(join(ctx.home, path), '# a founder upload\n', 'utf8');
+          return null;
+        },
+      );
+      assert.equal(outcome.gate.held.length, 0, `${path} was held by the gate rather than committed`);
+    }
+
+    const after = await pathsInRecord();
+    assert.deepEqual(after, [...before, 'uploads/report-docx.md', 'voice-samples/sample.md'].sort());
+
+    // Cleanup, so the suite after this one sees the record it expects. Both
+    // halves: the DB row AND the file materialise actually wrote, because a row
+    // deleted without its file removed too leaves the warm folder on disk
+    // disagreeing with the record, and the next turn's harvest reads that
+    // disagreement as an unpromised change of its own.
+    for (const path of ['uploads/report-docx.md', 'voice-samples/sample.md']) {
+      await rm(join(geHome(FOUNDER), path), { force: true });
+    }
+    await getDb().transaction(async (tx) => {
+      await setFounderScope(tx, FOUNDER);
+      await tx
+        .delete(geFile)
+        .where(
+          and(
+            eq(geFile.founderId, FOUNDER),
+            inArray(geFile.path, ['uploads/report-docx.md', 'voice-samples/sample.md']),
+          ),
+        );
+    });
+    assert.deepEqual(await pathsInRecord(), before);
+  });
+
+  /**
+   * THE TIGHTENED CHECK, PROVED BOTH WAYS. `storage/turn.ts` used to refuse an
+   * upload turn only when it wrote outside `uploads/`, which is exactly the
+   * check that would have refused every voice sample the moment this commit
+   * started writing them to `voice-samples/`. It now compares the plan against
+   * `subject` instead, so a voice sample is not refused for landing in its own
+   * folder, and a turn that writes anywhere other than what it promised still
+   * is, whichever folder that path happens to sit under.
+   */
+  it('THE TIGHTENED CHECK: a voice sample is not refused for landing in voice-samples/', dbTest, async () => {
+    const before = await pathsInRecord();
+    const path = 'voice-samples/second-sample.md';
+
+    const outcome = await runTurn(
+      { founderId: FOUNDER, actor: 'founder', verb: 'upload', subject: path },
+      async (ctx) => {
+        await mkdir(join(ctx.home, 'voice-samples'), { recursive: true });
+        await writeFile(join(ctx.home, path), '# another sample\n', 'utf8');
+        return null;
+      },
+    );
+    assert.equal(outcome.gate.held.length, 0);
+    assert.deepEqual(await pathsInRecord(), [...before, path].sort());
+
+    await rm(join(geHome(FOUNDER), path), { force: true });
+    await getDb().transaction(async (tx) => {
+      await setFounderScope(tx, FOUNDER);
+      await tx.delete(geFile).where(and(eq(geFile.founderId, FOUNDER), eq(geFile.path, path)));
+    });
+    assert.deepEqual(await pathsInRecord(), before);
+  });
+
+  it('THE TIGHTENED CHECK: an upload turn that writes anywhere but its promised path is refused whole, not narrowed', dbTest, async () => {
+    const before = await pathsInRecord();
+
+    await assert.rejects(
+      () =>
+        runTurn(
+          { founderId: FOUNDER, actor: 'founder', verb: 'upload', subject: 'voice-samples/promised.md' },
+          async (ctx) => {
+            // Writes a DIFFERENT path than the one it promised as `subject` — the
+            // exact bug this check exists to catch, whether that other path sits
+            // under an "allowed" upload folder or not.
+            await mkdir(join(ctx.home, 'voice-samples'), { recursive: true });
+            await writeFile(join(ctx.home, 'voice-samples', 'not-what-was-promised.md'), '# oops\n', 'utf8');
+            return null;
+          },
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof TurnRefused, `expected TurnRefused, got ${String(err)}`);
+        assert.equal(err.code, 'upload_broke_promise');
+        return true;
+      },
+    );
+
+    // Refused whole: the record shows neither the promised path nor the one
+    // actually written.
+    assert.deepEqual(await pathsInRecord(), before);
   });
 
 });

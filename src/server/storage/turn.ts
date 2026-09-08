@@ -469,6 +469,28 @@ export function founderGateCount(): number {
   return founderGates.size;
 }
 
+/**
+ * Does this founder have a turn in flight right now, in this process?
+ *
+ * FOR THE UPLOAD ROUTE. `agent/queue.ts` tracks a founder as "running" too,
+ * in `runningByFounder`, but that set is scoped to the queue's own admission
+ * and does not cover every caller of `runTurn` (a `ge` verb spawned outside
+ * the queue, for one), and the queue is not a file this task owns. This map
+ * is: it is the exact thing that would make the upload's own call to
+ * `runTurn` wait, because `withFounderGate` above is built from it. So this
+ * is the least invasive check available, not a second one added beside it.
+ *
+ * It answers the question at the moment it is asked. A turn can start in the
+ * gap between this returning false and the caller's own `runTurn` call, and
+ * that call then waits out the turn in front rather than hanging forever —
+ * the same wait `withFounderGate` always gave. What this buys is the common
+ * case: a founder typing mid-answer gets 409 in milliseconds instead of
+ * discovering the wait at the end of an HTTP timeout.
+ */
+export function founderIsBusy(founderId: string): boolean {
+  return founderGates.has(founderId);
+}
+
 /* -------------------------------------------------------------------------- */
 /* The handle the work function is given                                       */
 /* -------------------------------------------------------------------------- */
@@ -699,6 +721,33 @@ async function commitTurn<T>(
 
       const plan = await planHarvest(tx, { founderId, materialised, version: versionAfter });
 
+      // THE OTHER HALF OF THE UPLOAD PROMISE, AND IT LIVES HERE RATHER THAN
+      // IN THE GATE. `rules/harvest-gate.ts` answers "may this file be
+      // exempt", keyed on `verb`; this is "did the ROUTE THAT CLAIMED verb
+      // 'upload' actually keep its promise". routes/uploads.ts registers two
+      // routes off one shared handler, one for `uploads/` and one for
+      // `voice-samples/`, and each writes exactly one file, in its `work`
+      // callback, at the exact path it also passes as `subject` on this turn
+      // (see `RunTurnOptions.subject` above). So the check is not "somewhere
+      // under an allowed folder" — a founder's choice at upload time decides
+      // which folder that is, and this file does not referee that choice —
+      // it is "the plan's changes are exactly the one path this turn
+      // promised". Anything else — a second file, a different path, changes
+      // with no subject to compare against — means the promise was broken, a
+      // bug in that route rather than a founder's choice, and the whole turn
+      // is refused rather than silently narrowed to the promised path and
+      // applied anyway.
+      if (verb === 'upload') {
+        const outside = plan.changes.filter((c) => c.path !== options.subject);
+        if (outside.length > 0) {
+          throw new TurnRefused(
+            'upload_broke_promise',
+            `an upload turn promised ${String(options.subject)} and tried to write ` +
+              `${outside.map((c) => c.path).join(', ')} instead. Refusing the whole turn rather than saving part of it.`,
+          );
+        }
+      }
+
       const gate = await gateHarvest({
         founderId,
         changes: plan.changes.map((c) => ({
@@ -713,6 +762,9 @@ async function commitTurn<T>(
         brain: brain?.text ?? null,
         grounding: founderSaidAsGrounding(options.founderSaid),
         readPrevious: (path) => previousText(tx, founderId, dataKey, path),
+        // THE UPLOADS/ EXEMPTION IS KEYED HERE, on the turn's own verb, and
+        // nowhere path-based. See rules/harvest-gate.ts for the full argument.
+        verb,
       });
 
       // NOTHING ABOVE THIS LINE HAS TOUCHED ge_file, and nothing below it can be

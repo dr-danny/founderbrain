@@ -1,9 +1,10 @@
 /**
  * src/server/routes/files.ts
  *
- * WHAT THIS IS. Rule 4 as five HTTP routes: list what a founder has, open one
- * file, download one file, download the whole folder as a ZIP, and the one that
- * honestly refuses to save a pasted sample yet.
+ * WHAT THIS IS. Rule 4 as four HTTP routes: list what a founder has, open one
+ * file, download one file, and download the whole folder as a ZIP. Saving a
+ * founder's own upload is routes/uploads.ts, not this file: that route runs
+ * inside a turn, the machinery this one deliberately does not have.
  *
  * WHY IT EXISTS. On a laptop this rule held itself. The files were in a folder
  * the founder could open, and if they could not find it that was their problem
@@ -49,15 +50,14 @@
  * WHAT IT WRITES. Nothing.
  */
 
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
 import { GATE_FILES } from '../../../app/content/gates.ts';
 import { gateLabelForFile, trackForFile } from '../rules/index.ts';
 import { assertSafeRelPath, GE_FOLDER, PathRefused } from '../storage/paths.ts';
 import { trackFilter } from './founder-state.ts';
 import type { FileStatus } from './founder-state.ts';
-import { ERRORS, errorBody, type FounderError } from './errors.ts';
-import { extensionOf, LIMIT_FILE_BYTES, UPLOAD_EXTENSIONS } from '../storage/paths.ts';
+import { ERRORS, errorBody } from './errors.ts';
 import { ZipTooLarge, buildZip, type ZipEntry } from './zip.ts';
 import type { FileRow } from './ports.ts';
 import type { RouteDeps } from './deps.ts';
@@ -74,99 +74,6 @@ export interface FileListRow {
   /** Only for `people/`, where the row is a count that expands. */
   readonly count?: number;
 }
-
-/**
- * The most this route will read off the wire.
- *
- * The file limit plus a little, because a body is the file and nothing else and
- * the founder facing refusal should be the one in FILE_ERRORS rather than
- * Fastify's. The instance limit is 1 MB, which is BELOW the 2 MB a file may be,
- * so without this the first wall a founder meets is one nobody wrote a sentence
- * for.
- */
-const UPLOAD_BODY_LIMIT = LIMIT_FILE_BYTES + 64 * 1024;
-
-/**
- * The founder's own file name, out of the header the browser encoded it into.
- *
- * Encoded because it is theirs: an apostrophe or an accent in a file name is the
- * ordinary case, and a raw one in a header is where that goes wrong. A value that
- * will not decode is treated as no name at all rather than guessed at.
- */
-function decodedName(header: string | undefined): string {
-  try {
-    return decodeURIComponent(header ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
-/** One refusal, said once. Every upload refusal is a sentence, not a stack. */
-function send(reply: FastifyReply, error: FounderError): FastifyReply {
-  return reply.code(error.status).send(errorBody(error));
-}
-
-export const FILE_ERRORS = {
-  /**
-   * Saving a pasted sample as a file. Not built, and 501 says so.
-   *
-   * A single file written outside a turn would have to materialise the folder,
-   * write into it and harvest it, which is the turn machinery, without the
-   * advisory lock that stops two of those racing. Doing that here would mean a
-   * founder's sample landing in a folder another turn is about to roll back.
-   * That is storage's decision to make and not this layer's, so the route says
-   * what is true and gives the founder something that works today.
-   */
-  /**
-   * A format the model cannot open. The list is measured, not chosen: see
-   * UPLOAD_EXTENSIONS in ../storage/paths.ts.
-   *
-   * The message names the fix rather than the rule, because "unsupported file
-   * type" leaves a founder holding a Word document with nowhere to go, and the
-   * answer is eight seconds of work they already know how to do.
-   */
-  uploadWrongType: {
-    status: 415,
-    code: 'upload_wrong_type',
-    message:
-      'We can read plain text, Markdown, CSV, PDF and photos saved as PNG, JPG, GIF or WEBP. Word documents cannot be read, and neither can the HEIC photos an iPhone saves by default. For a Word file, open it, choose File then Save As, and pick PDF. For a photo, send it to yourself by email or message first, which converts it.',
-  },
-  uploadTooLarge: {
-    status: 413,
-    code: 'upload_too_large',
-    message:
-      'That file is bigger than 2 MB, which is the most one file can be. Nothing else is affected. A long document saved as a PDF is usually well under it, and a photo can be made smaller by sending it to yourself at a smaller size.',
-  },
-  uploadNoRoom: {
-    status: 413,
-    code: 'upload_no_room',
-    message:
-      'Your folder is full, so this was not saved and nothing else has changed. Delete something you no longer need, or ask in Slack.',
-  },
-  /**
-   * The one refusal that is about timing rather than the file.
-   *
-   * It says wait, because waiting works. A founder who uploads while an engine
-   * is mid run is doing something reasonable, and the answer is thirty seconds
-   * rather than a fault.
-   */
-  uploadBusy: {
-    status: 409,
-    code: 'upload_busy',
-    message:
-      'One of your engines is running, so this was not saved. Nothing is lost and nothing is broken. Wait for it to finish, then add the file again.',
-  },
-  uploadEmpty: {
-    status: 400,
-    code: 'upload_empty',
-    message: 'That file is empty, so there was nothing to save. Check you picked the right one and try again.',
-  },
-  uploadNoName: {
-    status: 400,
-    code: 'upload_no_name',
-    message: 'That file arrived without a name, so we could not save it. Try again, and if it happens twice say so in Slack.',
-  },
-} as const satisfies Record<string, FounderError>;
 
 /**
  * What a browser should do with each kind of file.
@@ -267,7 +174,23 @@ export function readmeFor(files: readonly FileRow[], today: string): string {
 export function listRowsFor(
   held: readonly FileRow[],
   mayShow: (path: string) => boolean,
-): { rows: readonly FileListRow[]; stateRows: readonly FileListRow[] } {
+): {
+  rows: readonly FileListRow[];
+  stateRows: readonly FileListRow[];
+  /**
+   * A founder's own uploaded documents, split out exactly as `.state/` already
+   * is. Additive: `rows` and `stateRows` keep the shape and the meaning they
+   * had before this existed, because the files screen is being built against
+   * both of those in parallel with this change.
+   */
+  uploadRows: readonly FileListRow[];
+  /**
+   * The founder's own writing, kept apart from `uploadRows` because the two
+   * folders mean different things to them: this one taught the Brain their
+   * voice, `uploadRows` never did.
+   */
+  voiceRows: readonly FileListRow[];
+} {
   const visible = held.filter((r) => mayShow(r.path));
   const byPath = new Map(visible.map((r) => [r.path, r]));
   const named = new Set<string>();
@@ -312,6 +235,8 @@ export function listRowsFor(
   }
 
   const stateRows: FileListRow[] = [];
+  const uploadRows: FileListRow[] = [];
+  const voiceRows: FileListRow[] = [];
   for (const r of visible) {
     if (named.has(r.path)) continue;
     const row: FileListRow = {
@@ -325,11 +250,17 @@ export function listRowsFor(
     };
     // `.state/` is the toolkit's own bookkeeping. Shown rather than hidden,
     // behind a disclosure, because a folder we hide is a folder they do not own.
-    if (r.path.startsWith('.state/')) stateRows.push(row);
+    // `uploads/` is a founder's own reference document, and `voice-samples/`
+    // is their own writing: both are clearly distinguishable from everything
+    // the app generated, which is `rows` and `stateRows` both, and from each
+    // other, because one taught the Brain their voice and the other did not.
+    if (r.path.startsWith('uploads/')) uploadRows.push(row);
+    else if (r.path.startsWith('voice-samples/')) voiceRows.push(row);
+    else if (r.path.startsWith('.state/')) stateRows.push(row);
     else rows.push(row);
   }
 
-  return { rows, stateRows };
+  return { rows, stateRows, uploadRows, voiceRows };
 }
 
 export async function registerFileRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
@@ -356,76 +287,6 @@ export async function registerFileRoutes(app: FastifyInstance, deps: RouteDeps):
     }
     return reply.send(listRowsFor(held, mayShow));
   });
-
-  /**
-   * RAW BYTES, NOT MULTIPART, and that is a decision rather than a shortcut.
-   *
-   * @fastify/multipart is the obvious answer and it costs a dependency. This
-   * app is forked and `npm ci`'d by 130 non technical people, and 32 of the 476
-   * entries already in package-lock.json resolve to Replit's own package
-   * firewall, so regenerating that lock is a real risk taken in a room with no
-   * time in it. One file per request needs no envelope: the body IS the file and
-   * the name rides in a header.
-   *
-   * `parseAs: 'buffer'` because the bytes are a PDF as often as they are text,
-   * and anything that decodes them as UTF-8 on the way in has already lost them.
-   */
-  app.addContentTypeParser(
-    'application/octet-stream',
-    { parseAs: 'buffer', bodyLimit: UPLOAD_BODY_LIMIT },
-    (_req, body, done) => { done(null, body); },
-  );
-
-  /**
-   * One file a founder uploaded, into voice-samples/.
-   *
-   * WHAT THIS ROUTE DOES NOT DO, because the 501 that used to live here was
-   * right about the danger and wrong about the shape. It never materialises the
-   * folder, never writes to disk and never harvests, so it never races ge for
-   * the folder. It writes the record, and the version bump invalidates the
-   * epoch, so the next turn rebuilds and the file is simply there.
-   *
-   * The route's own bodyLimit is above the instance's 1 MB, which is smaller
-   * than the 2 MB a file may be. Without it the wall a founder hits first is
-   * Fastify's, which answers with a message nobody wrote.
-   */
-  app.post(
-    '/api/files/voice-samples',
-    { bodyLimit: UPLOAD_BODY_LIMIT },
-    async (request, reply) => {
-      if (!(await deps.auth.requireFounder(request, reply))) return reply;
-      const founder = deps.auth.founderOf(request);
-
-      const raw = request.headers['x-upload-name'];
-      const name = decodedName(Array.isArray(raw) ? raw[0] : raw);
-      if (name === '') return send(reply, FILE_ERRORS.uploadNoName);
-
-      if (!UPLOAD_EXTENSIONS.includes(extensionOf(name))) {
-        deps.log.info({ founderId: founder.id, ext: extensionOf(name) }, 'upload refused on type');
-        return send(reply, FILE_ERRORS.uploadWrongType);
-      }
-
-      const bytes = request.body;
-      if (!Buffer.isBuffer(bytes) || bytes.byteLength === 0) {
-        return send(reply, FILE_ERRORS.uploadEmpty);
-      }
-
-      const outcome = await deps.store.saveUpload(founder.id, { name, bytes });
-      if (outcome.ok) {
-        deps.log.info(
-          { founderId: founder.id, path: outcome.path, sizeBytes: outcome.sizeBytes },
-          'a founder added a file of their own',
-        );
-        return reply.code(201).send({ path: outcome.path, sizeBytes: outcome.sizeBytes });
-      }
-
-      // Every one of these is an ordinary answer rather than a fault, so each
-      // gets the sentence written for it rather than a generic failure.
-      if (outcome.reason === 'turn_in_flight') return send(reply, FILE_ERRORS.uploadBusy);
-      if (outcome.reason === 'too_large') return send(reply, FILE_ERRORS.uploadTooLarge);
-      return send(reply, FILE_ERRORS.uploadNoRoom);
-    },
-  );
 
   /**
    * Everything, as one ZIP, built from the database in one pass.

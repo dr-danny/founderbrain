@@ -347,6 +347,9 @@ const PURPOSE: Readonly<Record<string, string>> = {
   GE_TIMEOUT_MS: "How long a ge invocation may take before it is killed. Default 10000, which is the number in the build document failure table.",
   WORKSPACE_ROOT: "Root of the per founder scratch folders. Default /tmp/ge. Not durable, by design.",
   GE_CONTENT_ROOT: "Where the public content repo is checked out. Blank uses the vendored submodule.",
+  GE_LIMIT_FILE_BYTES: "Override for the largest single file a harvest will store. Default is detected from this machine.",
+  GE_LIMIT_TOTAL_BYTES: "Override for the largest a founder's whole folder may grow. Default is detected from this machine.",
+  GE_LIMIT_FILE_COUNT: "Override for the most files a founder's folder may hold. Default is detected from this machine.",
   PGPOOL_MAX: "Postgres connections this process may open. Default 10, and it is a guess until B7 is run.",
   PG_STATEMENT_TIMEOUT_MS: "Cap on one statement. Default 30000. A statement past it is wedged, and a wedged statement holds a founder's lock.",
   OWNER_PASSPHRASE: "The passphrase that signs the founder in. Set it in Replit Secrets. Nobody can sign in until it is there.",
@@ -615,6 +618,14 @@ export interface LateSettings {
   readonly masterKeys: ReadonlyMap<number, string>;
   /** GE_MASTER_KEY_VERSION when it is set. Absent means the highest version held. */
   readonly masterKeyVersionPin: number | undefined;
+  /**
+   * Overrides for the three storage limits storage/paths.ts otherwise detects from the
+   * host. Absent means "let detection decide". See storageLimits() in storage/paths.ts
+   * for what a founder actually gets.
+   */
+  readonly limitFileBytes: number | undefined;
+  readonly limitTotalBytes: number | undefined;
+  readonly limitFileCount: number | undefined;
   /** Keeps the database URL and the keyring out of a stray log line. */
   toJSON(): Record<string, unknown>;
 }
@@ -635,6 +646,9 @@ const lateSchema = z.object({
   PG_STATEMENT_TIMEOUT_MS: wholeNumber(1_000, 600_000).optional(),
   GE_CONTENT_ROOT: z.string().trim().min(1).optional(),
   GE_MASTER_KEY_VERSION: wholeNumber(1, MAX_MASTER_KEY_VERSION).optional(),
+  GE_LIMIT_FILE_BYTES: wholeNumber(1, Number.MAX_SAFE_INTEGER).optional(),
+  GE_LIMIT_TOTAL_BYTES: wholeNumber(1, Number.MAX_SAFE_INTEGER).optional(),
+  GE_LIMIT_FILE_COUNT: wholeNumber(1, Number.MAX_SAFE_INTEGER).optional(),
 });
 
 /**
@@ -703,6 +717,9 @@ export function parseLateSettings(raw: Readonly<Record<string, string | undefine
     contentRoot: v.GE_CONTENT_ROOT !== undefined ? resolve(v.GE_CONTENT_ROOT) : undefined,
     masterKeys: masterKeys as ReadonlyMap<number, string>,
     masterKeyVersionPin: v.GE_MASTER_KEY_VERSION,
+    limitFileBytes: v.GE_LIMIT_FILE_BYTES,
+    limitTotalBytes: v.GE_LIMIT_TOTAL_BYTES,
+    limitFileCount: v.GE_LIMIT_FILE_COUNT,
     toJSON(): Record<string, unknown> {
       return {
         geBin: settings.geBin,
@@ -715,6 +732,9 @@ export function parseLateSettings(raw: Readonly<Record<string, string | undefine
         databaseUrl: databaseUrl === undefined ? "[not set]" : "[set, not shown]",
         masterKeys: `${String(settings.masterKeys.size)} version(s) held, values not shown`,
         masterKeyVersionPin: settings.masterKeyVersionPin,
+        limitFileBytes: settings.limitFileBytes,
+        limitTotalBytes: settings.limitTotalBytes,
+        limitFileCount: settings.limitFileCount,
       };
     },
   });

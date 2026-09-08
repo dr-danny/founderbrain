@@ -51,9 +51,9 @@ import type { ReactElement } from "react";
 import { checkProseText } from "../../server/rules/prose.ts";
 import { GHL_WALK_STEPS } from "../../../app/content/ghl-walk.ts";
 import { founder, homeState, screenText, setupState } from "../test-fixtures.ts";
-import type { FilesState, Founder, GatesState } from "../lib/api.ts";
+import type { FilesState, Founder, GatesState, StorageLimits } from "../lib/api.ts";
 import { Home } from "./Home.tsx";
-import { Setup } from "./Setup.tsx";
+import { Setup, StorageLimitsPanel } from "./Setup.tsx";
 import { SignIn } from "./SignIn.tsx";
 import { Apollo } from "./Apollo.tsx";
 import { GhlIntro, GhlWalk } from "./GhlWalk.tsx";
@@ -304,6 +304,28 @@ const FILES: FilesState = {
       track: "both",
     },
   ],
+  uploadRows: [
+    {
+      name: "uploads/last-newsletter.docx",
+      gateLabel: "-",
+      status: "ok",
+      sizeBytes: 22140,
+      changedAt: "2026-09-20T10:00:00Z",
+      kind: "other",
+      track: "both",
+    },
+  ],
+  voiceRows: [
+    {
+      name: "voice-samples/onboarding-email.md",
+      gateLabel: "-",
+      status: "ok",
+      sizeBytes: 3120,
+      changedAt: "2026-09-20T10:05:00Z",
+      kind: "markdown",
+      track: "both",
+    },
+  ],
 };
 
 /**
@@ -330,6 +352,45 @@ const GATES: GatesState = {
   formUrl: { A: "https://docs.google.com/forms/d/e/example/viewform", B: null, C: null },
 };
 
+/** Automatic on all three: nothing set, nothing clamped, nothing shadowed. */
+const LIMITS_AUTO: StorageLimits = {
+  fileBytes: { value: 26214400, detected: 26214400, source: "detection", requested: null, clamped: false, shadowedConfig: null },
+  totalBytes: {
+    value: 5368709120,
+    detected: 5368709120,
+    source: "detection",
+    requested: null,
+    clamped: false,
+    shadowedConfig: null,
+  },
+  fileCount: { value: 5000, detected: 5000, source: "detection", requested: null, clamped: false, shadowedConfig: null },
+};
+
+/**
+ * One limit clamped down from what the owner asked for, one carrying an ignored environment
+ * variable, and one set by that same kind of variable rather than by the owner. All three of
+ * the panel's harder sentences, reached in one fixture.
+ */
+const LIMITS_CLAMPED: StorageLimits = {
+  fileBytes: {
+    value: 5368709120,
+    detected: 26214400,
+    source: "owner",
+    requested: 10737418240,
+    clamped: true,
+    shadowedConfig: null,
+  },
+  totalBytes: {
+    value: 2147483648,
+    detected: 5368709120,
+    source: "owner",
+    requested: 2147483648,
+    clamped: false,
+    shadowedConfig: 1073741824,
+  },
+  fileCount: { value: 5000, detected: 5000, source: "config", requested: null, clamped: false, shadowedConfig: null },
+};
+
 function walkStep(slug: string): ReactElement {
   return createElement(GhlWalk, {
     slug,
@@ -351,6 +412,14 @@ const LOADED: readonly (readonly [string, ReactElement])[] = [
   [
     "gates, no track yet",
     await loadedScreen(Gates, { founder: founder(null, { trackLocked: false }) }, { "/api/gates": GATES }),
+  ],
+  [
+    "storage limits, automatic",
+    await loadedScreen(StorageLimitsPanel, {}, { "/api/limits": LIMITS_AUTO }),
+  ],
+  [
+    "storage limits, clamped and shadowed",
+    await loadedScreen(StorageLimitsPanel, {}, { "/api/limits": LIMITS_CLAMPED }),
   ],
 ];
 
@@ -399,10 +468,24 @@ test("THE LOADED SCREENS REALLY ARE LOADED, so the two tests above are reading t
   // above still claims the screen is checked. Each phrase below exists only in the branch
   // that renders after the data has arrived.
   const mustCarry: Readonly<Record<string, readonly string[]>> = {
-    "files, with files in it": ["Take everything", "Download everything", "founder-brain.md"],
+    "files, with files in it": [
+      "Take everything",
+      "Download everything",
+      "founder-brain.md",
+      "What you brought in yourself",
+      "last-newsletter.docx",
+      "Your writing samples",
+      "onboarding-email.md",
+    ],
     "gates, B2C, with progress on it": ["Open the form", "You sent this one on", "Next:"],
     "gates, B2B, with progress on it": ["Open the form", "Next:"],
     "gates, no track yet": ["Two of the three are the same for everybody", "Next:"],
+    "storage limits, automatic": ["We measured what this machine can handle: up to 25 MB"],
+    "storage limits, clamped and shadowed": [
+      "You asked for 10 GB. This machine can only manage 5 GB, so that is what we set it to.",
+      "environment variable set to 1 GB for this. It is being ignored",
+      "5,000 files",
+    ],
   };
 
   for (const [label, element] of LOADED) {

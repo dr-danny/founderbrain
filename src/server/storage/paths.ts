@@ -30,6 +30,8 @@
  */
 
 import { posix as posixPath, resolve, sep } from 'node:path';
+import { statfsSync } from 'node:fs';
+import { totalmem } from 'node:os';
 import { lateSettings } from '../env.ts';
 
 /** ULID. 26 characters of Crockford base32: no I, L, O or U, so no digit lookalikes. */
@@ -55,10 +57,304 @@ export const GE_FOLDER = 'growth-engine';
  */
 export const EPOCH_FILE = '.ge-epoch';
 
-/** Section 5, size limits and failure. Refused politely, before the write. */
-export const LIMIT_TOTAL_BYTES = 50 * 1024 * 1024;
-export const LIMIT_FILE_BYTES = 2 * 1024 * 1024;
-export const LIMIT_FILE_COUNT = 400;
+// -----------------------------------------------------------------------------------------
+// Section 5, size limits and failure. Refused politely, before the write.
+//
+// WHY THESE ARE DETECTED RATHER THAN PRESET. This app is self-hosted: every founder runs
+// their own copy, on their own machine or their own Replit plan, and a number picked for us
+// means nothing about the box it lands on. So the limit is worked out from what the host
+// actually has — free disk, total memory — at the first call, cached from then on because a
+// limit that moves mid-process is a bug (a turn refused at byte 40M and accepted at byte
+// 60M with nothing else having changed is not a limit, it is a coin flip). An operator who
+// knows better overrides it through GE_LIMIT_FILE_BYTES, GE_LIMIT_TOTAL_BYTES and
+// GE_LIMIT_FILE_COUNT in src/server/env.ts.
+//
+// THREE SOURCES NOW, AND THE ORDER IS OWNER, THEN CONFIG, THEN DETECTION. The Setup screen
+// lets the founder who owns this deployment set their own three numbers, and that value
+// beats GE_LIMIT_*, not the other way round. GE_LIMIT_* is how an operator seeds a fresh
+// deployment before anybody has opened it; once the owner changes a limit on a screen inside
+// their own app, a Secret they cannot see or edit from that screen must not go on quietly
+// winning. See applyStoredLimits below for where the owner's value enters, and
+// limits-store.ts for where it is read from and written to Postgres.
+//
+// THE FLOORS ARE THE THREE NUMBERS THIS FILE USED TO HARD-CODE, and detection may only ever
+// raise a limit above them, never lower one. A founder whose growth-engine/ folder already
+// holds 40 MB, running on a host that happens to report little free disk that day, would
+// otherwise have a detected total-bytes limit below what is already on disk, and every save
+// after that — including one that deletes nothing and adds one small file — would be
+// refused forever. The floor is the guarantee that detection can only make room, never take
+// it away.
+//
+// THE OWNER DOES NOT GET GE_LIMIT_*'S FREEDOM TO GO BELOW THE FLOOR. An operator who types a
+// number below the floor into a Secret has read the number and decided that. A non-technical
+// owner typing "0" into a form field on the Setup screen has made a mistake, not a decision,
+// and a mistake there must not turn into a folder that refuses its own next save forever.
+// So an owner-set value is clamped on both sides: never below its floor (limits-store.ts may
+// raise that floor above the constant below, to the founder's current usage, so the owner
+// also cannot set a ceiling under what is already on disk), never above what detection says
+// this machine can actually hold.
+// -----------------------------------------------------------------------------------------
+
+const MiB = 1024 * 1024;
+const GiB = 1024 * MiB;
+
+/**
+ * The three limits in force today, unchanged. See the section header for why they floor.
+ *
+ * EXPORTED so limits-store.ts can use the same numbers as the absolute bottom under an
+ * owner-set value, rather than a second copy of "2 MiB" living in two files and drifting.
+ */
+export const FLOOR_FILE_BYTES = 2 * MiB;
+export const FLOOR_TOTAL_BYTES = 50 * MiB;
+export const FLOOR_FILE_COUNT = 400;
+
+/** A ceiling on detection only. An explicit override is not bound by this. */
+const CEIL_FILE_BYTES = 256 * MiB;
+const CEIL_TOTAL_BYTES = 5 * GiB;
+const CEIL_FILE_COUNT = 10_000;
+
+function clamp(n: number, floor: number, ceil: number): number {
+  return Math.min(Math.max(n, floor), ceil);
+}
+
+interface DetectedLimits {
+  fileBytes: number;
+  totalBytes: number;
+  fileCount: number;
+}
+
+/**
+ * The two host facts detection is built from.
+ *
+ * TEST SEAM. statfsSync and totalmem are facts about the real machine a test does not
+ * control and should not have to reproduce (a test asserting "the floor applies on a
+ * machine with 1 GB free" should not need a container with 1 GB free). This interface is
+ * how limits.test.ts swaps them for fakes, through __setStorageDetectionForTest below.
+ * Nothing in production code ever supplies anything but the real ones.
+ */
+export interface StorageDetectionInputs {
+  /** Bytes free on the filesystem under the workspace root. */
+  freeDiskBytes: () => number;
+  /** Total system memory, in bytes. */
+  totalMemoryBytes: () => number;
+}
+
+const realDetectionInputs: StorageDetectionInputs = {
+  freeDiskBytes: () => {
+    const stats = statfsSync(workspaceRoot());
+    return stats.bavail * stats.bsize;
+  },
+  totalMemoryBytes: () => totalmem(),
+};
+
+let detectionInputs: StorageDetectionInputs = realDetectionInputs;
+
+/**
+ * TEST SEAM, not for production use. Swaps the host facts detection reads for fakes, and
+ * clears the cached limits so the next storageLimits() call runs detection again against
+ * the new inputs. Pass undefined to restore the real ones (also clearing the cache, so a
+ * test that runs after does not inherit a fake-derived value).
+ */
+export function __setStorageDetectionForTest(inputs: StorageDetectionInputs | undefined): void {
+  detectionInputs = inputs ?? realDetectionInputs;
+  cachedLimits = undefined;
+}
+
+/**
+ * Read the host and turn it into the three limits, unclamped by any config override.
+ *
+ * NEVER THROWS. statfsSync is not guaranteed on every host (an exotic filesystem, a
+ * sandbox that refuses the syscall, a workspace root that does not exist yet because
+ * nothing has booted there before), and a storage limit is on the critical path of every
+ * turn. A detection failure returns exactly the floors — the behaviour every founder
+ * already has today — rather than crashing the boot or the first save.
+ */
+function detectLimits(): DetectedLimits {
+  try {
+    const freeDisk = detectionInputs.freeDiskBytes();
+    const totalMem = detectionInputs.totalMemoryBytes();
+    const fileBytes = clamp(Math.min(totalMem / 32, freeDisk / 50), FLOOR_FILE_BYTES, CEIL_FILE_BYTES);
+    const totalBytes = clamp(freeDisk / 20, FLOOR_TOTAL_BYTES, CEIL_TOTAL_BYTES);
+    const fileCount = clamp(Math.round(totalBytes / (128 * 1024)), FLOOR_FILE_COUNT, CEIL_FILE_COUNT);
+    return {
+      fileBytes: Math.floor(fileBytes),
+      totalBytes: Math.floor(totalBytes),
+      fileCount: Math.round(fileCount),
+    };
+  } catch {
+    return { fileBytes: FLOOR_FILE_BYTES, totalBytes: FLOOR_TOTAL_BYTES, fileCount: FLOOR_FILE_COUNT };
+  }
+}
+
+/** Where one limit's effective value came from. 'owner' beats 'config' beats 'detection'. */
+export type LimitSource = 'owner' | 'config' | 'detection';
+
+/**
+ * One limit as the owner asked for it, before it is weighed against this machine.
+ *
+ * `floor` is deliberately not always one of the FLOOR_* constants above. limits-store.ts
+ * raises it to the founder's current usage when it can read that cheaply — see its own
+ * header for why — so this is the floor for THIS write, not the fixed one for every write.
+ * resolveOwnerLimit below still clamps it to at most `ceiling`, so a floor that has itself
+ * drifted above what this machine now detects can never produce an inverted range.
+ */
+export interface StoredLimitRequest {
+  /** What the owner typed, unclamped, kept even when it makes no sense. */
+  readonly requested: number;
+  readonly floor: number;
+}
+
+/**
+ * What a settings screen needs to say "we set this to X, which is as high as this machine
+ * goes" rather than silently substituting a number the owner never sees.
+ */
+export interface LimitOverride {
+  /** What the owner typed. Reported as-is even when `value` below had to move away from it. */
+  readonly requested: number;
+  /** What is actually enforced, after clamping to this machine's floor and ceiling. */
+  readonly value: number;
+  /** True when `value` differs from `requested`. */
+  readonly clamped: boolean;
+}
+
+export interface StorageLimits {
+  /** The limit harvest.ts enforces. The owner's value when one is set, then config, then detection. */
+  fileBytes: number;
+  totalBytes: number;
+  fileCount: number;
+  /**
+   * What detection alone would have produced, whatever else is in force. Kept alongside the
+   * effective values so a settings screen can show both: what is enforced and what the host
+   * would give a founder who had never touched either setting.
+   */
+  detected: DetectedLimits;
+  /** Which of the three sources actually won for that limit. */
+  source: { fileBytes: LimitSource; totalBytes: LimitSource; fileCount: LimitSource };
+  /** Non-null exactly when that limit's source is 'owner'. What was asked for versus what is enforced. */
+  owner: {
+    fileBytes: LimitOverride | null;
+    totalBytes: LimitOverride | null;
+    fileCount: LimitOverride | null;
+  };
+  /**
+   * The GE_LIMIT_* value for that limit, ONLY when it is set and is being overridden by the
+   * owner's own choice. Null otherwise, including when no GE_LIMIT_* was ever set. Without
+   * this a Secret that is being silently ignored is indistinguishable, from the settings
+   * screen, from a Secret that was never set at all — and an env var that silently does
+   * nothing is the same invisible-surprise failure as one that silently wins.
+   */
+  shadowedConfig: {
+    fileBytes: number | null;
+    totalBytes: number | null;
+    fileCount: number | null;
+  };
+}
+
+/** No owner override for any of the three. The state before the owner has ever saved one. */
+const NO_STORED_LIMITS: {
+  fileBytes: StoredLimitRequest | null;
+  totalBytes: StoredLimitRequest | null;
+  fileCount: StoredLimitRequest | null;
+} = { fileBytes: null, totalBytes: null, fileCount: null };
+
+let storedLimitInputs = NO_STORED_LIMITS;
+
+let cachedLimits: StorageLimits | undefined;
+
+/**
+ * Turn one owner-requested value into what actually governs a turn, against this machine's
+ * detected ceiling for that limit.
+ *
+ * NEVER THROWS ON A BAD NUMBER, matching detectLimits()'s own contract: a non-finite,
+ * negative or zero value — a corrupt row, a bug upstream, a hand-edited database — becomes
+ * the floor rather than propagating NaN into every size check that reads this limit
+ * afterwards. `requested` still reports the raw value exactly as it came in, so a settings
+ * screen can show what was actually typed even when it made no sense.
+ */
+function resolveOwnerLimit(input: StoredLimitRequest | null, ceiling: number): LimitOverride | null {
+  if (input === null) return null;
+  const { requested } = input;
+  // min, not the raw floor: a floor limits-store.ts raised to current usage could in
+  // principle sit above what this machine detects right now, and clamp() below requires
+  // floor <= ceiling to mean anything.
+  const floor = Math.min(input.floor, ceiling);
+  const safeRequested = Number.isFinite(requested) && requested > 0 ? requested : floor;
+  const value = Math.round(clamp(safeRequested, floor, ceiling));
+  return Object.freeze({ requested, value, clamped: value !== requested });
+}
+
+/**
+ * The three storage limits harvest.ts enforces, detected from the host at first call and
+ * cached for the life of the process. Precedence is owner, then GE_LIMIT_*, then detection.
+ *
+ * A GE_LIMIT_* override wins over detection outright, including when it is set below the
+ * floor: an operator who types a small number into a Secret has decided that, and this file
+ * does not second-guess it. An owner-set value gets no such freedom — see the section header
+ * above for why — and is clamped by resolveOwnerLimit instead. Detection alone never goes
+ * below the floor either way.
+ */
+export function storageLimits(): StorageLimits {
+  if (cachedLimits) return cachedLimits;
+
+  const detected = detectLimits();
+  const config = lateSettings();
+
+  const ownerFileBytes = resolveOwnerLimit(storedLimitInputs.fileBytes, detected.fileBytes);
+  const ownerTotalBytes = resolveOwnerLimit(storedLimitInputs.totalBytes, detected.totalBytes);
+  const ownerFileCount = resolveOwnerLimit(storedLimitInputs.fileCount, detected.fileCount);
+
+  const fileBytes = ownerFileBytes?.value ?? config.limitFileBytes ?? detected.fileBytes;
+  const totalBytes = ownerTotalBytes?.value ?? config.limitTotalBytes ?? detected.totalBytes;
+  const fileCount = ownerFileCount?.value ?? config.limitFileCount ?? detected.fileCount;
+
+  const sourceOf = (owner: LimitOverride | null, configValue: number | undefined): LimitSource =>
+    owner !== null ? 'owner' : configValue !== undefined ? 'config' : 'detection';
+
+  cachedLimits = Object.freeze({
+    fileBytes,
+    totalBytes,
+    fileCount,
+    detected: Object.freeze({ ...detected }),
+    source: Object.freeze({
+      fileBytes: sourceOf(ownerFileBytes, config.limitFileBytes),
+      totalBytes: sourceOf(ownerTotalBytes, config.limitTotalBytes),
+      fileCount: sourceOf(ownerFileCount, config.limitFileCount),
+    }),
+    owner: Object.freeze({ fileBytes: ownerFileBytes, totalBytes: ownerTotalBytes, fileCount: ownerFileCount }),
+    shadowedConfig: Object.freeze({
+      fileBytes: ownerFileBytes !== null && config.limitFileBytes !== undefined ? config.limitFileBytes : null,
+      totalBytes: ownerTotalBytes !== null && config.limitTotalBytes !== undefined ? config.limitTotalBytes : null,
+      fileCount: ownerFileCount !== null && config.limitFileCount !== undefined ? config.limitFileCount : null,
+    }),
+  });
+  return cachedLimits;
+}
+
+/**
+ * PRODUCTION SEAM for the owner's own stored choice. `__setStorageDetectionForTest` above
+ * exists to swap what the HOST looks like, for a test; this exists to swap what the OWNER
+ * asked for, for real, and the two must stay separate or a test that only meant to fake the
+ * disk would also silently carry a stale owner override into the next one.
+ *
+ * limits-store.ts calls this after every write to the settings row, and once at boot to
+ * restore whatever was chosen before the last restart. Setting the override AND clearing
+ * cachedLimits happen in the same call, deliberately: the entire feature this exists for is
+ * "the very next storageLimits() call sees the new value", and a caller that could set the
+ * input without also invalidating, or invalidate without supplying the new input, is a
+ * caller that can forget the half that matters. There is no separate invalidate-only export
+ * for exactly that reason.
+ *
+ * Pass null for a limit to clear its override, falling back to GE_LIMIT_* or detection
+ * exactly as if the owner had never set one.
+ */
+export function applyStoredLimits(overrides: {
+  fileBytes: StoredLimitRequest | null;
+  totalBytes: StoredLimitRequest | null;
+  fileCount: StoredLimitRequest | null;
+}): void {
+  storedLimitInputs = { ...overrides };
+  cachedLimits = undefined;
+}
 
 /** A single path segment. Space is allowed; nothing else outside this set is. */
 const SEGMENT_RE = /^[A-Za-z0-9._][A-Za-z0-9._ -]*$/;
@@ -236,81 +532,12 @@ export function isExcludedPath(rel: string): boolean {
   return false;
 }
 
-/**
- * The one folder a founder may put their own files into.
- *
- * WHY IT IS THIS NAME. It was reserved before any of this was built. The string
- * already appears in `../rules/harvest-gate.ts` NOT_GATED_FOLDERS, in
- * `../rules/ownership.ts` KNOWN_FOLDERS and in `../agent/labels.ts`, and the
- * first of those is the one that matters: everything gated has its bytes read as
- * UTF-8 text before the prose rules see it, and a PDF read as UTF-8 is mojibake
- * being judged for its writing style. Whoever reserved it had seen that.
- *
- * WHY FOUNDER UPLOADS ARE NOT GATED AT ALL, stated here because it looks like a
- * hole and is not. The rules gate polices what the MODEL writes. A founder's own
- * writing sample is the input, not the output, and holding a founder's own words
- * back from their own folder would be the product telling them their writing
- * breaks its rules.
- */
-export const UPLOADS_FOLDER = 'voice-samples';
-
-/** True for a path inside the uploads folder. Not for the folder itself. */
-export function isUploadPath(rel: string): boolean {
-  return rel.startsWith(`${UPLOADS_FOLDER}/`) && rel.length > UPLOADS_FOLDER.length + 1;
-}
-
-/**
- * What a founder may upload, and it is a shorter list than it looks.
- *
- * MEASURED AGAINST THE MODEL'S OWN Read TOOL, in the CLI this app pins, rather
- * than chosen. Read refuses `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`,
- * `.odt`, `.bmp` and `.tiff` outright with "This tool cannot read binary files",
- * and its image set is exactly png, jpg, jpeg, gif and webp. Accepting a `.docx`
- * would mean storing a file, charging it against the founder's limits, showing it
- * in their Files, and then having the model say it cannot open it. A refusal at
- * the upload screen that names the fix is worth more than a file nobody can read.
- *
- * `.heic` IS DELIBERATELY ABSENT AND IS THE ONE WORTH KNOWING. It is an iPhone's
- * default photo format, it is in neither of Read's sets, so it gets no refusal
- * and is read as text. That is the worst of the three outcomes: not a clear no,
- * and not a working yes, but silent nonsense. It is refused here instead.
- */
-export const UPLOAD_EXTENSIONS: readonly string[] = [
-  '.txt', '.md', '.csv', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp',
-];
-
 /** The extension, lower case, with its dot. Empty string when there is none. */
 export function extensionOf(name: string): string {
   const base = name.slice(name.lastIndexOf('/') + 1);
   const dot = base.lastIndexOf('.');
   if (dot <= 0) return '';
   return base.slice(dot).toLowerCase();
-}
-
-/**
- * Turn whatever a founder's file is called into a name this app will accept.
- *
- * IT SANITISES, AND EVERYTHING ELSE IN THIS FILE REFUSES. That is not a change of
- * heart, it is a different input. Every other path here is one this product built,
- * so a bad one is a bug and a refusal is how it gets fixed. This one is typed by a
- * person on a laptop, and `Sam's post (final).pdf` is not a bug. Measured against
- * assertSafeRelPath: apostrophes, brackets, commas, accented letters and a leading
- * dash are all refused, and a refused name written into ge_file throws PathRefused
- * out of every future materialise, permanently. So the name is made safe here,
- * once, before anything touches the disk or the record.
- *
- * The extension is carried through separately so a dot never survives into the
- * stem and turn into a second extension.
- */
-export function uploadSlug(name: string): string {
-  const base = name.slice(name.lastIndexOf('/') + 1).slice(name.lastIndexOf('\\') + 1);
-  const ext = extensionOf(base);
-  const stem = ext === '' ? base : base.slice(0, base.length - ext.length);
-
-  const dashed = stem.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const trimmed = dashed.replace(/^-+/, '').replace(/-+$/, '').slice(0, 60).replace(/-+$/, '');
-  const safe = trimmed === '' ? 'sample' : trimmed;
-  return `${safe}${ext}`;
 }
 
 /**

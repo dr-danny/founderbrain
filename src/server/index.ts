@@ -136,6 +136,7 @@ const env = loadEnv();
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
+import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import { sql } from 'drizzle-orm';
@@ -176,6 +177,7 @@ import { QueueTurnExecutor } from './routes/turn-executor.ts';
 import { MAX_MESSAGE_BYTES } from './routes/messages.ts';
 import { systemClock, type IdSource, type Logger } from './routes/ports.ts';
 import { assertFounderId } from './storage/paths.ts';
+import { loadStoredLimits } from './storage/limits-store.ts';
 import { dirname } from 'node:path';
 
 /**
@@ -646,6 +648,19 @@ export async function buildServer(options: BuildOptions): Promise<BuiltServer> {
 
   const executor = new QueueTurnExecutor(queue, events, appStore, systemClock, logger, runTurn);
 
+  /**
+   * `POST /api/uploads` is the one route on this instance that reads a
+   * multipart body. Registered with no fixed `limits` here on purpose: the
+   * plugin's own default for `limits.fileSize` is `fastify.initialConfig.bodyLimit`,
+   * which is this instance's GLOBAL 1,000,000 bytes, sized for a founder's typed
+   * message rather than a document. Fixing a bigger number here would raise
+   * that default for every multipart request this instance will ever accept,
+   * which is the same mistake as raising `bodyLimit` itself. So the route sets
+   * its own `limits.fileSize` per request, from the host-detected
+   * `storageLimits().fileBytes`, and this registration supplies none.
+   */
+  await app.register(fastifyMultipart);
+
   const routes = await registerApiRoutes(app, {
     store: appStore,
     auth,
@@ -1080,6 +1095,28 @@ async function main(): Promise<void> {
     // Named by founder id, never by content. A row that will not open is a half done
     // rotation or a damaged row, and it needs a person rather than a retry.
     if (restored.unreadable.length > 0) log.error({ founderIds: restored.unreadable }, 'a stored Anthropic key would not decrypt. That founder will be asked to paste theirs again.');
+  }
+
+  /**
+   * PUT ANY STORED STORAGE-LIMIT OVERRIDE BACK IN MEMORY, ONCE, BEFORE ANYTHING BINDS A PORT.
+   *
+   * `storageLimits()` in storage/paths.ts is read synchronously on every turn, so
+   * whatever the owner last saved through `routes/limits.ts` has to be pushed in here
+   * rather than looked up per request. Skipped without this, an owner's saved
+   * override would silently vanish on every restart and every deployment replacement
+   * would quietly fall back to the machine's own detected numbers.
+   *
+   * NEVER FATAL, same reasoning as the Anthropic key load just above: no database, no
+   * migration run yet, or a fresh remix all mean this table cannot be read, and
+   * `loadStoredLimits` already says so without throwing. Falling back to
+   * GE_LIMIT_ env vars or detection is exactly what every deployment had before this
+   * feature existed, so a founder must never watch boot fail, or the start page go
+   * blank, over a config table it does not yet need.
+   */
+  if (dbUp) {
+    const limitsLoaded = await loadStoredLimits();
+    if (limitsLoaded.applied) log.info({}, 'a stored storage-limit override was restored from the database.');
+    if (limitsLoaded.noDatabase) log.error({}, 'the storage-limit overrides could not be read. Falling back to the detected/env limits.');
   }
 
   // One line that answers "is this app able to do its job", separately from "is

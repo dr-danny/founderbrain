@@ -229,6 +229,47 @@ export function notGatedReason(path: string): string | null {
   return null;
 }
 
+/**
+ * `uploads/`, where a founder's own uploaded documents are stored.
+ *
+ * DELIBERATELY NOT IN `NOT_GATED_FOLDERS`, AND THIS IS THE ARGUMENT FOR WHY
+ * NOT, PINNED BY `harvest-gate.test.ts`. Every entry in that list is a
+ * PATH-KEYED hole: anything under it is skipped, by whoever wrote it. The
+ * model can `Write` to any path, so a path-keyed hole at `uploads/` would let
+ * it write `uploads/anything.md` and skip rule 1, rule 2, rule 4, rule 5 and
+ * the house style outright — exactly the trap this file's callers were told
+ * to avoid. `notGatedReason` above answers "does this PATH get read", and
+ * that is the wrong question for `uploads/`; the right one is "who wrote
+ * these BYTES", which only `gateHarvest` can answer, because only it is
+ * handed the turn's verb. So the exemption lives in the loop below, keyed on
+ * `input.verb === 'upload'`, and `notGatedReason` never learns the word
+ * "uploads" at all.
+ */
+const UPLOADS_PREFIX = 'uploads/';
+
+/**
+ * The other half of the same decision. A turn whose verb is anything but
+ * `'upload'` — `agent-run` above all — had the MODEL as its writer, and the
+ * model does not get to write into what the founder uploaded, whatever the
+ * file says. This is not a content judgement the house style rules are
+ * equipped to make, so it never runs through `runRules`: the violation is
+ * built here and holds the file outright, unconditionally, with no
+ * confirmation able to override it (there is no row for this code in
+ * `confidence.ts`, so `isOverridable` answers false, correctly).
+ */
+function uploadOwnershipViolation(path: string): Violation {
+  return {
+    rule: 'ownership',
+    code: 'ownership.upload-not-founder-written',
+    severity: 'block',
+    where: { path, line: 1, column: 1, excerpt: path },
+    found: '',
+    message: `${path} sits under uploads/, which only your own uploaded documents may write to.`,
+    why: 'The model does not get to write into material you uploaded yourself, whatever it wrote. Only a file you send in through the upload button lands here.',
+    recovery: { label: 'See your files', action: { kind: 'route', skill: 'status' } },
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* What a blocking violation costs                                            */
 /* -------------------------------------------------------------------------- */
@@ -594,6 +635,27 @@ export interface HarvestGateInput {
    */
   readPrevious?: ((path: string) => Promise<string | undefined>) | undefined;
   options?: GateOptions | undefined;
+  /**
+   * `RunTurnOptions.verb`, from `storage/turn.ts`. `'upload'` for the one turn
+   * a founder's own upload writes, anything else otherwise.
+   *
+   * THIS IS THE UPLOADS/ EXEMPTION, AND IT IS KEYED HERE RATHER THAN ON THE
+   * PATH. `uploads/` holds a founder's own document, so the house style rules
+   * must not hold it — but the model can `Write` anywhere, including
+   * `uploads/`, so exempting that path for every turn would let it dodge every
+   * rule in this folder by naming a file `uploads/anything.md`. Keying the
+   * exemption on who wrote the bytes closes that: only a turn whose own verb
+   * says the founder uploaded them gets the exemption, and every other verb
+   * gets the opposite of leniency, below.
+   *
+   * Optional, and absent defaults to the strict reading: NOT `'upload'`. A
+   * caller that forgets to pass it gets a gate that still checks `uploads/`
+   * normally for the (non-existent, absent verb-aware) exemption and still
+   * holds an `uploads/` write it was not told came from an upload. Failing
+   * toward "still gated" is the safe direction; failing toward "exempt by
+   * default" is the trap this field exists to close.
+   */
+  verb?: string | undefined;
 }
 
 export interface HarvestGateReport {
@@ -674,10 +736,33 @@ export async function gateHarvest(input: HarvestGateInput): Promise<HarvestGateR
   // Kept apart from `notGated`, because a deleted path is not a file the founder
   // still has, and the copy below tells them what they still have.
   const notGatedAndKept: string[] = [];
+  // uploads/ written by a verb other than 'upload'. Never run through the
+  // rules — see uploadOwnershipViolation above for why this is not a content
+  // judgement — and held unconditionally, regardless of what the file says.
+  const uploadsHeldByPath = new Map<string, Violation>();
 
   for (const change of input.changes) {
     if (change.kind === 'deleted') {
       notGated.push({ path: change.path, why: 'deleted this turn, so there is nothing to read.' });
+      continue;
+    }
+    // THE VERB-KEYED EXEMPTION. Checked before notGatedReason, and never
+    // folded into it: notGatedReason answers "does this path get read", and
+    // uploads/ must not have a fixed answer to that question. Only a turn
+    // whose own verb says the founder wrote these bytes this turn gets to
+    // skip the rules on them.
+    if (change.path.startsWith(UPLOADS_PREFIX)) {
+      if (input.verb === 'upload') {
+        notGated.push({
+          path: change.path,
+          why:
+            "the founder's own upload, from a turn whose verb says so. Only that turn may exempt " +
+            'uploads/ from the house style rules; a later turn writing here does not get this for free.',
+        });
+        notGatedAndKept.push(change.path);
+      } else {
+        uploadsHeldByPath.set(change.path, uploadOwnershipViolation(change.path));
+      }
       continue;
     }
     const why = notGatedReason(change.path);
@@ -710,7 +795,7 @@ export async function gateHarvest(input: HarvestGateInput): Promise<HarvestGateR
     });
   }
 
-  if (toCheck.length === 0) {
+  if (toCheck.length === 0 && uploadsHeldByPath.size === 0) {
     return { checked: [], notGated, held: [], saved: notGatedAndKept, answer: null, notes: [] };
   }
 
@@ -750,6 +835,15 @@ export async function gateHarvest(input: HarvestGateInput): Promise<HarvestGateR
     if (answer.blocked.length > 0) blockedByPath.set(entry.artifact.path, answer.blocked);
   }
 
+  // The uploads/ ownership holds join `blocked` here, so `answer.ok` and
+  // `answer.blocked` tell the truth about the turn even though these never
+  // went through `runRules`. None of them can ever be a refusing code (there
+  // is no row for `ownership.upload-not-founder-written` in
+  // `WORTH_THE_WHOLE_TURN`, and there never should be: a model reaching for
+  // `uploads/` says nothing about its other files that the gate did not
+  // already check on its own terms), so they cost their file, never the turn.
+  for (const violation of uploadsHeldByPath.values()) blocked.push(violation);
+
   // The turn is decided first, because a turn that is being refused has nothing to
   // say about which files were held: none of them are being saved either way.
   const refusing = blocked.filter((v) => outcomeFor(v) === 'refuse-the-turn');
@@ -764,7 +858,7 @@ export async function gateHarvest(input: HarvestGateInput): Promise<HarvestGateR
   const saved = [...checked.filter((path) => !blockedByPath.has(path)), ...notGatedAndKept];
   // Both lists are settled before a single sentence is written, so the copy can
   // say how many files were held without any of them having to guess.
-  const heldPaths = [...blockedByPath.keys()];
+  const heldPaths = [...blockedByPath.keys(), ...uploadsHeldByPath.keys()];
 
   const held: HeldFile[] = [];
   for (const [path, violations] of blockedByPath) {
@@ -774,6 +868,9 @@ export async function gateHarvest(input: HarvestGateInput): Promise<HarvestGateR
     const cause = violations[0];
     if (cause === undefined) continue;
     held.push({ path, violations, message: explainHold(path, cause, saved, heldPaths) });
+  }
+  for (const [path, violation] of uploadsHeldByPath) {
+    held.push({ path, violations: [violation], message: explainHold(path, violation, saved, heldPaths) });
   }
 
   const heldNotes: Violation[] = held.flatMap((file) => {

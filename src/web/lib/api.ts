@@ -124,10 +124,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
  *
  * 501 joins it, and the two mean different things that read the same to a
  * founder. 404 is "nobody registered that address". 501 is a route that exists
- * and says it cannot do this yet, which today is the GoHighLevel check and
- * saving a pasted sample as a file. Both of those carry a sentence of their own
- * that wins over the general one, so what a founder reads is written for the
- * thing they were actually trying to do.
+ * and says it cannot do this yet. Whichever routes that is at a given moment
+ * carry a sentence of their own that wins over the general one, so what a
+ * founder reads is written for the thing they were actually trying to do.
  */
 export function kindForStatus(status: number): ProblemKind {
   if (status === 401 || status === 403) return "signed_out";
@@ -185,9 +184,13 @@ type Expects = "an answer" | "nothing";
 
 async function request<T>(path: string, expects: Expects, init?: RequestInit): Promise<Result<T>> {
   try {
+    // A FormData body sets its own content type, boundary included. Naming one by hand here
+    // would send a boundary that does not match the one actually written into the body, and
+    // the upload would fail on every attempt.
+    const isForm = init?.body instanceof FormData;
     const res = await fetch(path, {
       credentials: "same-origin",
-      headers: { accept: "application/json", ...(init?.body ? { "content-type": "application/json" } : {}) },
+      headers: { accept: "application/json", ...(init?.body && !isForm ? { "content-type": "application/json" } : {}) },
       ...init,
     });
     return await toResult<T>(res, expects);
@@ -239,30 +242,14 @@ function post<T>(path: string, body?: unknown): Promise<Result<T>> {
   return request<T>(path, "an answer", { method: "POST", body: JSON.stringify(body ?? {}) });
 }
 
-/**
- * A write whose body is raw bytes rather than JSON.
- *
- * `accept` and `content-type` are spelled out because request() builds a headers
- * object and then spreads init over it, so a headers key here REPLACES that object
- * rather than merging into it. Without the accept, a refusal comes back as something
- * the parser cannot read.
- *
- * It is a named helper and not an inline request() call so that contract.test.ts can
- * see it. That test reads this file for the addresses the browser asks for, and it
- * knows the helpers by name; a route reached any other way is a route it reports as
- * dead and somebody deletes.
- */
-function postBytes<T>(path: string, body: Blob | string, headers: Record<string, string>): Promise<Result<T>> {
-  return request<T>(path, "an answer", {
-    method: "POST",
-    headers: { accept: "application/json", ...headers },
-    body,
-  });
-}
-
 /** A write with nothing to read back. It worked or it did not. */
 function postVoid(path: string, body?: unknown): Promise<Result<void>> {
   return request<void>(path, "nothing", { method: "POST", body: JSON.stringify(body ?? {}) });
+}
+
+/** A write whose body is a file rather than JSON, and whose answer is read. */
+function postForm<T>(path: string, form: FormData): Promise<Result<T>> {
+  return request<T>(path, "an answer", { method: "POST", body: form });
 }
 
 // ---------------------------------------------------------------------------------------
@@ -698,38 +685,58 @@ export function streamUrl(threadId: string): string {
 }
 
 /**
- * What a founder may hand the app, and it is shorter than they will expect.
+ * A file a founder attaches to a message, mid conversation, or hands over as a pasted
+ * sample. This is the built version of the same idea the paste cap above is built on: a
+ * founder's own material becomes a file the engine reads with the Read tool, rather than
+ * text stuffed into the context window.
  *
- * MEASURED AGAINST THE MODEL'S OWN Read TOOL rather than chosen. Word documents are
- * refused by Read outright, and `.heic`, which is what an iPhone saves by default, is
- * refused by neither of its lists and is read as text, which is worse than a refusal
- * because nothing says anything. Both are refused here, at the point the founder picks
- * the file, so they find out before the upload rather than after.
+ * TWO LITERAL ROUTES, NOT A DESTINATION FIELD, and this file mirrors the server's own
+ * reason for it exactly (see routes/uploads.ts's header): `voice-samples/` must hold only
+ * examples of the founder's own writing, and most uploads are AI generated business
+ * documents that are not that. So the founder's choice in the composer decides which of
+ * these two functions gets called, never a field or a query string riding along on one
+ * shared call — `contract.test.ts` reads this file for the addresses the browser asks
+ * for, and it can only see a literal string, not a destination built at runtime.
+ *
+ * `warnings` and `truncated` are read off a 201 and are the server's own account of what it
+ * could not keep: a hidden sheet it skipped, speaker notes it did not read, text it cut
+ * short. Both are rendered, because a founder who is about to ask the engine about a file
+ * needs to know what is missing from it before they ask.
  */
-export const UPLOAD_ACCEPT = ".txt,.md,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp";
-
-/** Kept in step with LIMIT_FILE_BYTES on the server, which is the one that decides. */
-export const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
+export interface UploadedDocument {
+  readonly name: string;
+  readonly sizeBytes: number;
+  readonly chars: number;
+  readonly warnings: readonly string[];
+  readonly truncated: boolean;
+}
 
 /**
- * One of the founder's own files, saved into `growth-engine/voice-samples/`.
+ * A founder's own writing: an example for the Brain to learn their voice from. The paste
+ * path (Thread.tsx's `saveAsFile`) always calls this one, because pasted prose is
+ * unambiguously the founder's own words; the composer's attach control calls it only when
+ * the founder has said, at upload time, that the file is a writing sample of theirs.
  *
- * RAW BYTES, NOT FormData, and the server side says why: multipart would cost a
- * dependency in a tree 130 people `npm ci`. One file per request needs no envelope, so
- * the body is the file and the name rides in a header.
- *
- * The name is encoded because it is the founder's own, and an apostrophe or an accent in
- * a header is the ordinary case rather than the strange one.
+ * A LITERAL STRING, NOT A VARIABLE, AND THAT IS NOT STYLE. `contract.test.ts` reads this
+ * file's own text for the addresses the browser calls, by matching a quoted literal
+ * directly inside a `postForm(...)` call; a path built from a shared variable is invisible
+ * to that scan. Duplicating the call rather than sharing one through a `path` argument is
+ * what keeps this function honest with the server's own two-literal-routes rule.
  */
-export function uploadFile(file: File): Promise<Result<{ readonly path: string; readonly sizeBytes: number }>> {
-  return postBytes<{ readonly path: string; readonly sizeBytes: number }>(
-    "/api/files/voice-samples",
-    file,
-    {
-      "content-type": "application/octet-stream",
-      "x-upload-name": encodeURIComponent(file.name),
-    },
-  );
+export function uploadVoiceSample(file: File): Promise<Result<UploadedDocument>> {
+  const form = new FormData();
+  form.append("file", file);
+  return postForm<UploadedDocument>("/api/uploads/voice-samples", form);
+}
+
+/**
+ * A document for the engine to read: reference material, not a voice to imitate. The
+ * composer's default, and the safer wrong answer — see Composer.tsx's own comment on why.
+ */
+export function uploadDocument(file: File): Promise<Result<UploadedDocument>> {
+  const form = new FormData();
+  form.append("file", file);
+  return postForm<UploadedDocument>("/api/uploads/documents", form);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -761,6 +768,21 @@ export interface FilesState {
   readonly rows: readonly FileRow[];
   /** `.state/` sits behind a disclosure labelled in plain words, not hidden. */
   readonly stateRows: readonly FileRow[];
+  /**
+   * What the founder attached themselves, mid chat, through `uploadDocument`.
+   *
+   * A row here is first class, the same as `rows`: it is not the app's own work, so it is
+   * shown apart from it, and it is never behind a disclosure the way `.state/` is.
+   */
+  readonly uploadRows: readonly FileRow[];
+  /**
+   * The founder's own writing samples, uploaded through `uploadVoiceSample`.
+   *
+   * Kept apart from `uploadRows` because the two folders mean different things
+   * to the founder: this one taught the Brain their voice, `uploadRows` never
+   * did, and the screen should say so rather than mix them into one list.
+   */
+  readonly voiceRows: readonly FileRow[];
 }
 
 /** ASSUMED path. */
@@ -812,4 +834,71 @@ export interface GatesState {
 /** ASSUMED path. */
 export function fetchGates(): Promise<Result<GatesState>> {
   return get<GatesState>("/api/gates");
+}
+
+// ---------------------------------------------------------------------------------------
+// Storage limits
+// ---------------------------------------------------------------------------------------
+
+/** Which of `owner`, `config` or `detection` produced the limit actually in force. */
+export type LimitSource = "owner" | "config" | "detection";
+
+/**
+ * One of the three storage limits, as the Setup screen needs to read and explain it.
+ *
+ * `value` is what is enforced right now. `detected` is what this machine would give a
+ * founder who had never touched this screen, kept alongside `value` so the panel can still
+ * say "this machine can hold up to X" after the founder has set their own number. `requested`
+ * and `clamped` exist because a limit that got quietly reduced to something smaller than what
+ * was typed is the single most confusing thing this screen could show without explaining
+ * itself: see Setup.tsx's storage limits panel for where that sentence is written.
+ * `shadowedConfig` is an environment variable's own value, non null only when one exists and
+ * is being overruled by the founder's own choice, so an ignored setting never sits there
+ * invisibly.
+ */
+export interface LimitView {
+  readonly value: number;
+  readonly detected: number;
+  readonly source: LimitSource;
+  readonly requested: number | null;
+  readonly clamped: boolean;
+  readonly shadowedConfig: number | null;
+}
+
+export interface StorageLimits {
+  /** The largest single file the folder will accept, in bytes. */
+  readonly fileBytes: LimitView;
+  /** The largest the whole folder may grow to, in bytes. */
+  readonly totalBytes: LimitView;
+  /** The most files the folder may hold. */
+  readonly fileCount: LimitView;
+}
+
+/**
+ * What the founder is asking to change. Each field is optional: a field left out is left
+ * exactly as it is, and a field sent as `null` clears the founder's own number and returns
+ * that one limit to whatever the environment or this machine would give on its own. Never
+ * send `undefined` for a field the founder just cleared: that is silently a no-op on the
+ * server, and the box would look emptied while the old number kept working underneath it.
+ */
+export interface StorageLimitsInput {
+  readonly fileBytes?: number | null;
+  readonly totalBytes?: number | null;
+  readonly fileCount?: number | null;
+}
+
+/** ASSUMED path. What is enforced right now, for all three limits, and where each came from. */
+export function getLimits(): Promise<Result<StorageLimits>> {
+  return get<StorageLimits>("/api/limits");
+}
+
+/**
+ * ASSUMED path. Saves one or more limits and answers with the true, already clamped result.
+ *
+ * There is never a second request after this one. The server clamps a number this machine
+ * cannot actually honour before it answers, so what comes back is what is really in force,
+ * and the screen renders that rather than the number the founder typed.
+ */
+export function saveLimits(input: StorageLimitsInput): Promise<Result<StorageLimits>> {
+  return post<StorageLimits>("/api/limits", input);
 }

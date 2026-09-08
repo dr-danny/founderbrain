@@ -38,19 +38,42 @@
  * Apollo row. A B2C founder has no Apollo row, no Apollo skip line, and no occurrence of
  * the word anywhere on this screen. The key box is on both tracks, because the key is.
  *
+ * WHY THE STORAGE LIMITS PANEL SITS AT THE BOTTOM, ON ITS OWN.
+ * Same reasoning as the key box, run the other way round. The key box is first because
+ * nothing on this screen works without it. The three storage numbers are the opposite: this
+ * machine already picked sensible ones the day it was set up, and nobody is blocked by them
+ * until the day their folder actually gets close to one. Putting a panel like that above the
+ * checklist, or inside either finish line, would tell a founder they have a fourth thing to
+ * configure before Session 1, and that would be false. So it sits below both tiers, out of
+ * the way of the two dates that actually matter, for the one founder in ten who ever opens
+ * it.
+ *
  * WHAT CALLS IT
  * app.tsx, on `#/setup`.
  *
  * WHAT IT READS AND WRITES
- * Reads the setup state. Writes the Anthropic key, through the three calls in api.ts. Every
- * other row links to the screen that does its own writing.
+ * Reads the setup state and the storage limits. Writes the Anthropic key, through the three
+ * calls in api.ts, and the storage limits, through `getLimits`/`saveLimits`. Every other row
+ * links to the screen that does its own writing.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { StepState } from "../../../app/content/ghl-walk.ts";
-import type { AnthropicKeyState, Founder, KeyProblem, KeyResult, Result, SetupState } from "../lib/api.ts";
-import { checkAnthropicKey, forgetAnthropicKey, saveAnthropicKey } from "../lib/api.ts";
+import type {
+  AnthropicKeyState,
+  Founder,
+  KeyProblem,
+  KeyResult,
+  LimitSource,
+  LimitView,
+  Problem,
+  Result,
+  SetupState,
+  StorageLimits,
+  StorageLimitsInput,
+} from "../lib/api.ts";
+import { checkAnthropicKey, forgetAnthropicKey, getLimits, saveAnthropicKey, saveLimits } from "../lib/api.ts";
 import { hrefFor } from "../lib/nav.ts";
 import { formatWhen } from "../lib/format.ts";
 import { railRows, setupSummary } from "../lib/setup-rail.ts";
@@ -139,6 +162,245 @@ export function Setup({
         rows={rows.filter((r) => r.tier === "publish")}
         complete={summary.readyToPublish}
       />
+
+      <StorageLimitsPanel />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------
+// Storage limits
+// ---------------------------------------------------------------------------------------
+
+type LimitKey = "fileBytes" | "totalBytes" | "fileCount";
+
+/** What each limit is called, in plain words, and how a founder types a new number for it. */
+const LIMIT_META: Readonly<Record<LimitKey, { readonly heading: string; readonly blurb: string; readonly unit: "bytes" | "count" }>> = {
+  fileBytes: {
+    heading: "The largest single file you can send",
+    blurb: "This caps one upload or one message attachment at a time.",
+    unit: "bytes",
+  },
+  totalBytes: {
+    heading: "How large your whole folder can grow",
+    blurb: "This is every file you have, added together, not any one of them on its own.",
+    unit: "bytes",
+  },
+  fileCount: {
+    heading: "The most files your folder can hold",
+    blurb: "This counts every file you have, whatever size each one is.",
+    unit: "count",
+  },
+};
+
+/** A byte or file count, in the words a founder reads. Never a raw byte number. */
+function limitWords(unit: "bytes" | "count", value: number): string {
+  if (unit === "count") return `${value.toLocaleString("en-US")} files`;
+  const gigabyte = 1024 * 1024 * 1024;
+  const megabyte = 1024 * 1024;
+  if (value >= gigabyte) {
+    const gb = value / gigabyte;
+    return `${gb >= 10 ? Math.round(gb) : Math.round(gb * 10) / 10} GB`;
+  }
+  const mb = value / megabyte;
+  return `${mb >= 10 ? Math.round(mb) : Math.round(mb * 10) / 10} MB`;
+}
+
+/** What a founder reads about where the number in force came from. */
+function sourceSentence(unit: "bytes" | "count", source: LimitSource, value: number, detected: number): string {
+  if (source === "owner") return `You set this to ${limitWords(unit, value)}.`;
+  if (source === "config") {
+    return `An environment variable in your deployment sets this to ${limitWords(unit, value)}.`;
+  }
+  return `We measured what this machine can handle: up to ${limitWords(unit, detected)}. You have not set your own number.`;
+}
+
+/** The box's own text, from the last number the owner asked for, or empty for automatic. */
+function typedFrom(unit: "bytes" | "count", requested: number | null): string {
+  if (requested === null) return "";
+  if (unit === "count") return String(requested);
+  const mb = Math.round((requested / (1024 * 1024)) * 100) / 100;
+  return String(mb);
+}
+
+type Typed = { readonly kind: "clear" } | { readonly kind: "invalid" } | { readonly kind: "value"; readonly raw: number };
+
+/** What is typed in the box, turned into what the server needs, or a reason it cannot be. */
+function parseTyped(unit: "bytes" | "count", text: string): Typed {
+  const trimmed = text.trim();
+  if (trimmed === "") return { kind: "clear" };
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n <= 0) return { kind: "invalid" };
+  if (unit === "count") return { kind: "value", raw: Math.round(n) };
+  return { kind: "value", raw: Math.round(n * 1024 * 1024) };
+}
+
+/**
+ * Three numbers, read once and changed rarely, so the whole panel is one box rather than
+ * three. It fetches on its own rather than through `SetupState`, because these are the
+ * founder's own choice about a machine, not a step in the checklist above.
+ */
+export function StorageLimitsPanel(): ReactElement {
+  const [limits, setLimits] = useState<StorageLimits | null>(null);
+  const [loadProblem, setLoadProblem] = useState<Problem | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void getLimits().then((result) => {
+      if (!live) return;
+      if (result.ok) setLimits(result.value);
+      else setLoadProblem(result.problem);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return (
+    <section className="tier">
+      <div className="tier-head">
+        <h2>Your storage limits</h2>
+      </div>
+      <p className="tier-meta">
+        Three numbers govern how much this app will hold for you: the largest file you can send, how large your
+        whole folder can grow, and the most files it can hold. This machine already picked sensible ones on its
+        own. You only need to touch this if you want something different.
+      </p>
+      {loadProblem === null ? null : (
+        <Notice tone="problem" title="We could not read your storage limits" lines={[loadProblem.text]} />
+      )}
+      {limits === null ? (
+        loadProblem === null ? <Working what="Reading your storage limits." /> : null
+      ) : (
+        <>
+          <LimitRow limitKey="fileBytes" view={limits.fileBytes} onSaved={setLimits} />
+          <LimitRow limitKey="totalBytes" view={limits.totalBytes} onSaved={setLimits} />
+          <LimitRow limitKey="fileCount" view={limits.fileCount} onSaved={setLimits} />
+        </>
+      )}
+    </section>
+  );
+}
+
+function LimitRow({
+  limitKey,
+  view,
+  onSaved,
+}: {
+  readonly limitKey: LimitKey;
+  readonly view: LimitView;
+  readonly onSaved: (next: StorageLimits) => void;
+}): ReactElement {
+  const meta = LIMIT_META[limitKey];
+  const [typed, setTyped] = useState<string>(() => typedFrom(meta.unit, view.requested));
+  const [working, setWorking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const apply = (body: StorageLimitsInput, nextTyped: string): void => {
+    setWorking(true);
+    setProblem(null);
+    void saveLimits(body).then((result) => {
+      setWorking(false);
+      if (!result.ok) {
+        setProblem(result.problem.text);
+        return;
+      }
+      setTyped(nextTyped);
+      onSaved(result.value);
+    });
+  };
+
+  const save = (): void => {
+    const parsed = parseTyped(meta.unit, typed);
+    if (parsed.kind === "invalid") {
+      setProblem("Enter a number greater than zero, or clear the box to go back to automatic.");
+      return;
+    }
+    if (parsed.kind === "clear") {
+      apply({ [limitKey]: null }, "");
+      return;
+    }
+    apply({ [limitKey]: parsed.raw }, typedFrom(meta.unit, parsed.raw));
+  };
+
+  /** The obvious way back to automatic, for a founder who does not think to empty the box. */
+  const resetToAutomatic = (): void => {
+    apply({ [limitKey]: null }, "");
+  };
+
+  if (working) {
+    return (
+      <div className="limit-row">
+        <h3 className="limit-row-title">{meta.heading}</h3>
+        <Working what="Saving." />
+      </div>
+    );
+  }
+
+  return (
+    <div className="limit-row">
+      <h3 className="limit-row-title">{meta.heading}</h3>
+      <p className="tier-meta">{meta.blurb}</p>
+      <p className="tier-meta">{sourceSentence(meta.unit, view.source, view.value, view.detected)}</p>
+
+      {/*
+        THE SINGLE MOST IMPORTANT SENTENCE ON THIS PANEL. A number that moved away from what
+        was typed, shown as though it was what was typed, is a lie by omission: see
+        src/server/routes/limits.ts's own header on why the server never does that silently.
+        This says what happened, in the two numbers a founder actually cares about.
+      */}
+      {view.clamped ? (
+        <Notice
+          tone="plain"
+          lines={[
+            `You asked for ${limitWords(meta.unit, view.requested ?? view.value)}. This machine can only manage ${limitWords(meta.unit, view.value)}, so that is what we set it to.`,
+          ]}
+        />
+      ) : null}
+
+      {/*
+        AN IGNORED SETTING MUST NEVER BE INVISIBLE. An environment variable doing nothing,
+        quietly, is a support ticket the day somebody else on the deployment goes looking for
+        why it has no effect.
+      */}
+      {view.shadowedConfig === null ? null : (
+        <Notice
+          tone="plain"
+          lines={[
+            `Your deployment also has an environment variable set to ${limitWords(meta.unit, view.shadowedConfig)} for this. It is being ignored: your own setting above wins.`,
+          ]}
+        />
+      )}
+
+      {problem === null ? null : <Notice tone="problem" title="We could not save that" lines={[problem]} />}
+
+      <label className="field">
+        <span className="field-label">
+          {meta.unit === "bytes" ? "Set it, in megabytes" : "Set the most files allowed"}
+        </span>
+        <input
+          className="field-input"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step={meta.unit === "bytes" ? "0.1" : "1"}
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          placeholder="Automatic"
+        />
+        <span className="field-note">
+          Leave the box empty, or clear it, and this goes back to what this machine detects on its own.
+        </span>
+      </label>
+
+      <p className="tier-meta">
+        <button type="button" className="button button-small" onClick={save}>
+          Save
+        </button>{" "}
+        <button type="button" className="button button-small button-quiet" onClick={resetToAutomatic}>
+          Set back to automatic
+        </button>
+      </p>
     </div>
   );
 }

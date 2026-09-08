@@ -31,6 +31,8 @@ import {
   recordStep,
   sendMessage,
   streamUrl,
+  uploadDocument,
+  uploadVoiceSample,
 } from "./api.ts";
 
 const realFetch = globalThis.fetch;
@@ -140,4 +142,29 @@ test("a file name in a URL is encoded, so a name can never be read as a path", (
   assert.equal(streamUrl("t 1"), "/api/threads/t%201/stream");
   assert.equal(downloadAllUrl(false), "/api/files/download.zip");
   assert.equal(downloadAllUrl(true), "/api/files/download.zip?snapshots=1");
+});
+
+test("a writing sample and a document upload land through two different literal addresses, never a shared one with a field", async () => {
+  // The whole point of Commit 2's "two literal routes, not a destination field": which
+  // folder an upload lands in is decided by which address this file calls, not by
+  // anything riding along inside the request. If a later edit collapsed these back onto
+  // one address with a field, this is the test that would notice.
+  const seen: string[] = [];
+  const answer = () =>
+    Promise.resolve(
+      new Response(JSON.stringify({ name: "x", sizeBytes: 1, chars: 1, warnings: [], truncated: false }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  stubFetch((url) => {
+    seen.push(url);
+    return answer();
+  });
+  const file = new File([new Uint8Array([1])], "notes.md");
+  const sample = await uploadVoiceSample(file);
+  const document = await uploadDocument(file);
+  assert.equal(sample.ok, true);
+  assert.equal(document.ok, true);
+  assert.deepEqual(seen, ["/api/uploads/voice-samples", "/api/uploads/documents"]);
 });

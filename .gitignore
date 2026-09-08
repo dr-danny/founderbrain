@@ -54,6 +54,56 @@ npm-debug.log*
 .vscode/
 .idea/
 
+# ---- AI coding assistants ----------------------------------------------------------------
+# Same rule as the founder data block at the top: none of this belongs in a git history.
+#
+# On this Replit box the separation is luck, not design. Claude Code keeps its credentials,
+# session transcripts and project state under $HOME/.claude, and HOME is /home/runner while
+# the repo is /home/runner/workspace. That is one `git init` in the wrong directory away
+# from being wrong, and a laptop checkout has no such separation at all.
+#
+# What these files actually hold: OAuth tokens and API keys (.credentials.json,
+# .claude.json, .codex/auth.json), full session transcripts including every file read and
+# every command run (projects/, history.jsonl, sessions/), and shell snapshots that capture
+# the environment. A transcript of work in a founder workspace contains founder data by
+# construction, so it falls under mechanism 4 exactly like /workspace/ does.
+#
+# The patterns are deliberately unanchored: they match at the repo root AND in any
+# subdirectory, because the failure mode is a tool writing state somewhere unexpected.
+
+# Claude Code
+.claude/
+.claude.json
+.claude.json.backup*
+# If team-shared Claude config is ever wanted, un-ignore only the reviewable pieces, never
+# the whole directory:
+#   !.claude/settings.json      <- shared settings. NEVER settings.local.json.
+#   !.claude/commands/
+#   !.claude/agents/
+#   !.claude/skills/
+# CLAUDE.md at the repo root holds personal working instructions, not project docs, so it
+# is ignored too. Anchored: only the root one, in case a subdir ever needs a tracked copy.
+/CLAUDE.md
+
+# OpenAI Codex CLI (codex), used here in an advisory role alongside Claude
+.codex/
+# auth.json holds the OAuth tokens or API key, sessions/ and history.jsonl hold full
+# transcripts, and config.toml can carry MCP server definitions with API keys inline.
+# Same un-ignore note as above if AGENTS.md-style shared config is ever worth committing.
+
+# Antigravity CLI (agy). Despite the name it stores everything under .gemini/:
+# conversations/, brain/, knowledge/, a conversation_summaries.db and OAuth credentials.
+# Currently at $HOME/.gemini, outside the repo, but ignored here for the same reason as
+# the rest of this block.
+.gemini/
+.antigravity/
+
+# Anything else that wanders through
+.aider*
+.continue/
+.windsurf/
+.codeium/
+
 # ---- Replit ------------------------------------------------------------------------------
 # The workspace's own scratch. .replit and replit.nix ARE committed: they are the machine
 # definition and the team needs them under review.
@@ -62,3 +112,9 @@ npm-debug.log*
 .upm/
 .breakpoints
 replit_zip_error_log.txt
+# Machine state, including .cache/claude-cli-nodejs (MCP server logs). Replit's own
+# /etc/.gitignore covers these via core.excludesFile, but that is a property of this box,
+# not of this repo, and it does not travel with a clone. Repeated here so it does.
+.cache/
+.local/
+.agents/memory/

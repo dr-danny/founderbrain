@@ -33,7 +33,9 @@
  *
  * WHAT IT READS AND WRITES
  * Opens the thread, sends messages, interrupts, and holds the SSE connection open. All of
- * it through lib/api.ts and lib/stream.ts.
+ * it through lib/api.ts and lib/stream.ts. It also reads the storage limits, once, to tell
+ * the composer's paperclip how big a file it can accept; a failed read of that leaves the
+ * hover line out rather than touching anything else on the screen.
  */
 
 import { useEffect, useReducer, useRef, useState } from "react";
@@ -41,13 +43,15 @@ import type { ReactElement } from "react";
 import { routeById } from "../../../app/content/routes.ts";
 import {
   fetchThread,
+  getLimits,
   interruptThread,
   openThread,
-  uploadFile,
+  uploadDocument,
+  uploadVoiceSample,
   sendMessage,
   streamUrl,
 } from "../lib/api.ts";
-import type { Founder, Problem } from "../lib/api.ts";
+import type { Founder, Problem, Result, UploadedDocument } from "../lib/api.ts";
 import { openStream } from "../lib/stream.ts";
 import type { StreamHandle } from "../lib/stream.ts";
 import { EMPTY_THREAD, FAILURE_COPY, WHILE_IT_RUNS, threadReducer } from "../lib/thread-state.ts";
@@ -55,6 +59,7 @@ import { mayOpenRoute } from "../lib/track.ts";
 import { hrefFor } from "../lib/nav.ts";
 import { plainFileName } from "../lib/format.ts";
 import { Composer } from "../components/Composer.tsx";
+import type { AttachDestination } from "../components/Composer.tsx";
 import { MessageText } from "../components/MessageText.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { StopButton } from "../components/StopButton.tsx";
@@ -67,6 +72,23 @@ function newClientMsgId(): string {
   return `c_${String(Date.now())}_${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * The name a pasted sample is stored under.
+ *
+ * DOWN TO THE SECOND, NOT JUST THE DAY, and that is a fix, not decoration. This used to
+ * read `sample-<date>.md`, so a founder's second paste on the same day silently replaced
+ * the first: same name, same slug on the server, one file where there should have been
+ * two. The server's own `slugForUpload` keeps whatever name arrives here rather than
+ * inventing one, so the name has to be unique on this side.
+ *
+ * A plain function, exported and not a closure over `new Date()`, so a test can prove two
+ * different times produce two different names without waiting on the clock.
+ */
+export function sampleFileName(now: Date): string {
+  const stamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return `sample-${stamp}.md`;
+}
+
 export function Thread({ founder, routeId }: { readonly founder: Founder; readonly routeId: string }): ReactElement {
   const [view, dispatch] = useReducer(threadReducer, EMPTY_THREAD);
   const [opening, setOpening] = useState(true);
@@ -77,9 +99,27 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
     See `Problem.needs` in lib/api.ts.
   */
   const [openProblem, setOpenProblem] = useState<Problem | null>(null);
+  /*
+    THIS FAILING NEVER TAKES THE COMPOSER DOWN WITH IT. `maxAttachmentBytes` only decorates
+    the paperclip's hover with a size, and a founder who cannot send a message because a
+    second, unrelated read failed would be exactly the kind of screen this app exists to
+    never show. So a failed fetch leaves this null, forever, and the composer simply omits
+    the line rather than showing a stale or wrong number.
+  */
+  const [maxAttachmentBytes, setMaxAttachmentBytes] = useState<number | null>(null);
   const streamRef = useRef<StreamHandle | null>(null);
   const row = routeById(routeId);
   const allowed = mayOpenRoute(routeId, founder.track);
+
+  useEffect(() => {
+    let live = true;
+    void getLimits().then((result) => {
+      if (live && result.ok) setMaxAttachmentBytes(result.value.fileBytes.value);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!allowed) {
@@ -136,12 +176,23 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
     );
   }
 
-  const send = (text: string): void => {
+  /**
+   * The composer already waited for the upload to finish before this runs at all, so
+   * `attachedName` is always a file the server already has. This is the one line that
+   * names it to the engine: the turn opens against whatever text the server stores, and a
+   * message that only says "look at the file I attached" without saying which one is a
+   * message the engine cannot act on.
+   */
+  const withAttachment = (text: string, attachedName: string | null): string =>
+    attachedName === null ? text : `${text}\n\n(The attached file is ${attachedName}.)`;
+
+  const send = (text: string, attachedName: string | null): void => {
     const threadId = view.threadId;
     if (threadId === null) return;
     const clientMsgId = newClientMsgId();
-    dispatch({ type: "sending", clientMsgId, text });
-    void sendMessage(threadId, text, clientMsgId).then((result) => {
+    const fullText = withAttachment(text, attachedName);
+    dispatch({ type: "sending", clientMsgId, text: fullText });
+    void sendMessage(threadId, fullText, clientMsgId).then((result) => {
       if (!result.ok) dispatch({ type: "send-failed", clientMsgId, text: result.problem.text });
     });
   };
@@ -149,16 +200,17 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
   /**
    * A long paste, kept as a file instead of sent as a message.
    *
-   * It goes through the same route an uploaded file does, as a file built out of
-   * the text. One route, one set of limits, one place the refusals are written.
+   * It always lands in voice-samples/, never through a choice: pasted prose is
+   * unambiguously the founder's own writing, the same way a founder attaching a
+   * file gets asked and a founder pasting one does not. One route, one set of
+   * limits, one place the refusals are written.
    */
   const saveAsFile = (text: string): void => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    const file = new File([new TextEncoder().encode(text)], `sample-${stamp}.md`, {
+    const file = new File([new TextEncoder().encode(text)], sampleFileName(new Date()), {
       type: "text/markdown",
     });
     dispatch({ type: "notice", text: "Saving that as a file." });
-    void uploadFile(file).then((result) => {
+    void uploadVoiceSample(file).then((result) => {
       dispatch({
         type: "notice",
         text: result.ok
@@ -169,23 +221,13 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
   };
 
   /**
-   * A file the founder picked off their own machine.
-   *
-   * One at a time on purpose. A founder adding ten writing samples wants to see
-   * each one land, and a batch that half fails is a screen that has to explain
-   * which half, in a room where nobody has time to read it.
+   * The composer's own choice, turned into which of the two upload routes gets
+   * called. The composer decides the destination; this is the one place that
+   * turns that decision into a network call, mirroring the server's own two
+   * literal routes rather than passing the choice through as a field.
    */
-  const attach = (file: File): void => {
-    dispatch({ type: "notice", text: `Adding ${file.name}.` });
-    void uploadFile(file).then((result) => {
-      dispatch({
-        type: "notice",
-        text: result.ok
-          ? `Added ${file.name}. It is in your files, and this engine can read it from there.`
-          : result.problem.text,
-      });
-    });
-  };
+  const upload = (file: File, destination: AttachDestination): Promise<Result<UploadedDocument>> =>
+    destination === "voice-samples" ? uploadVoiceSample(file) : uploadDocument(file);
 
   const stop = (): void => {
     const threadId = view.threadId;
@@ -359,7 +401,8 @@ export function Thread({ founder, routeId }: { readonly founder: Founder; readon
           }
           onSend={send}
           onSaveAsFile={saveAsFile}
-          onAttach={attach}
+          onUpload={upload}
+          maxAttachmentBytes={maxAttachmentBytes}
         />
       </div>
     </div>

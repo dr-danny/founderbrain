@@ -106,8 +106,13 @@ function stateFiles(): readonly string[] {
   return stateFilesCache;
 }
 
-/** Folders inside `growth-engine/` a founder's own material may sit in. */
-const KNOWN_FOLDERS: readonly string[] = ['people/', 'voice-samples/', 'snapshots/', '.state/'];
+/**
+ * Folders inside `growth-engine/` a founder's own material may sit in.
+ * `uploads/` is listed here for consistency only; it does not change
+ * behaviour today, because `uploads/` is already handled by the verb-keyed
+ * check in `harvest-gate.ts` before `runRules` is ever reached.
+ */
+const KNOWN_FOLDERS: readonly string[] = ['people/', 'voice-samples/', 'uploads/', 'snapshots/', '.state/'];
 
 /**
  * The person file name rule, copied in behaviour from `schemas/person.md`:
