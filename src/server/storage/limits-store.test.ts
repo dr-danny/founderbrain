@@ -34,7 +34,6 @@ import { __setStorageDetectionForTest, applyStoredLimits, storageLimits } from '
 
 const FLOOR_FILE_BYTES = 2 * 1024 * 1024;
 const FLOOR_TOTAL_BYTES = 50 * 1024 * 1024;
-const FLOOR_FILE_COUNT = 400;
 
 const NO_USAGE: CurrentUsage = { totalBytes: 0, fileCount: 0, largestFile: 0 };
 const NOW = new Date('2026-09-07T12:00:00.000Z');
