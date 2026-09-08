@@ -99,13 +99,14 @@ export function callsIn(source: string): readonly Call[] {
   const found: Call[] = [];
 
   // get<T>("/api/x"), getText("/api/x"), post<T>(`/api/x/${y}`), postVoid("/api/x"),
-  // postForm<T>("/api/x", form). getText comes before get, and postForm comes
-  // before post, in the alternation, because each shorter name would otherwise
-  // match the front of the longer one and then fail on the character right
-  // after it — `get` on the bracket that follows `getT`, `post` on the `F` that
-  // follows `post` in `postForm` — and a helper that silently matches nothing
-  // is a call this test cannot see.
-  const viaHelper = /\b(getText|get|postForm|post|postVoid)\s*(?:<[^()]*?>)?\(\s*([`"'])([^`"']+)\2/g;
+  // postForm<T>("/api/x", form), postBytes("/api/x", bytes). getText comes before
+  // get, and postForm/postBytes/postVoid come before post, in the alternation,
+  // because each shorter name would otherwise match the front of the longer one
+  // and then fail on the character right after it — `get` on the bracket that
+  // follows `getT`, `post` on the `F` (or `B`, or the `V`) that follows `post`
+  // in the longer names — and a helper that silently matches nothing is a call
+  // this test cannot see.
+  const viaHelper = /\b(getText|get|postForm|postBytes|postVoid|post)\s*(?:<[^()]*?>)?\(\s*([`"'])([^`"']+)\2/g;
   for (const m of flat.matchAll(viaHelper)) {
     const helper = m[1] ?? '';
     const raw = m[3] ?? '';
@@ -361,7 +362,15 @@ test('AND THE ROUTER ACTUALLY ANSWERS THEM, WHICH IS A DIFFERENT QUESTION', asyn
     const res = await h.app.inject({
       method: call.method as 'GET',
       url,
-      ...(call.method === 'POST' ? { headers: { 'content-type': 'application/json' }, payload: {} } : {}),
+      // The upload route parses one content type and it is not JSON. Probing it
+      // with JSON answers 415 from the parser, which is still not a 404 and so
+      // still proves the route is registered, but the header makes the intent
+      // legible rather than looking like an oversight.
+      ...(call.method === 'POST'
+        ? call.path === '/api/files/voice-samples'
+          ? { headers: { 'content-type': 'application/octet-stream', 'x-upload-name': 'probe.md' }, payload: 'x' }
+          : { headers: { 'content-type': 'application/json' }, payload: {} }
+        : {}),
     });
     assert.notEqual(res.statusCode, 404, `${call.method} ${url} is not routed: ${res.body}`);
   }

@@ -47,7 +47,7 @@ import { geFile, geFileVersion } from '../db/schema.ts';
 import { putBlob } from './blobs.ts';
 import { sha256Hex, type DataKey } from './crypto.ts';
 import type { MaterialisedSet } from './materialise.ts';
-import { geHome, isExcludedPath, relFromGeHome, storageLimits } from './paths.ts';
+import { geHome, isExcludedPath, isUploadPath, relFromGeHome, storageLimits } from './paths.ts';
 
 /** How deep the walk goes. growth-engine/ is two levels; ten is a runaway guard. */
 const MAX_DEPTH = 10;
@@ -257,6 +257,24 @@ export function diffFiles(args: {
       continue;
     }
     if (!materialisedPaths.has(path)) {
+      if (isUploadPath(path)) {
+        // A FOUNDER UPLOAD THAT ARRIVED AFTER THIS TURN'S materialise RAN.
+        //
+        // The uploads route writes ge_file directly, outside any turn, so there is
+        // one window where a row can exist that this turn's rebuild ran too early
+        // to see: the founder pressed upload while the model was still working.
+        // The route refuses while a turn is queued or running, so this is the
+        // narrow race left over rather than the normal case.
+        //
+        // Its absence proves nothing, exactly as an excluded path's does, and the
+        // next materialise writes it. The refusal below is for a file materialise
+        // was supposed to write and did not, which is a cache bug losing a
+        // founder's work. Treating an upload as that would turn the founder's own
+        // upload into a refusal that costs them the whole model run they were
+        // watching, which is the failure this branch exists to prevent, pointed
+        // the wrong way.
+        continue;
+      }
       // THE REFUSAL. The database says this file exists, and materialise never put it
       // on disk, so its absence proves nothing about what ge did. Deleting the row
       // here is how a founder loses a file to a cache bug.
