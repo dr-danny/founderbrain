@@ -1,0 +1,5 @@
+{
+  "extends":"./tsconfig.web.json",
+  "include":["src/founderbrain-web/**/*.ts","src/founderbrain-web/**/*.tsx"],
+  "exclude":["node_modules","dist","vendor"]
+}

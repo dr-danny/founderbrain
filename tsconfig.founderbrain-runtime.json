@@ -1,0 +1,6 @@
+{
+  "extends":"./tsconfig.founderbrain.json",
+  "compilerOptions":{"noEmit":false,"rewriteRelativeImportExtensions":true,"rootDir":".","outDir":"dist/founderbrain-server","declaration":false,"sourceMap":false},
+  "include":["src/founderbrain/main.ts","src/founderbrain/worker.ts","src/founderbrain/migrate-main.ts"],
+  "exclude":["node_modules","dist","vendor","**/*.test.ts"]
+}

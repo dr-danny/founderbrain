@@ -1,3 +1,18 @@
+# FounderBrain
+
+The new SaaS mode targets **Railway + Cloudflare Workers**. It is separate from the inherited single-owner Launchhouse app below.
+
+- [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
+- [API/domain contract](docs/founderbrain/CONTRACT.md)
+- Build: `npm run fb:build`
+- Tests: `npm run fb:test`
+- API: `railway.json` and `deploy/railway/Dockerfile`
+- Edge: `wrangler.jsonc` (no routes or workers.dev activation by default)
+
+Five guided missions, encrypted versioned Brain storage, managed-auth workspace isolation, history/restore/export, and one private invitation-generation job. No publishing, CRM, shell tools or automatic deployments. AI is disabled until configured with approved budgets.
+
+## Inherited upstream reference
+
 # launchhouse-app
 
 The runtime. One Fastify process on a Replit Reserved VM. A founder signs in, talks to the

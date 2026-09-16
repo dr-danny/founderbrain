@@ -1,0 +1,18 @@
+{
+  "$schema":"node_modules/wrangler/config-schema.json",
+  "name":"founderbrain",
+  "main":"src/founderbrain-edge/worker.ts",
+  "compatibility_date":"2026-09-16",
+  "workers_dev":false,
+  "preview_urls":false,
+  "assets":{
+    "directory":"./dist/founderbrain-web",
+    "binding":"ASSETS",
+    "not_found_handling":"single-page-application",
+    "run_worker_first":true
+  },
+  "vars":{
+    "API_ORIGIN":"https://replace-with-approved-railway-origin.invalid",
+    "AUTH_ORIGIN":"https://replace-with-dedicated-auth-origin.invalid"
+  }
+}
