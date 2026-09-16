@@ -62,7 +62,7 @@ Replit's assistant signs off by offering you follow-up tasks. Adding an API key 
 
 **Do not click any of them.** They are Replit's generic suggestions and they are not steps in this programme.
 
-The API key goes into the app instead, at step 8. That takes ten seconds and it checks the key actually works, which Replit's version does not. The timezone and deployment settings are already correct in your copy, because they are written into the files you forked.
+The API key goes into the app instead, at step 9. That takes ten seconds and it checks the key actually works, which Replit's version does not. The timezone and deployment settings are already correct in your copy, because they are written into the files you forked.
 
 Following those suggestions costs an evening and changes nothing.
 

@@ -8,8 +8,9 @@
  *
  * WHY IT EXISTS. Setup has two finish lines and the app names both. Ready to
  * start is sign in, a name and a timezone, due before session 1, and it blocks
- * everything. Ready to publish is GoHighLevel and an account to post to, due at
- * the clinic on 23 September, and it blocks publishing and sending only. A
+ * everything. Ready to publish is GoHighLevel and an account to post to, due by
+ * the clinic on 23 September (GoHighLevel itself is bought and connected in Session 2,
+ * on 14 or 15 September), and it blocks publishing and sending only. A
  * founder who has done tier one is done for now, and the screen can only say
  * that if this route tells it which rows are in which tier's state.
  *

@@ -25,6 +25,7 @@ Read whatever exists and report against this checklist. Show track first, becaus
 | outreach-sequence.md, outreach-firstlines.csv | B2B: sequence approved, list criteria defined, list built, first lines for the first 25 | 3 |
 | dm-openers.md, hook-bank.md, inbound-scripts.md | B2C: 25 openers, hook bank with offer tests, inbound scripts | 3 |
 | ops-workflow.md | Bottleneck named, snapshot chosen, copy written | 3 |
+| ghl-values.md | Every custom value the snapshot arrives without, written in their voice, starting with the pack ops-workflow.md names, and on B2C and Hybrid the two review emails. When it is missing, the next step is "fill my custom values" | After 3, before the clinic |
 | 90-day-plan.md | The number, Monday's three actions, kill criteria | Weekend |
 | playbook-insert.md | Brain, content, engine 2, ops and 90 day plan, gathered into one document | 3 |
 

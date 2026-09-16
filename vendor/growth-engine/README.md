@@ -2,17 +2,17 @@
 
 Claude plugin for Launchhouse Atlanta, 25 to 27 September 2026.
 
-> **In use.** This is version 0.2.0, the toolkit founders on the programme are running. The words are written in the week before, and the clinic is Wednesday 23 September. [docs/AFTER-THE-ENGINES.md](docs/AFTER-THE-ENGINES.md) is both. Fixes only from here.
+> **In use by founders who already installed it.** This is version 0.2.0. The words are written the evening after Session 3, and the clinic is Wednesday 23 September. [docs/AFTER-THE-ENGINES.md](docs/AFTER-THE-ENGINES.md) is both. Fixes only from here.
 
 > **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** Founders take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same three snapshots and writes the same words as this toolkit, so nothing made in the app is wasted. This repository stays for founders who already installed it, and it is still where the app's engine text comes from.
 
-## Two halves, and this repository is the second one
+## Two halves
 
 Founders use two things, in this order, and knowing which is which saves a lot of confusion.
 
 **The Launchhouse app, for Sessions 1 and 2.** Each founder takes their own copy of it. It asks them the questions, writes their Founder Brain, their 30 pieces, their openers and their workflow copy, and holds all of it for them. There is nothing to install and no folder to choose. That is where the work gets made, and [docs/PRE-WORK.md](docs/PRE-WORK.md) is how to set it up.
 
-**This plugin, from Session 3 onwards.** Session 3 is the handover: a founder downloads their work and opens it in Claude on their own machine, and that is where they work from then on. This plugin is what teaches Claude their track, their voice and the rules the programme runs on, so it writes as them rather than as anybody. Alongside it they connect Apollo and GoHighLevel, which are what actually send and publish. [docs/WORKING-IN-CLAUDE.md](docs/WORKING-IN-CLAUDE.md) is that setup, and it is sent before Session 3.
+**The Claude plugin, from Session 3 onwards.** Session 3 is the handover. A founder downloads their work from the app, takes a private copy of [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3), opens it in Claude on their own machine and says "bring my work across". The plugin in that copy teaches Claude their track, their voice and the rules. They connect HighLevel and, for B2B, Apollo, which are what actually publish and send. The plugin in this repository is the older one, kept for founders who already installed it, and [docs/WORKING-IN-CLAUDE.md](docs/WORKING-IN-CLAUDE.md) is its setup.
 
 So the app makes the work and Claude runs it. Neither half replaces the other.
 
@@ -25,6 +25,8 @@ So the app makes the work and Claude runs it. Neither half replaces the other.
 [docs/AFTER-THE-ENGINES.md](docs/AFTER-THE-ENGINES.md) is what a founder does once their engines are written: update the toolkit, write the words their snapshot will arrive without, then load it, paste them in, publish, and test it for real.
 
 ## Install the plugin
+
+Only if you already use this toolkit. Everyone else takes a private copy of [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3) instead.
 
 You install once. Cowork and Claude Code share the same plugin, so it is available in both.
 

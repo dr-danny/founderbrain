@@ -7,7 +7,7 @@ description: Build the operations engine. Runs a bottleneck diagnostic, names th
 
 Delivers the page promise: one workflow running on the founder's live business before they leave Atlanta.
 
-The workflow itself is a pre-built GoHighLevel snapshot. It is loaded into the founder's own account at the clinic, and every message inside it arrives empty. This skill does the two things that actually need thinking: choosing the right one, and writing the words inside it.
+The workflow itself is a pre-built GoHighLevel snapshot. It is loaded into the founder's own account at the clinic, and the messages inside it arrive without their words: each one is empty or holds the word PLACEHOLDER until the founder's words are pasted in. This skill does the two things that actually need thinking: choosing the right one, and writing the words inside it.
 
 **Founders do not build workflows.** If a founder starts describing a bespoke automation, bring them back to the library. Bespoke is what fails at 130.
 
@@ -44,7 +44,7 @@ Then name the bottleneck in one sentence, in their words. Confirm it with them b
 |---|---|---|
 | B2B | **B2B** | Essentials B2B, Lead follow-up, Discovery booking, Proposal chase |
 | B2C | **B2C** | Essentials B2C, Comment to DM, DM qualify and book, Review request |
-| Either, hybrid | **Hybrid** | One Essentials, plus all six packs, on a board of its own |
+| Either, hybrid | **Hybrid** | B2C Essentials, plus all six packs, on a board of its own |
 
 Every pack arrives as drafts. Nothing runs until the founder publishes it, so what the bottleneck decides is **which pack they publish first, and whose words get written first.**
 
@@ -66,7 +66,7 @@ Every pack arrives as drafts. Nothing runs until the founder publishes it, so wh
 
 The list is deliberately small. If the founder's bottleneck falls outside these six, for example onboarding, reactivation, abandoned checkout or win-back, name the nearest pack, adapt its copy, and note the gap in the output file so a mentor can help individually. Do not invent a pack that does not exist and do not attempt a bespoke build.
 
-**Name the platform from the table, never from memory.** A B2C pack runs on Instagram. Saying one runs on LinkedIn puts the other track's platform in front of a founder who is not on it, and it sends them to the wrong place on the day.
+**Name the platform from the table, never from memory.** A B2C pack runs on Instagram, or on email. Saying one runs on LinkedIn puts the other track's platform in front of a founder who is not on it, and it sends them to the wrong place on the day.
 
 Name the pack that answers their bottleneck, say why, and let them override. That one pack is what the output file records as the chosen snapshot, exactly as it always has. The rest of their snapshot stays as drafts until they want it.
 
@@ -94,7 +94,7 @@ Roughly one founder in six needs this. If the founder does not clearly need it, 
 
 Write `./growth-engine/ops-workflow.md` containing the named bottleneck, the chosen snapshot, all message copy, the trigger, the timings, the exit condition, and the tags.
 
-The founder takes this to the setup clinic on 23 September and loads the snapshot. Loading brings every workflow and the empty name of every message slot, and none of the words.
+The founder takes this to the clinic on Wednesday 23 September and loads the snapshot. Loading brings every workflow and the name of every message slot, and none of the words.
 
 The words go in next. They are written in Claude, the evening after Session 3, by saying "fill my custom values". That step fills the Essentials slots every founder gets as well as the snapshot's own, so the copy written here is part of the list rather than all of it. Publishing and the first live test come after that, because a published workflow with empty slots sends blank emails to real people.
 

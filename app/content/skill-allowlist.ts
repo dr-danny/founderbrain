@@ -368,6 +368,20 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     ],
   },
   {
+    skill: "content-engine",
+    group: "B",
+    why:
+      "Plugin reference. The content repo points to the launchhouse-v3 README for the Session 3 steps. " +
+      "In the app those same steps are on the Files screen, under Giving this to Claude, in Session 3",
+    times: 1,
+    removed: [
+      "**Posting is GoHighLevel's job and the founder does it from Claude, not from here.** Once they have connected the GoHighLevel connector to their Claude account, they can ask for these to be posted, a few at a time, and read them first. Say that when you hand the files over, in one line, and do not walk them through it: connecting it is a Session 3 step, done together, and the steps are in the launchhouse-v3 README, at github.com/Philm-moxywolf/launchhouse-v3.",
+    ],
+    added: [
+      "**Posting is GoHighLevel's job and the founder does it from Claude, not from here.** Once they have connected the GoHighLevel connector to their Claude account, they can ask for these to be posted, a few at a time, and read them first. Say that when you hand the files over, in one line, and do not walk them through it: connecting it is a Session 3 step, done together, and the steps are on the Files screen, under Giving this to Claude, in Session 3.",
+    ],
+  },
+  {
     skill: "outreach-b2b",
     group: "A",
     why:
@@ -486,6 +500,17 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
       "So when it is missing, that is expected. Say it is made later, in Claude, and move on. Do not offer to write it, do not ask what it is for, and do not count it against them.",
       "",
     ],
+  },
+  {
+    skill: "status",
+    group: "C",
+    why:
+      "ghl-values.md is written in Claude after session 3, and the app has no engine that makes it",
+    times: 1,
+    removed: [
+      "| ghl-values.md | Every custom value the snapshot arrives without, written in their voice, starting with the pack ops-workflow.md names, and on B2C and Hybrid the two review emails. When it is missing, the next step is \"fill my custom values\" | After 3, before the clinic |",
+    ],
+    added: [],
   },
   {
     skill: "playbook-export",

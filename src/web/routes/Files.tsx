@@ -319,6 +319,14 @@ function useAllowedFileNames(founder: Founder): readonly string[] | null {
  * is the folder. Private and not a fork, because a fork of a public repository is
  * always public and the copy is where their work is saved.
  *
+ * THE STEPS ARE THE WHOLE ROUTE, IN ORDER, AND MATCH THE V3 README. Installing the
+ * two apps comes first because every later step needs one of them. The plugin step
+ * carries its own fallback, because "say yes when it offers" is a dead end on the
+ * day it is not offered. The connector is named HighLevel, as Settings, then
+ * Connectors lists it, and "connect my tools" follows it so Claude checks the
+ * connection by reading the founder's own account back. Safari on a Mac unzips the
+ * download by itself, so the download step says what to do with the folder instead.
+ *
  * IT IS FOLDED SHUT BY DEFAULT. A founder in session 1 is not doing this and does
  * not need a wall of instructions under their files for a fortnight.
  *
@@ -334,7 +342,16 @@ export function HandingItToClaude({ track }: { readonly track: Founder["track"] 
       </p>
       <ol>
         <li>
+          <strong>Install the Claude desktop app and GitHub Desktop</strong>, and sign in to both. On a Windows PC, also
+          install Git for Windows from git-scm.com, pressing Next on every screen.
+        </li>
+        <li>
           <strong>Press Download everything, above.</strong> You get one file. Leave it as it is, zipped.
+          <br />
+          <span className="quiet">
+            If your Mac opens it into a folder called <code>growth-engine</code> instead, do not drag that folder
+            anywhere. Leave it where it is, and Claude finds it when you say &quot;bring my work across&quot;.
+          </span>
         </li>
         <li>
           <strong>Take your own private copy of the Launchhouse folder.</strong> Go to{" "}
@@ -353,15 +370,22 @@ export function HandingItToClaude({ track }: { readonly track: Founder["track"] 
           <strong>Open that folder in Claude</strong>, in the desktop app&apos;s Code tab, and say yes when it offers
           the Launchhouse plugin. That is what teaches it your track, your voice and the rules. Then say{" "}
           &quot;start launchhouse&quot;.
+          <br />
+          <span className="quiet">
+            If it does not offer the plugin, press the <strong>+</strong> button next to the message box, then{" "}
+            <strong>Plugins</strong>, add <code>Philm-moxywolf/launchhouse-v3</code>, and install{" "}
+            <strong>growth-engine</strong>.
+          </span>
         </li>
         <li>
-          <strong>Drag the file you downloaded into that folder</strong>, and say &quot;bring my work across&quot;. Your
+          <strong>Drag the file you downloaded into that folder</strong>, or leave the folder where it is if your Mac unzipped it, and say &quot;bring my work across&quot;. Your
           work arrives as it was, and nothing you wrote is rewritten.
         </li>
         <li>
-          <strong>Connect GoHighLevel</strong> to your Claude account, in Settings, then Connectors, so it can post for
-          you.
-          {track === "b2b" ? " And connect Apollo, so it can find your 25 and build your sequence, paused, for you to start." : ""}
+          <strong>Connect your tools.</strong> In Claude, open Settings, then Connectors, and connect HighLevel, which is
+          GoHighLevel&apos;s own connector.
+          {track === "b2b" ? " Connect Apollo too, so it can find your 25 and build your sequence, paused, for you to start." : ""}
+          {" "}Then say &quot;connect my tools&quot;. Claude checks each connection by reading your own account back.
         </li>
         <li>
           <strong>Say &quot;where am I up to&quot;.</strong> If it tells you what you have built, it can read

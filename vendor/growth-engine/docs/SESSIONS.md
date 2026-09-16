@@ -9,7 +9,7 @@ Everything is built before you travel. The weekend itself is for writing, sendin
 | Session 1 | Mon 7 or Tue 8 September | Your Founder Brain. B2B: your sending domain | The content engine. Start collecting pictures and clips |
 | Session 2 | Mon 14 or Tue 15 September | GoHighLevel and Apollo, set up and working | Your second engine, and your operations workflow |
 | Session 3 | Mon 21 or Tue 22 September | Connecting your Brain to Claude | Your GoHighLevel words written, ready to paste on the Wednesday. Then use it |
-| Clinic | Wed 23 September | Your workflow loaded, and your Brain proved | Nothing. Pack |
+| Clinic | Wed 23 September | Your snapshot loaded, and your Brain proved | Nothing. Pack |
 | Atlanta | Fri 25 to Sun 27 September | Using all of it | |
 
 Before Session 1 you only need the app running: a GitHub account, your own copy of the app, a Replit account, and a key. That is [docs/PRE-WORK.md](PRE-WORK.md), and it takes about twenty minutes.
@@ -44,7 +44,7 @@ If you already have a business domain that sends email every day, you are done i
 
 **Build your content engine.** Say "build my content engine" in the app. It reads your Brain and writes 30 pieces in your voice. About an hour, and you can do it in pieces.
 
-**Start collecting pictures and clips.** This is the one people leave and cannot fix on the day. The engine writes the words; it cannot film your workshop. Section 9 of the pre-work says exactly how many and what kind, split by track.
+**Start collecting pictures and clips.** This is the one people leave and cannot fix on the day. The engine writes the words; it cannot film your workshop. Section 12 of the pre-work says exactly how many and what kind, split by track.
 
 ## Session 2: your tools
 
@@ -52,7 +52,7 @@ GoHighLevel and Apollo, set up properly, with everything connected and checked i
 
 **GoHighLevel**, both tracks. It is your CRM, your social publishing and your automations. Buy the Starter plan in the session rather than starting a trial, because a trial started now expires during the weekend you need it.
 
-**Apollo**, B2B only, finished off. You started it in Session 1 for the domain. Now it becomes what actually sends: your plan, your sending schedule, and your sequences.
+**Apollo**, B2B only, finished off. You started it in Session 1 for the domain. If your work email is on Google, it now becomes what actually sends: your plan, your sending schedule, and your sequences. On any other provider your 25 go by hand from your own mailbox.
 
 You will connect both to your app and confirm they work. That confirmation is the point of the session: a connection that fails quietly in September is a Saturday lost in Atlanta.
 
@@ -66,7 +66,7 @@ You will connect both to your app and confirm they work. That confirmation is th
 
 Up to now you have been working in the app. From here you work in Claude, and this session is the handover.
 
-You download everything the app has made for you, take your own private copy of launchhouse-v3, open it in Claude on your own machine, say "bring my work across", and connect Apollo and GoHighLevel to your Claude account. After that, Claude can read your Brain, write in your voice, and drive both tools for you.
+You download everything the app has made for you, take your own private copy of launchhouse-v3, open it in Claude on your own machine, say "bring my work across", and connect GoHighLevel and, for B2B, Apollo to your Claude account. After that, Claude can read your Brain, write in your voice, and drive your tools for you.
 
 That is where you work from now on, and it is where you will be in Atlanta.
 
@@ -74,15 +74,15 @@ The steps are in the [launchhouse-v3 README](https://github.com/Philm-moxywolf/l
 
 ### Your homework
 
-**Write your GoHighLevel words.** Say "fill my custom values". Claude reads your Brain and your ops file and writes every message your snapshot will arrive without, into `ghl-values.md`. It does not need the snapshot, and this is the job that makes the clinic a paste rather than an hour of writing. About half an hour, and the clinic is the next day, so do it the same evening. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is the step by step.
+**Write your GoHighLevel words.** Say "fill my custom values". Claude reads your Brain and your ops file and writes every message your snapshot will arrive without, into `ghl-values.md`. It does not need the snapshot, and this is the job that makes the clinic a paste rather than an hour of writing. About half an hour, and the clinic is on the Wednesday, only one or two days later, so do it the same evening. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is the step by step.
 
-**Then use it.** Ask it for things. Publish something. The point of the fortnight before Atlanta is that the weekend is not the first time you have done this.
+**Then use it.** Ask it for things. Publish something. The point of the days before Atlanta is that the weekend is not the first time you have done this.
 
 ## The clinic, Wednesday 23 September
 
 Two things, and both have to be true before you travel.
 
-**Your workflow, loaded and sending.** You bring `ghl-values.md`, written the evening after Session 3, and load your one GoHighLevel snapshot. It arrives as a pack: the workflows, your pipeline, your forms, your tags, and the empty name of every message. Your words are the one thing it does not bring, so you paste in the ones you already wrote, publish, and send yourself one test through the real trigger. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is that half hour, step by step.
+**Your snapshot, loaded and sending.** You bring `ghl-values.md`, written the evening after Session 3, and load your one GoHighLevel snapshot. It arrives with Essentials and every pack in it: the workflows, your pipeline, your forms, your tags, and the name of every message slot. Your words are the one thing it does not bring, so you paste in the ones you already wrote, publish, and send yourself one test through the real trigger. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is that half hour, step by step.
 
 **Your Brain, proved.** We check that Claude on your machine is reading your Brain and writing as you. If something is wrong with the handover, this is where it gets found, with two days to fix it rather than none.
 

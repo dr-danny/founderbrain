@@ -28,9 +28,10 @@
  * sixty four other people in it.
  *
  * WHY THE TWO FINISH LINES EXIST BELOW.
- * Onboarding goes out on 4 September. The GoHighLevel clinic is on 23 September, and the
- * cohort buys together on purpose so that nobody's trial expires during the weekend. So for
- * most of September the true state of most founders is "everything you can do is done", and
+ * Onboarding goes out on 4 September. The cohort buys and connects GoHighLevel together in
+ * Session 2, on 14 or 15 September, on purpose so that nobody's trial expires during the
+ * weekend, and the clinic on 23 September assumes it is there. So for the first part of
+ * September the true state of most founders is "everything you can do is done", and
  * a single progress bar would tell 130 people they are 40 percent behind when they are not.
  * After that happens once, nobody reads the bar again.
  *

@@ -1,12 +1,12 @@
 # Working in Claude, after the app
 
-Sent before Session 3, and this is what Session 3 is. We do it together, so read it first if you like but do not worry if something does not work on your own.
+Sent before Session 3, for founders who already installed the older toolkit. If you have not, follow the [launchhouse-v3 README](https://github.com/Philm-moxywolf/launchhouse-v3) instead: that is what Session 3 is. We do it together, so read it first if you like but do not worry if something does not work on your own.
 
-By now the app has your Founder Brain, your voice, your 30 pieces and your engine, and your Apollo and GoHighLevel accounts are set up from Session 2. This is the handover: getting Claude on your own machine to use all of it.
+By now the app has your Founder Brain, your voice, your 30 pieces and your engine. Your GoHighLevel account, and your Apollo account if you sell to businesses, are set up from Session 2. This is the handover: getting Claude on your own machine to use all of it.
 
 **After this session you work in Claude, not in the app.** That is where you will be in Atlanta and every week after it. The app made the work. Claude is where you use it.
 
-> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** You take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same snapshots and writes the same words as this toolkit. Its README is the step by step for this session. This page stays for anyone who installed the older toolkit. If that is you, your work is safe in your own folder: bring it across to the new copy, then remove this toolkit from the Plugins panel so only one set of commands answers.
+> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** You take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same snapshots and writes the same words as this toolkit. Its README is the step by step for this session. This page stays for anyone who installed the older toolkit. If that is you, your work is safe in your own folder, and removing this toolkit does not touch it. Remove it from the Plugins panel first, then quit and reopen the app, so only one set of commands answers. Then take the new copy and bring your work across.
 
 ## Why bother, when the app already works
 
@@ -16,7 +16,7 @@ Three reasons, and if none of them matter to you, skip this until after Atlanta.
 
 **It remembers you.** The more you work in one place, the more it knows how you write and what you have already tried.
 
-**It is yours.** Your Apollo account, your GoHighLevel account, your machine. Nothing here goes through us.
+**It is yours.** Your GoHighLevel account, your Apollo account if you sell to businesses, your machine. Nothing here goes through us.
 
 ## 1. Get Claude on your machine
 
@@ -28,6 +28,8 @@ This needs a paid Claude plan. That is separate from the API key you put into th
 
 ## 2. Install the toolkit
 
+Only if you already use the older toolkit. Everyone else takes a private copy of launchhouse-v3 instead.
+
 In the desktop app, click the + button next to the message box, choose Plugins, and add the marketplace `Philm-moxywolf/Atlanta`. Then install `growth-engine` from it.
 
 This is what teaches Claude the rules this programme runs on: your track, your voice, and the two mistakes that cost the most.
@@ -36,11 +38,11 @@ If it does not appear, quit and reopen the app, then try again. That fixes it ne
 
 ## 3. Connect Apollo, if you sell to businesses
 
-You already have an Apollo account from Session 1 and it is set up to send from Session 2. This step is different: it gives Claude access to it.
+You already have an Apollo account from Session 1. If your work email is on Google, it is set up to send from Session 2. On any other provider your 25 go by hand from your own mailbox. This step is different: it gives Claude access to it.
 
 Apollo has a connector you add to your Claude account. It is a few clicks and there is nothing to paste.
 
-Once it is on, Claude can search for people, get their email addresses, and build a sequence in your Apollo account.
+Once it is on, Claude can search for people and get their email addresses. If your work email is on Google, it can also build your sequence in your Apollo account, paused, and nothing sends until you press start.
 
 Skip this entirely if you sell to consumers. Apollo is not part of your track.
 
@@ -56,9 +58,11 @@ You set GoHighLevel up in Session 2, so the account is already there. This conne
 
 ## 5. Give Claude your work
 
+If you are moving to your private copy of launchhouse-v3, skip this section. Leave the download zipped and bring it across there, as its START-HERE says.
+
 Claude cannot see inside the app. It has no idea who you are until you show it.
 
-In the app, open **Files** and press the button that downloads everything. You get a folder called `growth-engine`.
+In the app, open **Files** and press the button that downloads everything. You get one file, `growth-engine.zip`.
 
 Unzip it. You now have a folder called `growth-engine`, with your Brain and everything else inside it.
 
@@ -100,13 +104,13 @@ Read what it writes before it goes anywhere. You would do that with an assistant
 
 ## What this costs
 
-Nothing new. The connectors are free, the plugin is free, and Apollo and GoHighLevel are the accounts you already have.
+Nothing new. The connectors are free, the plugin is free, and GoHighLevel, plus Apollo if you sell to businesses, are the accounts you already have.
 
 Your Claude plan is the one cost, and you are on it for the desktop app anyway.
 
 ## What to do tonight
 
-One job, about half an hour, and it is what makes the Wednesday easy. The clinic is the day after tomorrow, so do it before you go to bed if you can.
+One job, about half an hour, and it is what makes the Wednesday easy. The clinic is on Wednesday 23 September, one or two days after your session, so do it before you go to bed if you can.
 
 Say **"fill my custom values"**. Claude reads your Brain and your ops file and writes every message your GoHighLevel snapshot will arrive without, into `ghl-values.md` in your folder. You do not need the snapshot to do it, and doing it now means the Wednesday is a paste rather than an hour of writing.
 

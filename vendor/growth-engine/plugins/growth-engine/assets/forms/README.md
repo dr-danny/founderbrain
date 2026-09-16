@@ -6,9 +6,9 @@ Google Forms, not Typeform. Typeform's free tier caps at 10 responses a month an
 
 | Gate | After session | Founder submits | Link |
 |---|---|---|---|
-| 1 | S1, w/c 7 Sep | /growth-engine:gate output: Brain locked, thesis, domain (B2B) or IG converted (B2C) | TODO |
-| 2 | S2, w/c 14 Sep | /growth-engine:gate output: 30 pieces edited | TODO |
-| 3 | S3, w/c 21 Sep | /growth-engine:gate output: engine 2 copy, snapshot chosen, pods confirmed | TODO |
+| A | S1, w/c 7 Sep | /growth-engine:gate output: Brain locked, thesis, domain (B2B) or IG converted (B2C) | TODO |
+| B | S2, w/c 14 Sep | /growth-engine:gate output: 30 pieces edited | TODO |
+| C | S3, w/c 21 Sep | /growth-engine:gate output: engine 2 copy, ops workflow with the pack to publish first, pods confirmed | TODO |
 
 Tracking sheet: one row per founder, red/amber/green per gate, track column, notes column. Link: TODO
 

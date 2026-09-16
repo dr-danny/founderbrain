@@ -2,7 +2,7 @@
 
 Where you are, what is left, and what has to be true before you travel. Today is the week of Session 3.
 
-> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** You take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same snapshots and writes the same words as this toolkit. Its own road to Atlanta page is the one to follow. This page stays for anyone who installed the older toolkit. If that is you, your work is safe in your own folder: bring it across to the new copy, then remove this toolkit from the Plugins panel so only one set of commands answers.
+> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** You take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same snapshots and writes the same words as this toolkit. Its own road to Atlanta page is the one to follow. This page stays for anyone who installed the older toolkit. If that is you, your work is safe in your own folder, and removing this toolkit does not touch it. Remove it from the Plugins panel first, then quit and reopen the app, so only one set of commands answers. Then take the new copy and bring your work across.
 
 ## The whole arc
 
@@ -25,7 +25,7 @@ Where you are, what is left, and what has to be true before you travel. Today is
 
 The handover. Up to now the work has been in the app. From here it is in Claude on your own machine.
 
-In the session: download Claude for desktop and sign in, take your private copy of launchhouse-v3 and open it in Claude, connect GoHighLevel and, for B2B, Apollo, then download everything from the app's Files screen and say "bring my work across".
+In the session: install the Claude desktop app and GitHub Desktop, and sign in. Download everything from the app's Files screen. Take your private copy of launchhouse-v3, clone it with GitHub Desktop, and open it in the Claude app's Code tab. Accept the plugin and say "start launchhouse". Drag your download in and say "bring my work across". Then, in Settings, then Connectors, connect HighLevel and, for B2B, Apollo, and say "connect my tools".
 
 The [launchhouse-v3 README](https://github.com/Philm-moxywolf/launchhouse-v3) is the step by step.
 
@@ -37,14 +37,14 @@ The [launchhouse-v3 README](https://github.com/Philm-moxywolf/launchhouse-v3) is
 
 Four things, and it is a short gap: Session 3 is the Monday or Tuesday and the clinic is the Wednesday. The third is the real job, and it takes about half an hour, so do it the same evening.
 
-1. **Update the toolkit.** It is not automatic, and the step that writes your snapshot's words arrived in a later version. [docs/UPDATE-YOUR-SETUP.md](UPDATE-YOUR-SETUP.md) is how.
+1. **Check the plugin is current.** If you took your private copy of launchhouse-v3 at Session 3, it already has the step that writes your snapshot's words. If you installed its plugin earlier, update it to version 0.9.5 or later. It is not automatic, and [its update page](https://github.com/Philm-moxywolf/launchhouse-v3/blob/main/UPDATE-YOUR-SETUP.md) is how.
 2. **Check `ops-workflow.md` exists.** Say "where am I up to". That file names your snapshot and which pack to publish first, and your words cannot be written without it. If it is missing, say "build my ops engine" and do it now.
 3. **Write your GoHighLevel words.** Say "fill my custom values". Claude reads your Brain and your engine files, asks you the few things nothing else answers, and writes every message your snapshot will arrive without into `ghl-values.md`. You do not need the snapshot to do this, and doing it now is what turns the day into a paste.
 4. **Read the words back.** They are yours, going to real people. Changing a word now costs nothing. Changing it on the day costs your place in the queue.
 
 ### The clinic, Wednesday 23 September
 
-About half an hour, and most of it is pasting. You load your snapshot, paste in the words you wrote the evening before, publish, and send yourself one real test.
+About half an hour, and most of it is pasting. You load your snapshot, paste in the words you wrote the evening after Session 3, publish, and send yourself one real test.
 
 Both things have to be true before you travel: your snapshot loaded and sending, and your Brain proved to be read by Claude on your own machine.
 
@@ -66,11 +66,11 @@ Writing, sending and meeting people. Nothing is set up on the day.
 
 ## What differs by track
 
-**B2B.** The sending domain started in Session 1 and is the only deadline that is not ours. Apollo sends. Your second engine is the sequence, the list criteria, 25 people and 25 first lines.
+**B2B.** The sending domain started in Session 1 and is the only deadline that is not ours. If your work email is on Google, Apollo sends. On any other provider your 25 go by hand from your own mailbox. Your second engine is the sequence, the list criteria, 25 people and 25 first lines.
 
 **B2C.** No domain and no Apollo. Instagram must be a Business or Creator account linked to a Facebook Page, or nothing publishes or captures inbound. Your second engine is 25 targets, 25 openers, the hook bank and your inbound scripts.
 
-Everything else is the same: the Brain, the 30 pieces, GoHighLevel, one snapshot of six, the clinic, and the Sunday plan.
+Everything else is the same: the Brain, the 30 pieces, GoHighLevel, one snapshot that your track decides with every pack in it arriving as drafts, the clinic, and the Sunday plan.
 
 ## If you are behind
 

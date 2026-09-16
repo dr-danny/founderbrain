@@ -87,7 +87,7 @@ export function progressLabel(step: number): string {
 /**
  * Shown above every step.
  *
- * The cohort buys GoHighLevel together on 23 September, so on 5 September most
+ * The cohort buys and connects GoHighLevel in Session 2, on 14 or 15 September, so on 5 September most
  * founders cannot do any of this. A progress bar that says they are behind
  * when they are not is how you teach 130 people to ignore the progress bar.
  */
@@ -363,24 +363,24 @@ export const GHL_WALK_CONNECTED = {
   /**
    * The other half of connecting GoHighLevel, and it is not this app.
    *
-   * WHY IT IS HERE AND NOT IN THE PRE WORK. GoHighLevel is bought at the clinic on 23
-   * September, so a founder reading the pre work in early September has nothing to
-   * connect it to yet. This screen is the moment it exists and is working, which is the
+   * WHY IT IS HERE AND NOT IN THE PRE WORK. GoHighLevel is bought and connected in
+   * Session 2, on 14 or 15 September, so a founder reading the pre work in early September
+   * has nothing to connect it to yet. This screen is the moment it exists and is working, which is the
    * only moment the next step makes sense.
    *
-   * WHAT IT IS FOR. The token above lets this app publish for them. It does nothing for
+   * WHAT IT IS FOR. The token above lets this app check their account. It does nothing for
    * Claude anywhere else. Connecting GoHighLevel's own MCP server to their Claude
    * account is what lets them ask Claude to check a contact or post something while they
-   * are working in Cowork, away from here.
+   * are working in Claude, away from here.
    *
-   * IT IS OPTIONAL AND IT IS SAID TO BE. Nothing in the three sessions needs it, and a
-   * founder who skips it loses nothing before Atlanta.
+   * IT IS A SESSION 3 STEP. Nothing in this app needs it, and it is done together in
+   * Session 3.
    */
   mcp: {
-    title: "Optional: let Claude reach GoHighLevel too",
+    title: "In Session 3: let Claude reach GoHighLevel too",
     body: [
-      "The token you just pasted lets this app publish for you. It does nothing for Claude when you are working somewhere else.",
-      "If you want to ask Claude about your contacts or your posts while you are working in Cowork, GoHighLevel has its own connector you add to your Claude account. It takes a few minutes and nothing here needs it.",
+      "The token you just pasted lets this app check your GoHighLevel account. It does nothing for Claude when you are working somewhere else.",
+      "In Session 3 you connect HighLevel, GoHighLevel's own connector, to your Claude account, in Settings, then Connectors, and we do it together. Nothing in this app needs it.",
     ],
     linkLabel: "How to set up the GoHighLevel connector",
     linkHref:

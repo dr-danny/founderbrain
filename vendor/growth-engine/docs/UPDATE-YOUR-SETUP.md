@@ -2,7 +2,7 @@
 
 You already downloaded your work and opened it in Claude. This is how to take the newest toolkit, and it takes about two minutes.
 
-> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** You take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same snapshots and writes the same words as this toolkit. Its own update page is the one to follow. This page stays for anyone who installed the older toolkit. If that is you, your work is safe in your own folder: bring it across to the new copy, then remove this toolkit from the Plugins panel so only one set of commands answers.
+> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** You take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same snapshots and writes the same words as this toolkit. Its own update page is the one to follow. This page stays for anyone who installed the older toolkit. If that is you, your work is safe in your own folder, and removing this toolkit does not touch it. Remove it from the Plugins panel first, then quit and reopen the app, so only one set of commands answers. Then take the new copy and bring your work across.
 
 ## First, the thing founders worry about
 
@@ -12,7 +12,7 @@ Updating cannot lose your Brain, your posts or your files, because they live in 
 
 ## Why update at all
 
-The step that writes your snapshot's words arrived in a later version. You run it in the week before the clinic, not on the day. Without it, Claude does not know your value names, how many there are, or which of them have to be filled before you publish.
+The step that writes your snapshot's words arrived in a later version. You run it the evening after Session 3, not on the day. Without it, Claude does not know your value names, how many there are, or which of them have to be filled before you publish.
 
 Updates are never automatic. You take them when we say, so that a room of 130 people is running the same thing.
 
@@ -33,12 +33,7 @@ Updates are never automatic. You take them when we say, so that a room of 130 pe
 
 Then reinstall the plugin if you are asked to.
 
-**If you never installed it at all:**
-
-```
-/plugin marketplace add Philm-moxywolf/Atlanta
-/plugin install growth-engine@launchhouse
-```
+If you never installed it at all, do not install this one. Take your private copy of [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3) instead: its README is the step by step.
 
 ## Check it worked
 
@@ -64,13 +59,13 @@ If `ops-workflow.md` is missing, say **"build my ops engine"** first. It names t
 
 Some founders took the downloadable folder, which put the toolkit inside `.claude/` in their own folder. That copy does not update itself and it does not have the new step.
 
-The simplest fix is to install the plugin properly, using the steps above, and stop using the copied one. Ask in Slack if you are not sure which you have.
+The simplest fix is to take your private copy of launchhouse-v3, say "bring my work across", and stop using the copied one. Ask in Slack if you are not sure which you have.
 
 ## If you have two of them
 
 If you also installed the `launchhouse-v3` toolkit at some point, you now have two sets of the same commands, and Claude will answer with whichever wins.
 
-Keep one. If you work in a folder you downloaded from the app, keep `growth-engine@launchhouse`. Remove the other from the Plugins panel, then quit and reopen the app.
+Keep `growth-engine@launchhouse-v3`. Your work is safe in your own folder. Remove `growth-engine@launchhouse` from the Plugins panel first, and quit and reopen the app. Then open your private copy of launchhouse-v3 in Claude, say "bring my work across", and tell Claude where your current folder is. If you have not made your private copy yet, the [launchhouse-v3 README](https://github.com/Philm-moxywolf/launchhouse-v3) is the step by step.
 
 ## Checking nothing was lost
 

@@ -1,14 +1,11 @@
 # GoHighLevel snapshots
 
-Six snapshot share links go here, three per track, built in the agency account and tested by loading into a second location before the link is published.
+Three snapshot share links go here, one per snapshot. The Brain's track decides which one a founder loads. Each link is tested by loading it into a clean sub-account before it is given out.
 
-| Track | Snapshot | Share link |
-|---|---|---|
-| B2B | Lead follow-up | TODO |
-| B2B | Discovery booking | TODO |
-| B2B | Proposal chase | TODO |
-| B2C | Comment-to-DM capture | TODO |
-| B2C | DM qualify and book | TODO |
-| B2C | Review request | TODO |
+| Snapshot | Share link |
+|---|---|
+| B2B | TODO |
+| B2C | TODO |
+| Hybrid | TODO |
 
-If a snapshot changes after publication, update the link here and announce in Slack.
+Once founders have loaded a snapshot, it is not changed or re-shared. Fixes go out as a one page fix sheet, announced in Slack.

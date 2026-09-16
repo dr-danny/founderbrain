@@ -10,8 +10,8 @@
  * Three failures.
  *
  * One, the half finished progress bar. Onboarding goes out on 4 September and the cohort
- * buys GoHighLevel together at the clinic on 23 September, so for nearly three weeks the
- * honest state of most founders is "everything you can do is done". Setup has two finish
+ * buys and connects GoHighLevel in Session 2, on 14 or 15 September, so for the first ten
+ * days the honest state of most founders is "everything you can do is done". Setup has two finish
  * lines, ready to start and ready to publish, and this file knows which row belongs to
  * which. Showing 40 percent to somebody who has done everything currently possible is how
  * you teach 130 people to ignore the progress bar.
@@ -45,7 +45,7 @@ import { hrefFor } from "./nav.ts";
  *
  * Section 6: tier one is sign in, name and timezone, due before session 1, and it blocks
  * everything. Tier two is GoHighLevel, the accounts to post to and Apollo where it applies,
- * due at the clinic, and it blocks publishing and sending only.
+ * due by the clinic, and it blocks publishing and sending only.
  */
 export type Tier = "start" | "publish";
 
@@ -112,7 +112,15 @@ export function railRows(setup: SetupState, track: Track | null): readonly RailR
   rows.push({
     id: "accounts",
     title: "An account to post to",
-    blurb: "A Facebook Page or an Instagram account, connected inside GoHighLevel's Social Planner.",
+    // Rule 1. A B2B founder posts to LinkedIn and a B2C founder to Instagram, so each is
+    // shown only their own platform. A Facebook Page is asked of everyone elsewhere, so it
+    // is the one name a founder with no track yet is shown.
+    blurb:
+      track === "b2b"
+        ? "Your LinkedIn page or profile, or a Facebook Page, connected inside GoHighLevel's Social Planner."
+        : track === "b2c"
+          ? "A Facebook Page or an Instagram account, connected inside GoHighLevel's Social Planner."
+          : "An account to post to, such as a Facebook Page, connected inside GoHighLevel's Social Planner.",
     tier: "publish",
     state: setup.ghl.accounts.length > 0 ? "done" : setup.ghl.connected ? "in_progress" : "not_started",
     href: hrefFor({ kind: "setup-ghl-step", slug: "verify" }),
@@ -124,7 +132,7 @@ export function railRows(setup: SetupState, track: Track | null): readonly RailR
     rows.push({
       id: "apollo",
       title: "Apollo",
-      blurb: "Two ways to do this, and both end in the same place. Nothing sends until you press send.",
+      blurb: "Only if your work email is on Google. Two ways to do this, and both end in the same place. Nothing sends until you press send.",
       tier: "publish",
       state: setup.apollo.connected ? "done" : "not_started",
       href: hrefFor({ kind: "setup-apollo" }),

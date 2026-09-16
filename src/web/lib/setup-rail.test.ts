@@ -48,6 +48,19 @@ test("a B2B founder gets the Apollo row once the server sends its state", () => 
   assert.ok(rows.some((r) => r.id === "apollo"));
 });
 
+test("the account to post to names each track's own platform and never the other's", () => {
+  const blurb = (track: "b2b" | "b2c" | null): string =>
+    railRows(BLANK, track).find((r) => r.id === "accounts")?.blurb ?? "";
+  assert.match(blurb("b2b"), /LinkedIn/);
+  assert.ok(!blurb("b2b").includes("Instagram"), "a B2B founder is not pointed at Instagram");
+  assert.match(blurb("b2c"), /Instagram/);
+  assert.ok(!blurb("b2c").includes("LinkedIn"), "a B2C founder is not pointed at LinkedIn");
+  for (const track of ["b2b", "b2c", null] as const) {
+    assert.match(blurb(track), /Facebook Page/, "every founder is told a Facebook Page works");
+  }
+  assert.ok(!/Instagram|LinkedIn/.test(blurb(null)), "no track yet means neither track's platform");
+});
+
 test("before the track is known there is no Apollo row either", () => {
   const rows = railRows({ ...BLANK, apollo: { connected: false } }, null);
   assert.ok(!rows.some((r) => r.id === "apollo"));

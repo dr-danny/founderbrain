@@ -102,7 +102,7 @@ Leave `scheduled_date` blank. When a piece goes out is decided later, and not he
 
 ## How these get published
 
-**Posting is GoHighLevel's job and the founder does it from Claude, not from here.** Once they have connected the GoHighLevel connector to their Claude account, they can ask for these to be posted, a few at a time, and read them first. Say that when you hand the files over, in one line, and do not walk them through it: `docs/WORKING-IN-CLAUDE.md` is where that lives.
+**Posting is GoHighLevel's job and the founder does it from Claude, not from here.** Once they have connected the GoHighLevel connector to their Claude account, they can ask for these to be posted, a few at a time, and read them first. Say that when you hand the files over, in one line, and do not walk them through it: connecting it is a Session 3 step, done together, and the steps are in the launchhouse-v3 README, at github.com/Philm-moxywolf/launchhouse-v3.
 
 The CSV is the second way in and it stays. A founder who has not connected anything yet, or who would rather do it by hand, has a table they can import or work down. It is also the copy they keep if they ever leave.
 

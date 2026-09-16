@@ -44,6 +44,11 @@ export function Apollo(): ReactElement {
         Two things happen here. You check your key works, so nothing is a surprise later. Then, in Session 3,
         Claude gets its own access and does the work.
       </p>
+      <p className="quiet">
+        Apollo is for founders whose work email is on Google. If yours is on Microsoft 365 or anything else, you do not
+        need Apollo at all: you send your 25 by hand from your own mailbox, and the spreadsheet below is your checklist
+        for the day, not something to upload.
+      </p>
 
       <ConnectApollo />
 
@@ -141,7 +146,7 @@ function ConnectApollo(): ReactElement {
           <label htmlFor="apollo-key">Your Apollo API key</label>
           <p className="quiet">
             In Apollo, go to Settings, Integrations, API Keys, and create one. Turn on Set as master key so it can do
-            everything this needs. A key made with only some endpoints ticked will stop halfway through session 3.
+            everything this needs. A key made with only some endpoints ticked can fail this check.
           </p>
           <input
             id="apollo-key"

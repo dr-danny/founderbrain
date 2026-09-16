@@ -17,8 +17,8 @@
  *
  * The three decisions that matter, all from section 6.
  *
- * Nothing here blocks anything. Most founders cannot do any of this before the clinic on 23
- * September, and the screens say so rather than showing a red mark.
+ * Nothing here blocks anything. Most founders cannot do any of this before Session 2, on 14 or
+ * 15 September, and the screens say so rather than showing a red mark.
  *
  * A skip and a failure are different, and the difference reaches the mentor board. "Not
  * bought yet" waits. "Private Integrations is not in my Settings menu" needs a human today.

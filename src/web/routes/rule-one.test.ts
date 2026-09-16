@@ -165,6 +165,37 @@ test("the handover steps name Apollo for an outreach founder and never for an au
   assert.match(b2b.toLowerCase(), /gohighlevel/);
 });
 
+test("the handover steps are the whole Session 3 route, in order, for every track", () => {
+  // A step left out here is a founder stuck in Session 3: without the two apps nothing
+  // after the download can be done, without the fallback a plugin that is not offered is
+  // a dead end, and without "connect my tools" nobody checks the connector works. The
+  // connector is named HighLevel because that is how Settings, then Connectors lists it.
+  for (const track of ["b2b", "b2c", null] as const) {
+    const text = screenText(createElement(HandingItToClaude, { track }));
+    const order = [
+      "Install the Claude desktop app and GitHub Desktop",
+      "Git for Windows",
+      "Download everything",
+      "github.com/new/import",
+      "Open with GitHub Desktop",
+      "Code tab",
+      '"start launchhouse"',
+      "Philm-moxywolf/launchhouse-v3 , and install growth-engine",
+      '"bring my work across"',
+      "connect HighLevel",
+      '"connect my tools"',
+      '"where am I up to"',
+    ];
+    let from = 0;
+    for (const words of order) {
+      const at = text.indexOf(words, from);
+      assert.ok(at >= 0, `"${words}" is on the ${track ?? "no track"} handover, after the step before it`);
+      from = at;
+    }
+    assert.ok(!text.includes("Philm-moxywolf/Atlanta"), "nobody is sent to the older toolkit");
+  }
+});
+
 test("a founder with no track yet is not offered either track's connector", () => {
   const none = screenText(createElement(HandingItToClaude, { track: null }));
   assertAbsent(none, B2B_WORDS, "the handover steps before a track is chosen");
