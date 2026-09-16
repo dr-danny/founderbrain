@@ -50,6 +50,7 @@ test("the line for a founder who is not sure comes out of the content file", () 
   const line = notSureLine();
   assert.ok(line.startsWith("Look in your inbox"), line);
   assert.ok(line.includes("that is fine"), "the reassurance is the point of the line");
+  assert.ok(line.includes("Slack"), "and the way forward comes with it");
 });
 
 test("a sentence written mid line in the content file is shown as a sentence", () => {

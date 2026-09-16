@@ -86,7 +86,7 @@ export const STATE_WORDS: Readonly<Record<StepState, string>> = {
   not_started: "Not started",
   in_progress: "In progress",
   done: "Done",
-  skipped: "Not needed yet",
+  skipped: "Not yet",
   failed: "Needs a hand",
 };
 
@@ -128,8 +128,8 @@ export function Setup({
           tone="good"
           title="You are done for now"
           lines={[
-            "Everything you can do today is done. The rest needs GoHighLevel, and the whole cohort buys that together at the clinic on 23 September.",
-            "We will bring you back here then. Nothing is late.",
+            "Everything setup asks for is done, GoHighLevel included. It is bought and connected in Session 2, on 14 or 15 September, and the clinic on 23 September assumes it is there.",
+            "Nothing is late. Go back to your engines and keep writing.",
           ]}
         />
       ) : null}
@@ -157,7 +157,7 @@ export function Setup({
 
       <Tier
         title="Ready to publish"
-        due="The clinic, 23 September"
+        due="Session 2, 14 or 15 September. The clinic on 23 September assumes it is in place"
         blocks="Publishing and sending, and nothing else"
         rows={rows.filter((r) => r.tier === "publish")}
         complete={summary.readyToPublish}

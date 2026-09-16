@@ -220,7 +220,7 @@ export const ROUTES: readonly RouteRow[] = [
       ],
     },
     label: "Operations Engine",
-    subtitle: "Find your bottleneck, choose a GoHighLevel snapshot, and write the copy",
+    subtitle: "Find your bottleneck, name the pack to publish first, and write the copy",
     skill: "ghl-workflows",
     tracks: ["b2b", "b2c"],
     session: 2,
@@ -420,10 +420,10 @@ export function normalisePhrase(s: string): string {
  * `Track` and `Model` to a route name. F3.
  *
  * Returns null rather than guessing when a B2C founder has no `Model` line.
- * Guessing would pick a snapshot, and the two B2C snapshots are different
- * files with different dependencies. A Brain written before the Model question
- * existed is the normal way to arrive here, so the caller asks the founder
- * rather than treating it as an error.
+ * Guessing would shape their content and their first operations pack on an
+ * answer they never gave. A Brain written before the Model question existed is
+ * the normal way to arrive here, so the caller asks the founder rather than
+ * treating it as an error.
  *
  * `Model` is ignored on the B2B track because it is never asked of a B2B
  * founder. `schemas/brain.md:81` says so, and asking would be showing them the
@@ -446,14 +446,17 @@ export const ROUTE_LABELS: Readonly<Record<RouteName, string>> = {
 /**
  * The GoHighLevel snapshot each route imports at the clinic.
  *
- * From `planning/delivery/05-routes-and-platforms.md:85`. The keys are ours,
- * not GoHighLevel's: nothing here names a GoHighLevel field, an id or an
- * endpoint, because no spike has run.
+ * Three snapshots exist, B2B, B2C and Hybrid, and the track decides which one a
+ * founder gets. `Model` does not change it: both B2C routes load the B2C
+ * snapshot, and it only guides which pack inside it is published first. Hybrid
+ * is not a route. It is the Brain's hybrid flag, read by the operations engine,
+ * so it has no row here. Nothing here names a GoHighLevel field, an id or an
+ * endpoint.
  */
 export const SNAPSHOT_FOR_ROUTE: Readonly<Record<RouteName, string>> = {
-  b2b: "b2b-core",
-  "b2c-service": "b2c-service-core",
-  "b2c-ecom": "b2c-ecom-core",
+  b2b: "B2B",
+  "b2c-service": "B2C",
+  "b2c-ecom": "B2C",
 };
 
 /**

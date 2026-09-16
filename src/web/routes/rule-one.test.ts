@@ -102,20 +102,33 @@ test("a founder with no track yet cannot open a single track engine by address",
   assert.ok(text.includes("That is not one of yours"));
 });
 
-test("the setup screen never tells a founder they are behind when they cannot act yet", () => {
+test("the setup screen tells a founder who has everything in place that nothing is late", () => {
   const text = screenText(
     createElement(Setup, {
       founder: founder(null, { trackLocked: false }),
       setup: setupState({
-        steps: { "have-it": { state: "skipped", evidence: "not bought yet" } },
-        // The key is in. Without it "everything you can do is done" is not true, and the
-        // test below is the other half of that sentence.
+        ghl: { connected: true, locationId: "loc_1", locationName: "Lumen Skin", accounts: [{ platform: "Facebook", name: "Lumen Skin" }], contacts: "not_checked", tokenMadeAt: "2026-09-14T10:00:00Z" },
         anthropic: { set: true, checkedAt: "2026-09-07T14:00:00.000Z", length: 108 },
       }),
     }),
   );
   assert.ok(text.includes("You are done for now"));
   assert.ok(text.includes("Nothing is late"));
+});
+
+test("a founder without GoHighLevel is never told they are behind, and is shown where to start", () => {
+  const text = screenText(
+    createElement(Setup, {
+      founder: founder(null, { trackLocked: false }),
+      setup: setupState({
+        steps: { "have-it": { state: "skipped", evidence: "not bought yet" } },
+        anthropic: { set: true, checkedAt: "2026-09-07T14:00:00.000Z", length: 108 },
+      }),
+    }),
+  );
+  assert.ok(!/(you are|you're|youre)\s+(behind|late|overdue)/i.test(text), "the screen tells the founder they are behind");
+  assert.ok(!text.includes("You are done for now"), "GoHighLevel is not excused any more");
+  assert.ok(text.includes("Connect GoHighLevel") && text.includes("Start"), "the way forward is on the screen");
 });
 
 /**

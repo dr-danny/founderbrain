@@ -2,7 +2,9 @@
 
 Claude plugin for Launchhouse Atlanta, 25 to 27 September 2026.
 
-> **Pre-release.** This is version 0.1.0 and is still being built and tested. Founders on the programme receive the finished version, with setup instructions, on 4 September. Nothing here is final until then.
+> **In use.** This is version 0.2.0, the toolkit founders on the programme are running. The words are written in the week before, and the clinic is Wednesday 23 September. [docs/AFTER-THE-ENGINES.md](docs/AFTER-THE-ENGINES.md) is both. Fixes only from here.
+
+> **From Session 3, Launchhouse runs on [launchhouse-v3](https://github.com/Philm-moxywolf/launchhouse-v3).** Founders take a private copy of it, open that copy in Claude, and say "bring my work across". It loads the same three snapshots and writes the same words as this toolkit, so nothing made in the app is wasted. This repository stays for founders who already installed it, and it is still where the app's engine text comes from.
 
 ## Two halves, and this repository is the second one
 
@@ -15,6 +17,12 @@ Founders use two things, in this order, and knowing which is which saves a lot o
 So the app makes the work and Claude runs it. Neither half replaces the other.
 
 [docs/SESSIONS.md](docs/SESSIONS.md) is what happens in each session and what the homework is.
+
+[docs/ROAD-TO-ATLANTA.md](docs/ROAD-TO-ATLANTA.md) is the whole arc on one page: where a founder is, what is left, and what has to be true before they travel.
+
+[docs/UPDATE-YOUR-SETUP.md](docs/UPDATE-YOUR-SETUP.md) is how a founder who has already downloaded their work takes the newest toolkit, and what to say to one who is afraid of losing it.
+
+[docs/AFTER-THE-ENGINES.md](docs/AFTER-THE-ENGINES.md) is what a founder does once their engines are written: update the toolkit, write the words their snapshot will arrive without, then load it, paste them in, publish, and test it for real.
 
 ## Install the plugin
 
@@ -44,6 +52,7 @@ Every command starts with `/growth-engine:` because that is how installed plugin
 | `/growth-engine:content` | "build my content engine" | Pillars and your 30 posts or scripts |
 | `/growth-engine:engine2` | "build my outreach engine" or "build my audience engine" | Outreach (B2B) or audience (B2C), picked automatically from your track |
 | `/growth-engine:ops` | "find my bottleneck" | Bottleneck, snapshot choice, workflow copy |
+| `/growth-engine:values` | "fill my custom values" | Writes every message your chosen snapshot will arrive without. Run it before the snapshot is loaded, then paste the words in |
 | `/growth-engine:plan` | "build my 90 day plan" | Your 90-day plan |
 | `/growth-engine:playbook` | "generate my playbook insert" | Your personalised playbook insert, delivered as a PDF |
 | `/growth-engine:status` | "where am I up to" | Where you are up to |
@@ -62,6 +71,7 @@ Start with the Brain: `/growth-engine:brain`, or just say "build my founder brai
 | outreach-b2b | List criteria, sequence copy, personalised first lines | B2B |
 | audience-b2c | Targeting, 25 DM openers, hook bank, inbound scripts | B2C |
 | ghl-workflows | Bottleneck diagnostic, snapshot choice, all workflow copy | Both |
+| ghl-values | The words your chosen snapshot will arrive without, written before it loads and pasted in after | Both |
 | growth-plan | Your 90-day plan with kill criteria | Both |
 | playbook-export | Your personalised playbook insert, as a PDF | Both |
 | status | Where you are up to and what is outstanding | Both |

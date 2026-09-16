@@ -32,6 +32,7 @@ the check that looks for a file claimed by two owners.
 | `hook-bank.md` | the `audience-b2c` skill |
 | `inbound-scripts.md` | the `audience-b2c` skill |
 | `ops-workflow.md` | the `ghl-workflows` skill |
+| `ghl-values.md` | the `ghl-values` skill |
 | `90-day-plan.md` | the `growth-plan` skill |
 | `playbook-insert.md` | the `playbook-export` skill |
 | `ledger.md` | `ge ledger` |

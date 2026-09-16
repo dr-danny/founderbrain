@@ -102,7 +102,7 @@ export function railRows(setup: SetupState, track: Track | null): readonly RailR
   rows.push({
     id: "ghl",
     title: "Connect GoHighLevel",
-    blurb: "This is what publishes your posts and holds your contacts. You do not need it until session 3.",
+    blurb: "This is what publishes your posts and holds your contacts. It is bought and connected in Session 2, on 14 or 15 September. The clinic on 23 September assumes it is there.",
     tier: "publish",
     state: ghlState,
     href: hrefFor({ kind: "setup-ghl-intro" }),
@@ -160,21 +160,12 @@ export function setupSummary(rows: readonly RailRow[]): SetupSummary {
   return {
     readyToStart,
     readyToPublish,
-    doneForNow: readyToStart && blocking.length === 0 && waiting.every((r) => r.tier === "publish" && isSkippable(r)),
+    doneForNow: readyToStart && blocking.length === 0 && waiting.length === 0,
     next: rows.find((r) => !isDone(r) && r.state !== "skipped") ?? null,
     blocking,
   };
 }
 
-/**
- * A publish row that is legitimately not doable yet.
- *
- * Only the GoHighLevel rows qualify, and only because the cohort buys it together at the
- * clinic. Nothing else in setup is allowed to be quietly excused.
- */
-function isSkippable(row: RailRow): boolean {
-  return row.id === "ghl" || row.id === "accounts";
-}
 
 /** Which row of the failure table each verifier answer maps to. */
 const FAILURE_INDEX: Readonly<Record<GhlFailureKind, number>> = {

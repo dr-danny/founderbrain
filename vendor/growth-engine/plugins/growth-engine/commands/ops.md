@@ -1,5 +1,5 @@
 ---
-description: Find your bottleneck, choose a GoHighLevel snapshot, and write the copy
+description: Find your bottleneck, name the pack to publish first, and write the copy
 ---
 
 Use the ghl-workflows skill.

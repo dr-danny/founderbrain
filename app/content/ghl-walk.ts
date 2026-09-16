@@ -93,9 +93,9 @@ export function progressLabel(step: number): string {
  */
 export const GHL_WALK_INTRO = {
   title: "Connect GoHighLevel",
-  doubt: "You may not have bought GoHighLevel yet. On most days before the clinic, that is the normal answer.",
+  doubt: "You may not have connected GoHighLevel yet. It is bought and connected in Session 2, on 14 or 15 September, and the clinic on 23 September assumes it is there.",
   body: [
-    "Nothing here blocks you. You do not need this until session 3.",
+    "Nothing else in this app waits on it. If it is not done yet, this is where you do it, before the clinic.",
     "It is six screens with one thing to do on each. If you already have GoHighLevel open, it takes about ten minutes.",
   ],
   action: "Start",
@@ -107,7 +107,7 @@ export const GHL_WALK_STEPS: readonly WalkStep[] = [
     number: 1,
     title: "Do you have GoHighLevel yet",
     doubt:
-      "If you have not bought it, you are not behind. The cohort buys together at the clinic on 23 September so that nobody's trial runs out during the weekend.",
+      "If you have not bought it yet, you are not behind, and you can still do it today. It is bought in Session 2, on 14 or 15 September, so that it is in place for the clinic on 23 September.",
     body: [
       "GoHighLevel is the tool that publishes your posts and holds your contacts.",
       "Have you got it already?",
@@ -121,7 +121,7 @@ export const GHL_WALK_STEPS: readonly WalkStep[] = [
       {
         label: "I am not sure",
         meaning:
-          "show one line and stay here: look in your inbox for an email from GoHighLevel with a login link. If there is nothing, you have not bought it yet, and that is fine.",
+          "show one line and stay here: look in your inbox for an email from GoHighLevel with a login link. If there is nothing, you have not bought it yet, and that is fine. Post in the Slack channel and a mentor will get you set up before the clinic.",
       },
     ],
     checkName: null,
@@ -286,7 +286,7 @@ export const GHL_TOKEN_CHECK_IS_BUILT =
 export const GHL_WALK_CANNOT_CHECK_YET = [
   "Keep the token somewhere safe and come back to this screen. There is nothing to paste it into yet, because the part of this app that checks a token with GoHighLevel is still being built.",
   "You have not done anything wrong and nothing you made is wasted. The token you just created is the one you will use.",
-  "If it is still not here by the setup clinic on 23 September, bring the token and a mentor will connect it with you in a couple of minutes.",
+  "If it is still not here when Session 2 ends, tell a mentor in the Slack channel and they will connect it with you before the clinic on 23 September. Never paste the token into Slack.",
 ] as const;
 
 export const GHL_WALK_SCOPE_NOTE =
@@ -314,14 +314,14 @@ export const GHL_WALK_NO_PRIVATE_INTEGRATIONS = {
 
 /** Step 1, "Not yet". A skip, and the screen says so in those words. */
 export const GHL_WALK_NOT_BOUGHT = {
-  title: "Nothing to do yet",
+  title: "Come back when you have it",
   body: [
-    "You are not behind. You buy GoHighLevel at the clinic on 23 September, with everybody else.",
-    "We will bring you back here then.",
+    "You are not behind. GoHighLevel is bought and connected in Session 2, on 14 or 15 September, and the clinic on 23 September assumes it is there.",
+    "When you have it, come back here and press Start. If anything is in the way, post in the Slack channel and a mentor will help.",
   ],
   action: "Back to my checklist",
   state: "skipped" as StepState,
-  evidence: "not bought yet, due at the clinic on 23 September",
+  evidence: "not bought yet, due in Session 2, needed before the clinic on 23 September",
 };
 
 /**

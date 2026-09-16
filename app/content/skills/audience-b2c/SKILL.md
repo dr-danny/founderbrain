@@ -98,7 +98,7 @@ Every flow here starts with something the other person did. If you cannot name t
 
 **Cap the follow-up.** One follow-up, then stop. If they do not reply to the first message and do not reply to the follow-up, the conversation is over and nothing more goes out. Write the stop into the copy, because a flow with no exit carries on at somebody who has already decided.
 
-Write the copy for each. The workflow itself is a GHL snapshot loaded at the clinic, so do not attempt to build automation here. Copy only.
+Write the copy for each. The workflow itself is a GoHighLevel snapshot loaded at the clinic, so do not attempt to build automation here. Copy only. These words become the snapshot's custom values, and the values step fits them to their slots.
 
 **Name the trigger in every label, not just the first one.**
 

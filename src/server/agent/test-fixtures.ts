@@ -84,7 +84,7 @@ export const FIXTURE_ROUTES: RouteTable = [
   row({
     id: 'ghl-workflows',
     label: 'Operations Engine',
-    subtitle: 'Find your bottleneck, choose a snapshot, and write the copy',
+    subtitle: 'Find your bottleneck, name the pack to publish first, and write the copy',
     tracks: ['b2b', 'b2c'],
     session: 3,
     gate: 'C',

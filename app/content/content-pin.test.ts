@@ -121,12 +121,15 @@ test("every file the app reads out of the content is in the pin", () => {
   }
 });
 
-test("the nine skill originals and the twelve schemas are all vendored", () => {
+test("the ten skill originals and the twelve schemas are all vendored", () => {
   const pin = readPin();
   const paths = Object.keys(pin.files);
 
+  // Ten, and the app ports nine of them. The tenth is ghl-values, which writes a
+  // founder's GoHighLevel words in Claude after Session 3. It is vendored because
+  // the content is copied whole, and never ported, because nothing in the app runs it.
   const skills = paths.filter((p) => /^plugins\/growth-engine\/skills\/[^/]+\/SKILL\.md$/.test(p));
-  assert.equal(skills.length, 9, `expected nine skill bodies, found ${String(skills.length)}:\n${skills.join("\n")}`);
+  assert.equal(skills.length, 10, `expected ten skill bodies, found ${String(skills.length)}:\n${skills.join("\n")}`);
 
   const schemas = paths.filter((p) => /^plugins\/growth-engine\/schemas\/[^/]+\.md$/.test(p));
   assert.equal(schemas.length, 12, `expected twelve schemas, found ${String(schemas.length)}:\n${schemas.join("\n")}`);

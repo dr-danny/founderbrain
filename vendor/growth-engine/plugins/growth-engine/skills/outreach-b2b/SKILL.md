@@ -29,7 +29,7 @@ Ask one question: **is their work email on Google (Gmail or Google Workspace), o
 
 Record the answer in the output file. Nobody chooses twice.
 
-**On the cost, and get this the right way round.** The free plan connects to the app in full, so nothing in session 3 needs paying for. The 65 USD/month plan is what actually sends, and it is bought at the setup clinic on 23 September, alongside GoHighLevel and for the same reason: a plan bought in September is running on the Saturday, and one bought in August has been paid for three weeks of not sending yet.
+**On the cost, and get this the right way round.** The free plan connects to the app in full, so nothing in session 3 needs paying for. The 65 USD/month plan is what actually sends, and it is bought in Session 2, on 14 or 15 September, alongside GoHighLevel and for the same reason: a plan bought in September is running on the Saturday, and one bought in August has been paid for three weeks of not sending yet.
 
 Say it that way round. Telling a founder they need the plan to connect it is not true, they will find that out, and every other number in this programme is worth less to them afterwards.
 

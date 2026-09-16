@@ -164,7 +164,7 @@ for d in "$PLUGIN"/skills/*/; do
     show "$dupes"
   fi
 done
-[ "$SKILL_COUNT" -eq 9 ] && ok "9 skills found" || warn "expected 9 skills, found $SKILL_COUNT"
+[ "$SKILL_COUNT" -eq 10 ] && ok "10 skills found" || warn "expected 10 skills, found $SKILL_COUNT"
 
 # ----------------------------------------------------------------- commands
 
@@ -187,7 +187,7 @@ for f in "$PLUGIN"/commands/*.md; do
     esac
   done
 done
-[ "$CMD_COUNT" -eq 10 ] && ok "10 commands found" || warn "expected 10 commands, found $CMD_COUNT"
+[ "$CMD_COUNT" -eq 11 ] && ok "11 commands found" || warn "expected 11 commands, found $CMD_COUNT"
 
 # Every check from here to the end of the locked facts reads this one list. An
 # empty list is not proof that the tree is clean: it is a tree this script could
@@ -206,7 +206,7 @@ head_ "Command namespacing"
 # Allowed: the namespaced form, path-like uses (commands/gate.md), and bare
 # forms inside a skill description's trigger list, which act as natural
 # language safety nets.
-CMDS='setup|doctor|brain|content|engine2|ops|plan|gate|playbook|status'
+CMDS='setup|doctor|brain|content|engine2|ops|values|plan|gate|playbook|status'
 BARE=$(grep -rn "/" $(founder_files) /dev/null 2>/dev/null \
   | grep -v ':description:' \
   | sed 's|/growth-engine:[a-z0-9]*||g' \

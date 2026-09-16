@@ -222,7 +222,7 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     removed: [],
     added: [
       "<!-- TRACK:b2c -->",
-      "**If track is B2C**, ask one more question: do they sell a service people book, or products people buy from a shop? Record the answer as `Model`, either `service` or `ecommerce`. It decides which operations snapshot they get and how their content is shaped. Never ask this of a B2B founder.",
+      "**If track is B2C**, ask one more question: do they sell a service people book, or products people buy from a shop? Record the answer as `Model`, either `service` or `ecommerce`. It shapes their content, and it guides which pack of their operations snapshot they publish first. Never ask this of a B2B founder.",
       "<!-- /TRACK -->",
       "",
     ],
@@ -413,6 +413,20 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     ],
   },
   {
+    skill: "ghl-workflows",
+    group: "B",
+    why:
+      "The values step is a namespaced slash command, and there are none in the app. The step runs in Claude after Session 3, so the sentence says where and when, " +
+      "and keeps the plain words that start it",
+    times: 1,
+    removed: [
+      "The words go in next, with `/growth-engine:values`, or by saying \"fill my custom values\". That step fills the Essentials slots every founder gets as well as the snapshot's own, so the copy written here is part of the list rather than all of it. Publishing and the first live test come after that, because a published workflow with empty slots sends blank emails to real people.",
+    ],
+    added: [
+      "The words go in next. They are written in Claude, the evening after Session 3, by saying \"fill my custom values\". That step fills the Essentials slots every founder gets as well as the snapshot's own, so the copy written here is part of the list rather than all of it. Publishing and the first live test come after that, because a published workflow with empty slots sends blank emails to real people.",
+    ],
+  },
+  {
     skill: "growth-plan",
     group: "A",
     why:
@@ -524,9 +538,9 @@ export const TRACK_BLOCKS: readonly TrackBlock[] = [
     skill: "founder-brain",
     track: "b2c",
     firstLine:
-      "**If track is B2C**, ask one more question: do they sell a service people book, or products people buy from a shop? Record the answer as `Model`, either `service` or `ecommerce`. It decides which operations snapshot they get and how their content is shaped. Never ask this of a B2B founder.",
+      "**If track is B2C**, ask one more question: do they sell a service people book, or products people buy from a shop? Record the answer as `Model`, either `service` or `ecommerce`. It shapes their content, and it guides which pack of their operations snapshot they publish first. Never ask this of a B2B founder.",
     lastLine:
-      "**If track is B2C**, ask one more question: do they sell a service people book, or products people buy from a shop? Record the answer as `Model`, either `service` or `ecommerce`. It decides which operations snapshot they get and how their content is shaped. Never ask this of a B2B founder.",
+      "**If track is B2C**, ask one more question: do they sell a service people book, or products people buy from a shop? Record the answer as `Model`, either `service` or `ecommerce`. It shapes their content, and it guides which pack of their operations snapshot they publish first. Never ask this of a B2B founder.",
   },
   {
     skill: "founder-brain",

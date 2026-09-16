@@ -312,12 +312,12 @@ function useAllowedFileNames(founder: Founder): readonly string[] | null {
  * downloading is step one of it. A separate page would be a page nobody opens at
  * the moment they need it.
  *
- * STEP THREE IS THE WHOLE THING. Claude looks for a folder called growth-engine
- * inside wherever it was opened. Open growth-engine itself and it looks inside
- * itself, finds nothing, and says they have not started. Their entire Brain is one
- * level up. Every other step here is a link somebody can follow; this one is a
- * mistake nobody would ever guess they had made, so it says what going wrong looks
- * like as well as what to do.
+ * FROM SESSION 3 THE WORK MOVES TO LAUNCHHOUSE-V3. Each founder imports a
+ * private copy of that repository, opens it in Claude with its plugin, and says
+ * "bring my work across", which unpacks this download into the right place. So
+ * the file stays zipped, and nobody has to choose which folder to open: the copy
+ * is the folder. Private and not a fork, because a fork of a public repository is
+ * always public and the copy is where their work is saved.
  *
  * IT IS FOLDED SHUT BY DEFAULT. A founder in session 1 is not doing this and does
  * not need a wall of instructions under their files for a fortnight.
@@ -334,28 +334,34 @@ export function HandingItToClaude({ track }: { readonly track: Founder["track"] 
       </p>
       <ol>
         <li>
-          <strong>Press Download everything, above.</strong> You get one file.
+          <strong>Press Download everything, above.</strong> You get one file. Leave it as it is, zipped.
         </li>
         <li>
-          <strong>Unzip it.</strong> You now have a folder called <code>growth-engine</code>.
-        </li>
-        <li>
-          <strong>Put that folder inside another folder.</strong> Make one called anything you like, and drop{" "}
-          <code>growth-engine</code> into it. Then open the outer folder in Claude, not{" "}
-          <code>growth-engine</code> itself.
+          <strong>Take your own private copy of the Launchhouse folder.</strong> Go to{" "}
+          <code>github.com/new/import</code>, paste <code>https://github.com/Philm-moxywolf/launchhouse-v3</code>,
+          give it a name, choose <strong>Private</strong>, and press Begin import.
           <br />
           <span className="quiet">
-            This is the step people get wrong. If Claude says you have not started yet, this is why: it is
-            looking inside your work rather than at it. Go up one level and open that.
+            Private, not a fork. A fork is always public, and this copy is where your work will be saved.
           </span>
         </li>
         <li>
-          <strong>Install the toolkit</strong> in Claude, from the marketplace{" "}
-          <code>Philm-moxywolf/Atlanta</code>. That is what teaches it your track, your voice and the rules.
+          <strong>Put it on your computer.</strong> On your new copy, press <strong>Code</strong>, then{" "}
+          <strong>Open with GitHub Desktop</strong>, then <strong>Clone</strong>.
         </li>
         <li>
-          <strong>Connect GoHighLevel</strong> to your Claude account, so it can post for you.
-          {track === "b2b" ? " And connect Apollo, so it can find people and send." : ""}
+          <strong>Open that folder in Claude</strong>, in the desktop app&apos;s Code tab, and say yes when it offers
+          the Launchhouse plugin. That is what teaches it your track, your voice and the rules. Then say{" "}
+          &quot;start launchhouse&quot;.
+        </li>
+        <li>
+          <strong>Drag the file you downloaded into that folder</strong>, and say &quot;bring my work across&quot;. Your
+          work arrives as it was, and nothing you wrote is rewritten.
+        </li>
+        <li>
+          <strong>Connect GoHighLevel</strong> to your Claude account, in Settings, then Connectors, so it can post for
+          you.
+          {track === "b2b" ? " And connect Apollo, so it can find your 25 and build your sequence, paused, for you to start." : ""}
         </li>
         <li>
           <strong>Say &quot;where am I up to&quot;.</strong> If it tells you what you have built, it can read

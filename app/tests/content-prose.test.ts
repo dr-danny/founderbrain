@@ -200,6 +200,7 @@ test("a skip and a fail are different things and say different words", () => {
   assert.equal(walk.GHL_WALK_NO_PRIVATE_INTEGRATIONS.state, "failed");
   // The evidence string is what a mentor reads in the "needs attention"
   // column, so it has to be the reason and not a category.
+  assert.match(walk.GHL_WALK_NOT_BOUGHT.evidence, /Session 2/);
   assert.match(walk.GHL_WALK_NOT_BOUGHT.evidence, /23 September/);
   assert.match(walk.GHL_WALK_NO_PRIVATE_INTEGRATIONS.evidence, /Private Integrations/);
 

@@ -3,8 +3,8 @@
 # downloads, unzips once, and opens every time they work on the programme.
 #
 # The folder carries the whole toolkit, not a pointer to it:
-#   .claude/skills/     the nine skills
-#   .claude/commands/   the ten commands, bare-named
+#   .claude/skills/     the ten skills
+#   .claude/commands/   the eleven commands, bare-named
 #   CLAUDE.md           how Claude behaves here, plus install help if needed
 #   growth-engine/      pre-created, so "where does my work go" answers itself
 #
@@ -45,9 +45,9 @@ programme, 25 to 27 September 2026. Toolkit version $VERSION.
 
 ## How to behave in this folder
 
-- The nine Launchhouse skills live in .claude/skills/ inside this folder.
+- The ten Launchhouse skills live in .claude/skills/ inside this folder.
   Route any programme request (brain, content, outreach, audience, ops,
-  plan, gate, playbook, status) to the matching skill.
+  values, plan, gate, playbook, status) to the matching skill.
 - Every output lands in ./growth-engine/ in this folder. Never write
   programme output anywhere else.
 - If those skills are somehow not available on this surface, the founder

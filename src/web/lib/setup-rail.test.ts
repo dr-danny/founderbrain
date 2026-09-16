@@ -60,13 +60,25 @@ test("name and timezone are the only thing between a founder and starting", () =
   assert.equal(after.readyToStart, true);
 });
 
-test("a founder who has done everything possible today is told they are done for now", () => {
+test("a founder with GoHighLevel connected and an account to post to is told they are done for now", () => {
+  const setup = withSteps({}, {
+    profile: { name: "Priya", timezone: "America/New_York" },
+    ghl: { connected: true, locationId: "abc", locationName: "Lumen Skin", accounts: [{ platform: "Facebook", name: "Lumen Skin" }], contacts: "not_checked", tokenMadeAt: null },
+  });
+  const summary = setupSummary(railRows(setup, null));
+  assert.equal(summary.doneForNow, true);
+  assert.equal(summary.readyToPublish, true);
+});
+
+test("a founder without GoHighLevel after Session 2 is not told they are done, and is not blocked either", () => {
   const setup = withSteps({ "have-it": { state: "skipped", evidence: "not bought yet" } }, {
     profile: { name: "Priya", timezone: "America/New_York" },
   });
   const summary = setupSummary(railRows(setup, null));
-  assert.equal(summary.doneForNow, true);
-  assert.equal(summary.readyToPublish, false, "not ready to publish, and that is not the same thing");
+  assert.equal(summary.doneForNow, false, "nothing in setup is excused any more");
+  assert.equal(summary.readyToPublish, false);
+  assert.equal(summary.blocking.length, 0, "a skip is still not a failure, so nothing turns red");
+  assert.equal(summary.next?.id, "accounts", "there is still a row to press");
 });
 
 test("a plan that cannot make a token is blocking, and a skip is not", () => {

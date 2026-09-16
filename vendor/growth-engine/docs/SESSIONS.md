@@ -8,7 +8,7 @@ Everything is built before you travel. The weekend itself is for writing, sendin
 |---|---|---|---|
 | Session 1 | Mon 7 or Tue 8 September | Your Founder Brain. B2B: your sending domain | The content engine. Start collecting pictures and clips |
 | Session 2 | Mon 14 or Tue 15 September | GoHighLevel and Apollo, set up and working | Your second engine, and your operations workflow |
-| Session 3 | Mon 21 or Tue 22 September | Connecting your Brain to Claude | Use it. Get comfortable before you travel |
+| Session 3 | Mon 21 or Tue 22 September | Connecting your Brain to Claude | Your GoHighLevel words written, ready to paste on the Wednesday. Then use it |
 | Clinic | Wed 23 September | Your workflow loaded, and your Brain proved | Nothing. Pack |
 | Atlanta | Fri 25 to Sun 27 September | Using all of it | |
 
@@ -74,13 +74,15 @@ The steps are in [docs/WORKING-IN-CLAUDE.md](WORKING-IN-CLAUDE.md), sent before 
 
 ### Your homework
 
-Use it. Ask it for things. Publish something. The point of the fortnight before Atlanta is that the weekend is not the first time you have done this.
+**Write your GoHighLevel words.** Say "fill my custom values". Claude reads your Brain and your ops file and writes every message your snapshot will arrive without, into `ghl-values.md`. It does not need the snapshot, and this is the job that makes the clinic a paste rather than an hour of writing. About half an hour, and the clinic is the next day, so do it the same evening. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is the step by step.
+
+**Then use it.** Ask it for things. Publish something. The point of the fortnight before Atlanta is that the weekend is not the first time you have done this.
 
 ## The clinic, Wednesday 23 September
 
 Two things, and both have to be true before you travel.
 
-**Your workflow, loaded.** You bring your operations file, load your one GoHighLevel workflow, paste your copy in, and send yourself one test through the real trigger.
+**Your workflow, loaded and sending.** You bring `ghl-values.md`, written in the week before, and load your one GoHighLevel snapshot. It arrives as a pack: the workflows, your pipeline, your forms, your tags, and the empty name of every message. Your words are the one thing it does not bring, so you paste in the ones you already wrote, publish, and send yourself one test through the real trigger. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is that half hour, step by step.
 
 **Your Brain, proved.** We check that Claude on your machine is reading your Brain and writing as you. If something is wrong with the handover, this is where it gets found, with two days to fix it rather than none.
 

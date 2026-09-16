@@ -64,7 +64,7 @@ To update, the route depends on where they are:
 
 Updating or reinstalling never touches the founder's `growth-engine/` folder. Their work lives in their own folder, not inside the plugin. Say this if they hesitate.
 
-If a founder reports behaviour that does not match what they were told in a session, updating is the first thing to try.
+If a founder reports behaviour that does not match what they were told in a session, updating is the first thing to try. The same goes for a command they were told about and cannot find, such as `/growth-engine:values`: it arrived in a later version. The page sent to founders for this is called After the engines, and it covers the update, loading the snapshot, filling its words and the first live test.
 
 ## Common problems
 
