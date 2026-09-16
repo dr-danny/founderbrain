@@ -39,7 +39,7 @@ Their track decides their snapshot, and the snapshot decides the lists. Nobody c
 | **B2C** | Essentials 11, Comment to DM 7, DM qualify and book 10, Review request 0 | 28 |
 | **Hybrid** | One Essentials 11, plus all six packs, on one board of its own | 51 |
 
-**Write them all.** Every pack arrives as drafts, and a founder publishes the folders they filled. Words written now are what lets them switch a second folder on in October without coming back to this.
+**Write them all.** Every pack arrives as drafts, and a founder publishes the packs they filled. Words written now are what lets them switch a second pack on in October without coming back to this.
 
 **Write the pack `ops-workflow.md` names first,** then Essentials, then the rest. That is the pack that answers their bottleneck. If they run short of time, stop after any pack and say plainly which ones you have left, so nothing is published thinking it is finished.
 
