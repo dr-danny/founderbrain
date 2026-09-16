@@ -35,7 +35,8 @@
     "fb:migrate": "TZ=UTC tsx src/founderbrain/migrate-main.ts",
     "fb:build": "tsc -p tsconfig.founderbrain.json && tsc -p tsconfig.founderbrain-web.json && vite build --config vite.founderbrain.config.ts && tsc -p tsconfig.founderbrain-runtime.json && node scripts/founderbrain-copy-sql.mjs",
     "fb:test": "TZ=UTC node --import tsx --test --test-concurrency=1 src/founderbrain/*.test.ts src/founderbrain-edge/*.test.ts",
-    "fb:preview": "vite --config vite.founderbrain.config.ts"
+    "fb:preview": "vite --config vite.founderbrain.config.ts",
+    "fb:reconcile": "TZ=UTC tsx src/founderbrain/reconcile-main.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.258",

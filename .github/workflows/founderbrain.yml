@@ -46,3 +46,20 @@ jobs:
         run: npx wrangler deploy --dry-run --outdir dist/edge-dry-run
       - name: Production container build only, no push or deployment
         run: docker build -f deploy/railway/Dockerfile -t founderbrain:test .
+      - name: Start production container against disposable native Postgres
+        run: |
+          KEY="$(openssl rand -base64 32)"
+          GATE="$(openssl rand -hex 32)"
+          docker run -d --name founderbrain-smoke --network host \
+            -e DATABASE_URL="$FB_TEST_DATABASE_URL" -e GE_MASTER_KEY="$KEY" \
+            -e ORIGIN_SECRET="$GATE" -e APP_ORIGIN=https://founderbrain.example.test \
+            -e SUPABASE_URL=https://auth.example.test -e SUPABASE_ANON_KEY=fixture-public \
+            -e AI_ENABLED=false founderbrain:test
+          trap 'docker rm -f founderbrain-smoke >/dev/null 2>&1' EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/health/ready; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/health/ready
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/brain)" = 403
+          curl -fsS -H "X-FounderBrain-Origin: $GATE" http://127.0.0.1:8080/api/config | grep 'supabase'

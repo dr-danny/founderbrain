@@ -102,6 +102,8 @@ The API needs the same approved model/rate/cap settings for job admission. The w
 
 The app reserves a conservative maximum before dispatch and settles actual reported token usage. Provider pricing must be kept current; application caps cannot override provider billing. Generation uses one attempt per job. An ambiguous response or expired in-flight lease becomes `uncertain`, retains its budget reservation and blocks new workspace jobs until operator reconciliation. There is deliberately no automatic retry of potentially billed calls.
 
+To release quarantine, an operator must inspect provider usage, then run `node src/founderbrain/reconcile-main.js` with the admin URL in `MIGRATION_DATABASE_URL`, the exact `JOB_ID`, verified `CONFIRMED_COST_MICROUSD`, and `RECONCILIATION_CONFIRMED=yes`. The command settles accounting atomically and never calls the model. It refuses active/completed/already-reconciled jobs. Do not infer zero cost from an elapsed lease.
+
 ### Cloudflare Worker
 
 1. Build assets and dry-run bundle first.
