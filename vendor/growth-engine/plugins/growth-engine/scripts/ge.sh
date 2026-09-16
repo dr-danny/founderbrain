@@ -143,6 +143,12 @@ trap ge_exit_trap EXIT
 ge_load() {                             # <path inside the plugin> <function it ends with>
   ge_ld_file="$GE_HOME_DIR/$1"
   [ -f "$ge_ld_file" ] && [ -r "$ge_ld_file" ] && [ -s "$ge_ld_file" ] || ge_damaged "$1"
+  # Read for shape first, as the command files below are. A file cut off mid
+  # function does not parse, and the dot command is a special built-in: bash 5
+  # ends the shell on it without running the exit trap below, so the founder was
+  # told nothing at all. dash does run the trap, which is why only one family
+  # showed it. Checked here, the answer is the same sentence under every shell.
+  sh -n "$ge_ld_file" 2>/dev/null || ge_damaged "$1"
   GE_LOADING=$1
   # The redirect sits on the group, never on the dot itself: a redirect that
   # fails on a special built-in ends the shell outright. What it hides is the
@@ -261,8 +267,8 @@ case "$ge_cmd" in
     # still opens, and the dot command below is a special built-in: one that
     # trips ends the shell where it stands under dash, and under any shell it
     # prints a line number inside ge that a founder cannot act on. The libraries
-    # above are proved whole a cheaper way, by the function each one ends with,
-    # but a command file runs as it loads and has no such moment.
+    # above get the same check, and the function each one ends with as well,
+    # because a command file runs as it loads and has no such moment.
     sh -n "$ge_sub_file" 2>/dev/null || ge_damaged "$ge_sub"
     GE_RUNNING=$ge_cmd
     # ctrl-c, a closed terminal, or a stop sent by hand. Answered here rather
