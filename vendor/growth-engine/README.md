@@ -52,7 +52,7 @@ Every command starts with `/growth-engine:` because that is how installed plugin
 | `/growth-engine:content` | "build my content engine" | Pillars and your 30 posts or scripts |
 | `/growth-engine:engine2` | "build my outreach engine" or "build my audience engine" | Outreach (B2B) or audience (B2C), picked automatically from your track |
 | `/growth-engine:ops` | "find my bottleneck" | Bottleneck, snapshot choice, workflow copy |
-| `/growth-engine:values` | "fill my custom values" | Writes every message your chosen snapshot will arrive without. Run it before the snapshot is loaded, then paste the words in |
+| `/growth-engine:values` | "fill my custom values" | Writes every message your snapshot will arrive without. Run it before the snapshot is loaded, then paste the words in |
 | `/growth-engine:plan` | "build my 90 day plan" | Your 90-day plan |
 | `/growth-engine:playbook` | "generate my playbook insert" | Your personalised playbook insert, delivered as a PDF |
 | `/growth-engine:status` | "where am I up to" | Where you are up to |
@@ -71,7 +71,7 @@ Start with the Brain: `/growth-engine:brain`, or just say "build my founder brai
 | outreach-b2b | List criteria, sequence copy, personalised first lines | B2B |
 | audience-b2c | Targeting, 25 DM openers, hook bank, inbound scripts | B2C |
 | ghl-workflows | Bottleneck diagnostic, snapshot choice, all workflow copy | Both |
-| ghl-values | The words your chosen snapshot will arrive without, written before it loads and pasted in after | Both |
+| ghl-values | The words your snapshot will arrive without, written before it loads and pasted in after | Both |
 | growth-plan | Your 90-day plan with kill criteria | Both |
 | playbook-export | Your personalised playbook insert, as a PDF | Both |
 | status | Where you are up to and what is outstanding | Both |

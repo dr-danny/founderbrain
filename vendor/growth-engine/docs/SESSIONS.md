@@ -60,17 +60,17 @@ You will connect both to your app and confirm they work. That confirmation is th
 
 **Your second engine.** B2B: say "build my outreach". B2C: say "build my audience engine". Your 25 messages, your sequences or your hooks and DM scripts.
 
-**Your operations engine.** Say "build my ops engine". It finds your bottleneck, picks one GoHighLevel workflow, and writes every message inside it. You load that workflow at the clinic.
+**Your operations engine.** Say "build my ops engine". It finds your bottleneck, names the pack of your GoHighLevel snapshot to publish first, and writes every message inside it. Your track decides the snapshot, and you load it at the clinic.
 
 ## Session 3: connecting your Brain to Claude
 
 Up to now you have been working in the app. From here you work in Claude, and this session is the handover.
 
-You download everything the app has made for you, open it in Claude on your own machine, and connect Apollo and GoHighLevel to your Claude account. After that, Claude can read your Brain, write in your voice, and drive both tools for you.
+You download everything the app has made for you, take your own private copy of launchhouse-v3, open it in Claude on your own machine, say "bring my work across", and connect Apollo and GoHighLevel to your Claude account. After that, Claude can read your Brain, write in your voice, and drive both tools for you.
 
 That is where you work from now on, and it is where you will be in Atlanta.
 
-The steps are in [docs/WORKING-IN-CLAUDE.md](WORKING-IN-CLAUDE.md), sent before the session. Read it first if you like, but we do it together.
+The steps are in the [launchhouse-v3 README](https://github.com/Philm-moxywolf/launchhouse-v3), sent before the session. Read it first if you like, but we do it together.
 
 ### Your homework
 
@@ -82,7 +82,7 @@ The steps are in [docs/WORKING-IN-CLAUDE.md](WORKING-IN-CLAUDE.md), sent before 
 
 Two things, and both have to be true before you travel.
 
-**Your workflow, loaded and sending.** You bring `ghl-values.md`, written in the week before, and load your one GoHighLevel snapshot. It arrives as a pack: the workflows, your pipeline, your forms, your tags, and the empty name of every message. Your words are the one thing it does not bring, so you paste in the ones you already wrote, publish, and send yourself one test through the real trigger. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is that half hour, step by step.
+**Your workflow, loaded and sending.** You bring `ghl-values.md`, written the evening after Session 3, and load your one GoHighLevel snapshot. It arrives as a pack: the workflows, your pipeline, your forms, your tags, and the empty name of every message. Your words are the one thing it does not bring, so you paste in the ones you already wrote, publish, and send yourself one test through the real trigger. [docs/AFTER-THE-ENGINES.md](AFTER-THE-ENGINES.md) is that half hour, step by step.
 
 **Your Brain, proved.** We check that Claude on your machine is reading your Brain and writing as you. If something is wrong with the handover, this is where it gets found, with two days to fix it rather than none.
 
