@@ -63,3 +63,24 @@ jobs:
           curl -fsS http://127.0.0.1:8080/health/ready
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/brain)" = 403
           curl -fsS -H "X-FounderBrain-Origin: $GATE" http://127.0.0.1:8080/api/config | grep 'supabase'
+          docker exec founderbrain-smoke node --input-type=module -e "
+            import {PgBrainStore} from './src/founderbrain/store.js';
+            const s=new PgBrainStore(process.env.DATABASE_URL);
+            const id=await s.ensureWorkspace('ci-container-fixture');
+            const current=await s.read(id);
+            current.brain.identity.name='Container restart fixture';
+            await s.commit(id,current.brain,current.version,'ci-container-save');
+            await s.close();"
+          docker restart founderbrain-smoke
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/health/ready; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/health/ready
+          docker exec founderbrain-smoke node --input-type=module -e "
+            import {PgBrainStore} from './src/founderbrain/store.js';
+            const s=new PgBrainStore(process.env.DATABASE_URL);
+            const id=await s.ensureWorkspace('ci-container-fixture');
+            const current=await s.read(id);
+            if(current.version!==1||current.brain.identity.name!=='Container restart fixture')throw new Error('Restart persistence failed');
+            await s.close();console.log('Encrypted revision survived container restart');"

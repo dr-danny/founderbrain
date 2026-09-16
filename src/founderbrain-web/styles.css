@@ -5,3 +5,5 @@
 .button,.field input,.field select{min-height:48px}.mission-heading>div{min-width:0}.dialog{max-height:90vh;overflow-y:auto}@media(max-width:760px){.mission-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}.mission{min-width:0;width:100%}.mission-heading h1{font-size:32px}.mission-number{flex-shrink:0}.quiet{min-height:44px}}
 
 button:not(.link-button){min-height:44px}
+
+.summary dt{font-size:12px;font-weight:700;margin-top:12px}.summary dd{margin:4px 0 0}.field>label{font-weight:600;font-size:13px}
