@@ -23,11 +23,12 @@ If the snapshot is already loaded, nothing changes except that the pasting can f
 
 1. **Find the folder.** Everything the engines wrote lives in `./growth-engine/`. If it is not in the folder Claude was opened in, check the folder above and the home folder before concluding it is missing. Founders open Claude in different folders, and this is the most common problem there is.
 2. **Read the Brain.** Read `./growth-engine/founder-brain.md`.
-   - If it genuinely does not exist, stop. Tell the founder the Founder Brain comes first (`/growth-engine:brain`, or "build my founder brain"), and do not proceed.
+   - If it genuinely does not exist, say plainly that the words are written from the Founder Brain, and offer to build it with them now. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say "build my founder brain".
    - Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice.
 3. **Read `./growth-engine/ops-workflow.md`.** It names the pack to publish first and holds the copy already written for it. Reuse that copy rather than writing a second version of the same email. A file made in the app calls that pack a snapshot, using one of six names: Lead follow-up, Discovery booking, Proposal chase, Comment-to-DM capture, DM qualify and book, or Review request. Comment-to-DM capture is the Comment to DM pack. Read the name as the pack to publish first. The file is not out of date, and nothing in it needs redoing. Their snapshot still comes from the Brain.
-   - If it does not exist, build the operations engine first (`/growth-engine:ops`, or "find my bottleneck"). Which pack goes first is decided there.
-4. **Check for existing values.** If `ghl-values.md` already exists, ask whether they want to change the words or start again, and go straight there.
+   - If it does not exist, offer the operations engine first: it finds their bottleneck and writes copy this step reuses (`/growth-engine:ops`, or "build my ops engine"). If they would rather carry on now, ask which pack in their snapshot answers the job they most want off their plate, from the lists in `references/values.md`, write Essentials and that pack first, fresh from the Brain, and suggest the operations engine afterwards.
+4. **When something is missing or thin.** If something this step needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
+5. **Check for existing values.** If `ghl-values.md` already exists, ask whether they want to change the words or start again, and go straight there.
 
 ## Step 1: name their lists
 

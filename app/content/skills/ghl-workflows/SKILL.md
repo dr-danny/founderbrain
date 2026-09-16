@@ -15,9 +15,11 @@ The workflow itself is a pre-built GoHighLevel snapshot. It is loaded into the f
 
 Read `./growth-engine/founder-brain.md`.
 
-If it genuinely does not exist, stop. Tell the founder to open Founder Brain, or to say "build my founder brain", and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.
+If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then point them to it: the Founder Brain is about an hour of their own answers, and every engine reads it. The next step is to open Founder Brain from their list, or to say "build my founder brain".
 
 Use it for track, stage, offer and goal.
+
+**When the Brain is not enough.** If something this engine needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
 
 **If `./growth-engine/ops-workflow.md` already exists, the bottleneck is already found, so do not run the diagnostic again.** The pack it names is the pack to publish first, even when the file calls it a snapshot, as files from the app do (Comment-to-DM capture is the Comment to DM pack). Keep the file as it is. Ask whether they want to change the copy or put a different pack first, and go straight there. Change only what they ask for, and never replace their copy without their yes. The other packs get their words from the values step, not here.
 
@@ -31,6 +33,8 @@ Find the one repetitive task that costs the most time or leaks the most revenue.
 4. If one repetitive job disappeared on Monday, which one?
 
 Then name the bottleneck in one sentence, in their words. Confirm it with them before moving on. Getting this wrong means automating the wrong thing.
+
+**If they cannot pick one, do not stall.** Offer the pack most founders on their track start with: Lead follow-up on B2B, and on B2C, DM qualify and book when people book a service with them, otherwise Comment to DM. Say they can put a different pack first later, because every pack is in their snapshot anyway.
 
 ## Step 2: name their snapshot, then order the packs
 

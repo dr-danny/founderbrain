@@ -295,6 +295,24 @@ if [ -n "$DM" ]; then
   show "$DM"
 fi
 
+# No dead ends. An engine that is missing something offers the way forward, or
+# asks for what it needs, and never just ends. "do not proceed" and "stop and tell
+# the founder to run" were how a missing Brain used to end a conversation. Safety
+# stops, such as the wrong folder or the wrong track, still say where to go.
+DEADEND=$(grep -rniE 'do not proceed|stop and tell the founder to run' "$PLUGIN/skills" /dev/null 2>/dev/null || true)
+if [ -n "$DEADEND" ]; then
+  err "an engine ends at a dead end. Offer the next step, or ask for what is missing:"
+  show "$DEADEND"
+else
+  ok "no engine ends at a dead end"
+fi
+for sk in content-engine outreach-b2b audience-b2c ghl-workflows growth-plan ghl-values; do
+  f="$PLUGIN/skills/$sk/SKILL.md"
+  [ -f "$f" ] || continue
+  grep -q 'When the Brain is not enough\|When something is missing or thin' "$f" \
+    || err "$sk does not say what to ask when the Brain is not enough"
+done
+
 if grep -rqi 'track' "$PLUGIN/commands/engine2.md"; then
   ok "engine2 routes on the track field"
 else

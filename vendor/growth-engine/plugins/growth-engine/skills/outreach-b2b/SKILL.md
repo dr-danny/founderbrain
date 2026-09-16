@@ -13,9 +13,11 @@ Read `./growth-engine/founder-brain.md`.
 
 If it does not exist, check the parent folder and the home directory before concluding it is missing. Founders commonly open Claude Code in a different folder from the one they built in.
 
-If it genuinely does not exist, stop. Tell the founder to run `/growth-engine:brain` first (or to say "build my founder brain") and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.
+If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then offer to build the Brain with them now: it is about an hour of their own answers, and every engine reads it. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say "build my founder brain".
 
 If `track` is not `b2b`, stop and route the founder to the audience-b2c skill instead. Do not run a B2B sequence for a B2C founder.
+
+**When the Brain is not enough.** If something this engine needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
 
 ## Step 0: what is going to send this
 

@@ -11,9 +11,9 @@ Produces the four to six page personalised insert that prints with the generic p
 
 Read every file in `./growth-engine/`.
 
-If `founder-brain.md` does not exist, stop and tell the founder to open Founder Brain, or to say "build my founder brain". There is nothing to compile.
+If `founder-brain.md` does not exist, there is nothing to compile yet. Say so plainly. The next step is to open Founder Brain from their list, or to say "build my founder brain".
 
-This is a compilation task, not a generation task. Do not invent content that is not already in the founder's own files. If a section has no source file, leave it out and say so, rather than writing filler.
+This is a compilation task, not a generation task. Do not invent content that is not already in the founder's own files. If a section has no source file, leave it out and say so, rather than writing filler, and name the engine that would fill it.
 
 ## Contents
 
@@ -21,7 +21,7 @@ This is a compilation task, not a generation task. Do not invent content that is
 2. **Your Brain.** Offer, audience, proof, voice, in one page.
 3. **Your content.** Pillars and the 30 pieces, titles and openers only, not full text.
 4. **Your engine 2.** B2B: the sequence. B2C: the hook bank and inbound scripts.
-5. **Your ops.** Bottleneck, snapshot, and message copy.
+5. **Your ops.** Bottleneck, snapshot, the pack to publish first, and its message copy.
 6. **Your 90 days.** The plan, the number, Monday's three actions, kill criteria.
 
 ## Output

@@ -15,11 +15,13 @@ Read all of these that exist:
 - `./growth-engine/outreach-sequence.md` (B2B) or `./growth-engine/dm-openers.md` and `inbound-scripts.md` (B2C)
 - `./growth-engine/ops-workflow.md`
 
-If `founder-brain.md` itself is missing, stop and tell the founder to open Founder Brain, or to say "build my founder brain". There is no plan to build without it.
+If `founder-brain.md` itself is missing, say plainly that the plan is built on the Founder Brain. The next step is to open Founder Brain from their list, or to say "build my founder brain".
 
-If the Brain exists but engine files are missing, build the plan from what exists and note the gaps honestly. Do not pretend an engine is running when it is not.
+If the Brain exists but engine files are missing, build the plan from what exists and note the gaps honestly. Do not pretend an engine is running when it is not. Name the engine that fills each gap, so the plan says what to do about it.
 
 Read the `track` field. A B2B plan sequences the sequence, the list and the sending. A B2C plan sequences the DMs, the hooks and the inbound machine. Never put the other track's work in a founder's plan.
+
+**When the Brain is not enough.** If something this engine needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
 
 ## Structure
 

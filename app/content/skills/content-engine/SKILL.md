@@ -11,9 +11,11 @@ Produces the 30 pieces of content each founder publishes before Atlanta.
 
 Read `./growth-engine/founder-brain.md`.
 
-If it genuinely does not exist, stop and tell the founder to open Founder Brain, or to say "build my founder brain". Do not guess at their business or voice.
+If it genuinely does not exist, do not guess at their business or voice, and do not leave them stuck. Say in one plain sentence that the thirty pieces are written from their Founder Brain, about an hour of their own answers. The next step is to open Founder Brain from their list, or to say "build my founder brain".
 
 Read the `track` field. Everything below branches on it.
+
+**When the Brain is not enough.** If something this engine needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
 
 ## Step 1: pillars
 

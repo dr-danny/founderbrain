@@ -33,11 +33,13 @@ Then go straight to Step 5 and build it with them. A founder who gets a no and n
 
 Read `./growth-engine/founder-brain.md`.
 
-If it genuinely does not exist, stop. Tell the founder to open Founder Brain, or to say "build my founder brain", and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.
+If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then point them to it: the Founder Brain is about an hour of their own answers, and every engine reads it. The next step is to open Founder Brain from their list, or to say "build my founder brain".
 
 If `track` is not `b2c`, stop and route the founder to the outreach-b2b skill instead.
 
 Check the Brain for Instagram account type. If it is still personal, tell them to convert to Business or Creator and link a Facebook Page before anything else works.
+
+**When the Brain is not enough.** If something this engine needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
 
 ## Step 1: targeting
 

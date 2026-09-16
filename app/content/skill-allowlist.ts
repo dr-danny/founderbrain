@@ -316,10 +316,10 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
       "Namespaced slash command. Both the interface name and the plain language phrase, because both routes into the Brain exist",
     times: 1,
     removed: [
-      "If it genuinely does not exist, stop and tell the founder to run `/growth-engine:brain` first, or to say \"build my founder brain\". Do not guess at their business or voice.",
+      "If it genuinely does not exist, do not guess at their business or voice, and do not leave them stuck. Say in one plain sentence that the thirty pieces are written from their Founder Brain, then offer to build it with them now: about an hour of their own answers. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say \"build my founder brain\".",
     ],
     added: [
-      "If it genuinely does not exist, stop and tell the founder to open Founder Brain, or to say \"build my founder brain\". Do not guess at their business or voice.",
+      "If it genuinely does not exist, do not guess at their business or voice, and do not leave them stuck. Say in one plain sentence that the thirty pieces are written from their Founder Brain, about an hour of their own answers. The next step is to open Founder Brain from their list, or to say \"build my founder brain\".",
     ],
   },
   {
@@ -376,10 +376,10 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     removed: [
       "If it does not exist, check the parent folder and the home directory before concluding it is missing. Founders commonly open Claude Code in a different folder from the one they built in.",
       "",
-      "If it genuinely does not exist, stop. Tell the founder to run `/growth-engine:brain` first (or to say \"build my founder brain\") and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.",
+      "If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then offer to build the Brain with them now: it is about an hour of their own answers, and every engine reads it. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say \"build my founder brain\".",
     ],
     added: [
-      "If it genuinely does not exist, stop. Tell the founder to open Founder Brain, or to say \"build my founder brain\", and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.",
+      "If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then point them to it: the Founder Brain is about an hour of their own answers, and every engine reads it. The next step is to open Founder Brain from their list, or to say \"build my founder brain\".",
     ],
   },
   {
@@ -391,10 +391,10 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     removed: [
       "If it does not exist, check the parent folder and the home directory before concluding it is missing. Founders commonly open Claude Code in a different folder from the one they built in.",
       "",
-      "If it genuinely does not exist, stop. Tell the founder to run `/growth-engine:brain` first (or to say \"build my founder brain\") and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.",
+      "If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then offer to build the Brain with them now: it is about an hour of their own answers, and every engine reads it. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say \"build my founder brain\".",
     ],
     added: [
-      "If it genuinely does not exist, stop. Tell the founder to open Founder Brain, or to say \"build my founder brain\", and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.",
+      "If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then point them to it: the Founder Brain is about an hour of their own answers, and every engine reads it. The next step is to open Founder Brain from their list, or to say \"build my founder brain\".",
     ],
   },
   {
@@ -406,10 +406,10 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
     removed: [
       "If it does not exist, check the parent folder and the home directory before concluding it is missing. Founders commonly open Claude Code in a different folder from the one they built in.",
       "",
-      "If it genuinely does not exist, stop. Tell the founder to run `/growth-engine:brain` first (or to say \"build my founder brain\") and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.",
+      "If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then offer to build the Brain with them now: it is about an hour of their own answers, and every engine reads it. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say \"build my founder brain\".",
     ],
     added: [
-      "If it genuinely does not exist, stop. Tell the founder to open Founder Brain, or to say \"build my founder brain\", and do not proceed. Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice. Everything this skill produces is only as good as the Brain behind it.",
+      "If it genuinely does not exist, do not guess at their offer, audience or voice, and do not leave them stuck. Everything this skill produces is only as good as the Brain behind it, so say that in one plain sentence, then point them to it: the Founder Brain is about an hour of their own answers, and every engine reads it. The next step is to open Founder Brain from their list, or to say \"build my founder brain\".",
     ],
   },
   {
@@ -433,10 +433,10 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
       "The prerequisite paragraph and the namespaced slash command, both on one line in this file",
     times: 1,
     removed: [
-      "If `founder-brain.md` itself is missing, check the parent folder and home directory first. If it genuinely does not exist, stop and tell the founder to run `/growth-engine:brain`, or to say \"build my founder brain\". There is no plan to build without it.",
+      "If `founder-brain.md` itself is missing, check the parent folder and home directory first. If it genuinely does not exist, say plainly that the plan is built on the Founder Brain, and offer to build the Brain with them now. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say \"build my founder brain\".",
     ],
     added: [
-      "If `founder-brain.md` itself is missing, stop and tell the founder to open Founder Brain, or to say \"build my founder brain\". There is no plan to build without it.",
+      "If `founder-brain.md` itself is missing, say plainly that the plan is built on the Founder Brain. The next step is to open Founder Brain from their list, or to say \"build my founder brain\".",
     ],
   },
   {
@@ -507,10 +507,10 @@ export const PORT_ALLOWLIST: readonly AllowRule[] = [
       "Namespaced slash command. Both the interface name and the plain language phrase",
     times: 1,
     removed: [
-      "If `founder-brain.md` does not exist, stop and tell the founder to run `/growth-engine:brain` (or say \"build my founder brain\"). There is nothing to compile.",
+      "If `founder-brain.md` does not exist, there is nothing to compile yet. Say so plainly, and offer to build the Brain with them now. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say \"build my founder brain\".",
     ],
     added: [
-      "If `founder-brain.md` does not exist, stop and tell the founder to open Founder Brain, or to say \"build my founder brain\". There is nothing to compile.",
+      "If `founder-brain.md` does not exist, there is nothing to compile yet. Say so plainly. The next step is to open Founder Brain from their list, or to say \"build my founder brain\".",
     ],
   },
 ];

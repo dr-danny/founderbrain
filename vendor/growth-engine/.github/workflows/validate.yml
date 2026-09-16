@@ -130,7 +130,28 @@ jobs:
       # Invoked as `sh tests/run.sh` rather than `./tests/run.sh`, so the run does not
       # depend on the executable bit surviving a checkout.
       - name: Run the 36 cases
-        run: sh tests/run.sh --shell ${{ matrix.shell }}
+        run: |
+          set -o pipefail
+          sh tests/run.sh --shell ${{ matrix.shell }} 2>&1 | tee "$RUNNER_TEMP/golden-${{ matrix.shell }}.log"
+
+      # A job log is only readable by somebody signed in to GitHub, and the diffs
+      # below go into an artifact that needs the same. An annotation is readable by
+      # anyone, on the run page and through the API. So a red run names each failing
+      # case, and the start of its diff, where the person fixing it can actually see.
+      - name: Name each failing case where anyone can read it
+        if: failure()
+        run: |
+          log="$RUNNER_TEMP/golden-${{ matrix.shell }}.log"
+          if [ -f "$log" ]; then
+            grep '^FAIL' "$log" | while IFS= read -r line; do
+              echo "::error title=golden suite (${{ matrix.shell }})::$line"
+            done || true
+          fi
+          for f in tests/.work/*/*/diff.txt; do
+            [ -s "$f" ] || continue
+            body=$(head -n 60 "$f" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN { ORS = "%0A" } { print }')
+            echo "::error title=diff for ${f#tests/.work/}::$body"
+          done
 
       # A red job that says "see tests/.work/<shell>/<case>/diff.txt" is no use when that
       # folder lives on a runner that has already gone. The diff is the evidence.

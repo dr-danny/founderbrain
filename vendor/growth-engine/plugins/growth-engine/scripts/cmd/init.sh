@@ -89,6 +89,18 @@ GE_INIT_WAS=''                          # the path the anchor used to name
 # steps written out for somebody who is reading rather than pasting. Pasted, the
 # shell reads chmod's arguments as a list of files and one of them is the word
 # "then". So the second step is joined on with && and the line does both.
+# ge_init_mode <a folder that refused a write>: the chmod that is enough for it.
+#
+# WHY: making a folder, or a file inside one, needs the search bit as well as the
+# write bit. A folder that has lost both, as a sync client can leave the folder a
+# founder is standing in, stays shut after chmod u+w, and the same refusal comes
+# back from the line that was meant to clear it. Linux can still name that folder
+# where a Mac cannot, so this is where the difference showed. u+w is kept for the
+# folder that only lost its write bit, because that is the whole answer there.
+ge_init_mode() {                        # <folder>
+  if [ -x "$1" ]; then printf 'u+w'; else printf 'u+rwx'; fi
+}
+
 ge_init_no_write() {                    # <the file that would not be written>
   gi_nw_d=${1%/*}
   [ "$gi_nw_d" = "$1" ] && gi_nw_d=.
@@ -131,7 +143,7 @@ ge_init_no_write() {                    # <the file that would not be written>
     printf '      → run: chmod u+w %s && ge init\n' "$(ge_quote "$1")" >&2
   elif [ -d "$gi_nw_d" ] && [ ! -w "$gi_nw_d" ]; then
     printf '      This makes that folder writable and runs ge init again.\n' >&2
-    printf '      → run: chmod u+w %s && ge init\n' "$(ge_quote "$gi_nw_d")" >&2
+    printf '      → run: chmod %s %s && ge init\n' "$(ge_init_mode "$gi_nw_d")" "$(ge_quote "$gi_nw_d")" >&2
   else
     # Nothing curative to offer: the file is writable, or absent, and the folder
     # around it takes writes. ge will not guess at a cause it did not examine,
@@ -409,10 +421,10 @@ ge_init_main() {
     ge_parent=$(dirname -- "$ge_target")
     if [ -d "$ge_target" ] && [ ! -w "$ge_target" ]; then
       printf '      This makes that folder writable and runs ge init again.\n' >&2
-      printf '      → run: chmod u+w %s && ge init\n' "$(ge_quote "$ge_target")" >&2
+      printf '      → run: chmod %s %s && ge init\n' "$(ge_init_mode "$ge_target")" "$(ge_quote "$ge_target")" >&2
     elif [ -d "$ge_parent" ] && [ ! -w "$ge_parent" ]; then
       printf '      This makes the folder it goes in writable and runs ge init again.\n' >&2
-      printf '      → run: chmod u+w %s && ge init\n' "$(ge_quote "$ge_parent")" >&2
+      printf '      → run: chmod %s %s && ge init\n' "$(ge_init_mode "$ge_parent")" "$(ge_quote "$ge_parent")" >&2
     else
       # ge cannot name the folder to move to, so the gap is left visible and in
       # brackets rather than filled with a guess. It used to read "ge init from a
