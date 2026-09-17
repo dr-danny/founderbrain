@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {"lib":["ES2023","DOM","DOM.Iterable"]},
+  "include":["src/founderbrain/**/*.ts","src/founderbrain-edge/**/*.ts","src/founderbrain-shared/**/*.ts"],
+  "exclude":["node_modules","dist","vendor"]
+}
