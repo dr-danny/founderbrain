@@ -50,6 +50,8 @@ Rollup is pinned to its official WASM build. Dependency lock URLs use the public
 
 ## Provisioning gates
 
+**Staging execution runbook:** [PROVISIONING.md](./PROVISIONING.md) (scripts under `scripts/founderbrain-*.sh` for #13/#14/#15/#24). Cost and traffic for staging are approved to proceed via that runbook; secrets still never belong in git.
+
 Before any paid resource creation, obtain cost approval. Before enabling any Cloudflare rule, DNS route, custom domain or existing-site configuration, show the exact target and get explicit approval. This repository has no automatic deploy workflow. `workers_dev:false`, `preview_urls:false`, and no `routes` make the checked-in Worker configuration non-routed by default.
 
 Use a NEW isolated FounderBrain Railway project and a dedicated Hexclave project (never the one another product uses; the project id is the workspace key namespace). Never reuse client data, client databases, or client secrets. Choose a region and confirm actual resource pricing; resource limits are not hard billing caps.

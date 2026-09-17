@@ -3,6 +3,7 @@
 The SaaS runs on three vendors: **Cloudflare** (a Worker for the edge, static assets), **Railway** (Fastify API, job worker, private Postgres) and **Hexclave** (identity; the platform formerly named Stack Auth). It is separate from the inherited single-owner Launchhouse app below.
 
 - [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
+- [Staging provision runbook (#13/#14/#15/#24)](docs/founderbrain/PROVISIONING.md)
 - [API/domain contract](docs/founderbrain/CONTRACT.md)
 - Env checklist (Hexclave, no Supabase): [`.env.founderbrain.example`](.env.founderbrain.example)
 - Build: `npm run fb:build`

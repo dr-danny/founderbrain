@@ -1,7 +1,9 @@
 name: FounderBrain build and database proof
 on:
   push:
-    branches: [feat/founderbrain-railway-workers]
+    branches: [feat/founderbrain-railway-workers, cursor/launch-provision-runbooks-3684]
+  pull_request:
+    branches: [main, feat/founderbrain-railway-workers]
   workflow_dispatch:
 permissions:
   contents: read
