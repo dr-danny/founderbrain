@@ -4,6 +4,7 @@
  */
 import type { RefObject } from "react";
 import type { Brain, BrainState } from "../types";
+import { BrainDiff } from "./BrainDiff";
 
 export function ConflictDialog({
   conflict,
@@ -35,18 +36,12 @@ export function ConflictDialog({
           Compare the actual text before choosing. Escape keeps your draft against the current
           version.
         </p>
-        <div className="conflict-compare">
-          <pre>
-            <b>Current saved v{conflict.version}</b>
-            {"\n"}
-            {JSON.stringify(conflict.brain, null, 2)}
-          </pre>
-          <pre>
-            <b>Your draft</b>
-            {"\n"}
-            {JSON.stringify(draft, null, 2)}
-          </pre>
-        </div>
+        <BrainDiff
+          left={conflict.brain}
+          right={draft}
+          leftLabel={`Current saved v${conflict.version}`}
+          rightLabel="Your draft"
+        />
         <div className="dialog-actions">
           <button className="button secondary" onClick={onLoadServer}>
             Load server version
