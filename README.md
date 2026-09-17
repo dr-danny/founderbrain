@@ -1,3 +1,27 @@
+# FounderBrain
+
+The SaaS runs on three vendors: **Cloudflare** (a Worker for the edge, static assets), **Railway** (Fastify API, job worker, private Postgres) and **Hexclave** (identity; the platform formerly named Stack Auth). It is separate from the inherited single-owner Launchhouse app below.
+
+- [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
+- [Staging provision runbook (#13/#14/#15/#24)](docs/founderbrain/PROVISIONING.md)
+- [API/domain contract](docs/founderbrain/CONTRACT.md)
+- Env checklist (Hexclave, no Supabase): [`.env.founderbrain.example`](.env.founderbrain.example)
+- Node **22** only (see `.nvmrc` / `.node-version`; `engine-strict=true` in `.npmrc`)
+- Build: `npm run fb:build`
+- Tests: `npm run fb:test` (set `FB_TEST_DATABASE_URL` to a disposable Postgres to run the storage and API suites; they skip otherwise and say so). Easiest: `npm run fb:local-db` then export the printed `FB_TEST_DATABASE_URL`.
+- Local demo API: after `fb:local-db`, set vars from `.env.founderbrain.example` with `FOUNDERBRAIN_LOCAL_DEMO=true`, `NODE_ENV=development`, `AI_ENABLED=false`, then `npm run fb:dev`
+- Browser authentication checks: [local setup and commands](docs/founderbrain/RAILWAY-CLOUDFLARE.md#browser-regression-checks)
+- API: `railway.json` and `deploy/railway/Dockerfile`
+- Edge: `wrangler.jsonc` (no routes or workers.dev activation by default)
+
+Five guided missions, encrypted versioned Brain storage, per-founder workspace isolation keyed on the Hexclave user id, history/restore/export, and one private invitation-generation job. No publishing, CRM, shell tools or automatic deployments. AI is disabled until configured with approved budgets.
+
+**Sign-in** is Hexclave with a one-time code: a founder presses Sign in, types their email on Hexclave's hosted page, gets a code by email, and is in. No passwords. Invite-only is `allowSignUp: false` in `hexclave.config.ts`; the operator creates each pilot user. There is no sign-in form in this app. The browser SDK is confined to one module with analytics and session replays switched off, and the API verifies the Hexclave JWT itself on every request.
+
+**Not using Supabase** (Auth or otherwise) and **not using Cloudflare Access** for product identity. That decision is locked in [docs/founderbrain/RAILWAY-CLOUDFLARE.md](docs/founderbrain/RAILWAY-CLOUDFLARE.md#auth-decision-locked). FounderBrain env vars for local/staging are listed in [`.env.founderbrain.example`](.env.founderbrain.example) (no values; Hexclave project id and related settings only).
+
+## Inherited upstream reference
+
 # launchhouse-app
 
 The runtime. One Fastify process on a Replit Reserved VM. A founder signs in, talks to the
@@ -5,7 +29,7 @@ app, and the nine engines run server side. No terminal and nothing to install.
 
 **This repository is public, and it holds no founder data and no credentials.** That is worth
 saying plainly, because an earlier version of this file said the opposite and it is the first
-thing anybody reads.
+thing anybody reads. `package.json` is named `founderbrain` with `license: UNLICENSED` (no open-source grant yet); source is public, credentials are not.
 
 **Every founder brings this into their own Replit account from GitHub.** They get their own
 database, their own passphrase and their own keys. There is no roster, no shared seat, and no
@@ -67,25 +91,32 @@ Nothing in section 5 of the build document should be written before the probe ha
 
 | Thing | Why |
 |---|---|
-| Node 22 | The Agent SDK ships the Linux CLI binary the agent loop spawns as a per platform optional dependency, and the SDK's reference implementation is the npm package |
+| Node 22 | Required by `engines` / `.nvmrc`. The Agent SDK ships a Linux CLI binary for the inherited app; FounderBrain CI also pins 22 |
 | Postgres | The record. Everything else is a cache |
-| An Anthropic API key | One key funds the whole cohort, which is why the spend caps are required |
-| The content submodule | `git submodule update --init`. Without it there is no `ge`, and `ge` is how every founder file is written |
+| An Anthropic API key | Only when enabling AI (#24). Not required for local demo with `AI_ENABLED=false` |
+| Vendored content in `vendor/` | Already in the tree. There is no git submodule |
 
 ## Running it locally
 
 ```bash
-git submodule update --init          # brings in vendor/growth-engine
-npm install
-cp .env.example .env                 # then fill it in. There are no values in the example
+npm install                          # Node 22; engine-strict refuses other majors
+cp .env.example .env                 # Launchhouse vars — fill from a password manager
 npm run db:migrate
 npm run dev                          # API on PORT, default 5000
 npm run dev:web                      # the React app, proxied to the API
 ```
 
-`npm run dev` refuses to start if the environment is not usable, and prints every problem at
-once with the variable named. That refusal is the feature. Fixing one variable, restarting,
-and finding the next one is four restarts and forty minutes.
+### FounderBrain local demo (separate from Launchhouse)
+
+```bash
+npm run fb:local-db                  # disposable Postgres 16 + roles + migrations
+# export the printed DATABASE_URL / FB_TEST_DATABASE_URL / GE_MASTER_KEY / APP_ORIGIN
+# FOUNDERBRAIN_LOCAL_DEMO=true NODE_ENV=development AI_ENABLED=false
+npm run fb:dev
+npm run fb:test                      # with FB_TEST_DATABASE_URL set, storage tests run
+```
+
+See `.env.founderbrain.example` for every FounderBrain variable name (no values).
 
 ## The commands
 
@@ -102,7 +133,7 @@ and finding the next one is four restarts and forty minutes.
 | `npm run db:generate` | Generate a migration from `src/server/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
 | `npm run skills:gen` | Rebuild the typed skill prompt map from `app/content/skills/` |
-| `npm run engine:bump` | Move the content submodule pin and print the prose diff |
+| `npm run engine:bump` | Move the vendored content pin and print the prose diff |
 
 ### One note on tests
 
