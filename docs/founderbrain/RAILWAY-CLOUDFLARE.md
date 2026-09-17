@@ -10,6 +10,16 @@ A separately configured Railway worker process drains durable jobs using the res
 
 Three vendors: Cloudflare (Worker, static assets), Railway (API, worker, Postgres) and Hexclave (identity, one-time-code email). Hexclave is the platform formerly named Stack Auth; same product, new brand. There is no email sending service of ours.
 
+### Auth decision (locked)
+
+| Vendor | Status | Notes |
+|---|---|---|
+| **Hexclave** | **Yes — identity for FounderBrain** | One-time-code email, invite-only (`allowSignUp: false`), stable user id, API verifies JWTs locally. See #38 / #14. |
+| Supabase Auth (or any Supabase product) | **Won't do** | Not in the stack. Do not restore `SUPABASE_*` env vars or `@supabase/supabase-js`. See #36. |
+| Cloudflare Access | **Won't do** for product sign-in | Corporate Zero Trust gate, not a customer identity directory. Briefly considered in #36; superseded by Hexclave. |
+
+Database remains private Railway PostgreSQL. Auth is Hexclave only; storage is not Supabase.
+
 - UI: `src/founderbrain-web/`
 - Edge: `src/founderbrain-edge/worker.ts`, `wrangler.jsonc`
 - API, store, jobs: `src/founderbrain/`
@@ -39,6 +49,8 @@ ESBUILD_BINARY_PATH="$PWD/node_modules/esbuild-wasm/bin/esbuild" npm run fb:buil
 Rollup is pinned to its official WASM build. Dependency lock URLs use the public npm registry instead of an inaccessible Replit-internal hostname. Docker and CI use the same portable build. TypeScript emits Node ESM and copies SQL migrations into `dist/founderbrain-server`; runtime does not depend on tsx.
 
 ## Provisioning gates
+
+**Staging execution runbook:** [PROVISIONING.md](./PROVISIONING.md) (scripts under `scripts/founderbrain-*.sh` for #13/#14/#15/#24). Cost and traffic for staging are approved to proceed via that runbook; secrets still never belong in git.
 
 Before any paid resource creation, obtain cost approval. Before enabling any Cloudflare rule, DNS route, custom domain or existing-site configuration, show the exact target and get explicit approval. This repository has no automatic deploy workflow. `workers_dev:false`, `preview_urls:false`, and no `routes` make the checked-in Worker configuration non-routed by default.
 

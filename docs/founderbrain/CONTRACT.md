@@ -9,6 +9,7 @@ BrainState={workspaceId:string,version:number,sha:string,updatedAt:string|null,b
 
 ## HTTP under /api
 GET /config => {authMode:'hexclave'|'local-demo',hexclave:{projectId:string,apiUrl:string,publishableClientKey:string|null}|null,aiEnabled:boolean}; production never local-demo. Everything in it is public by design (project id is every token's audience; pck_ is publishable). Never a secret, never an ssk_ key. Reachable through the Worker without a token: the browser reads it before it has one.
+Identity is Hexclave only (not Supabase, not Cloudflare Access). Env checklist: `.env.founderbrain.example`. Decision locked in `RAILWAY-CLOUDFLARE.md`.
 Identity is the x-stack-access-token header, set by the web app from the Hexclave browser SDK and forwarded by the Worker. API verifies ES256 signature against `<HEXCLAVE_API_URL>/api/v1/projects/<HEXCLAVE_PROJECT_ID>/.well-known/jwks.json`, issuer = `<HEXCLAVE_API_URL>/api/v1/projects/<id>`, audience = `<id>`, exp, non-empty sub, is_anonymous false, is_restricted false, email_verified true, well-formed email. Anonymous and restricted token forms are refused by issuer and audience. Subject = `hexclave|<projectId>|<sub>`, opaque, API hostname deliberately excluded; email is display only. No Authorization header and no cookie is read. Local-only development server accepts X-Dev-User: demo on loopback; never in production. Client demo auth only when config says local-demo.
 GET /me => {email:string}. Never returns the subject.
 GET /brain => BrainState (initializes owner's isolated workspace idempotently).

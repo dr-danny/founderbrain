@@ -26,6 +26,7 @@ backup/
 .env
 .env.*
 !.env.example
+!.env.founderbrain.example
 *.pem
 *.key
 !src/**/*.key.ts
