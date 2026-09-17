@@ -7,3 +7,4 @@
 button:not(.link-button){min-height:44px}
 
 .summary dt{font-size:12px;font-weight:700;margin-top:12px}.summary dd{margin:4px 0 0}.field>label{font-weight:600;font-size:13px}
+.field.needs-attention input,.field.needs-attention textarea{border-color:#c45b52}.field-hint{color:#942720!important}

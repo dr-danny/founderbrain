@@ -1,5 +1,5 @@
 {
   "extends":"./tsconfig.web.json",
-  "include":["src/founderbrain-web/**/*.ts","src/founderbrain-web/**/*.tsx","hexclave.config.ts"],
+  "include":["src/founderbrain-web/**/*.ts","src/founderbrain-web/**/*.tsx","src/founderbrain-shared/**/*.ts","hexclave.config.ts"],
   "exclude":["node_modules","dist","vendor"]
 }

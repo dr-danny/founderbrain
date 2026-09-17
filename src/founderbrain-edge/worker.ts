@@ -32,7 +32,9 @@ const REQUEST_TIMEOUT_MS = 10_000;
 /** The header the web app puts the Hexclave access token in. Same name the API reads. */
 export const ACCESS_TOKEN_HEADER = "x-stack-access-token";
 /** Request headers that may cross from the browser to the API. Everything else is dropped. */
-const FORWARDED_HEADERS = [ACCESS_TOKEN_HEADER, "content-type", "accept", "origin", "x-request-id"] as const;
+const FORWARDED_HEADERS = [ACCESS_TOKEN_HEADER, "content-type", "accept", "origin"] as const;
+/** Edge-minted correlation id. Never taken from the client (#20). */
+const REQUEST_ID_HEADER = "x-request-id";
 
 function validOrigin(value: string | undefined, allowInsecure = false): URL | null {
   if (!value) return null;
@@ -62,9 +64,18 @@ function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
 }
 function response(body: BodyInit | null, status: number, env: FounderBrainEdgeEnv): Response { return new Response(body, { status, headers: securityHeaders(new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" }), env) }); }
 function isApi(pathname: string): boolean { return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`); }
-function gatewayHeaders(request: Request, secret: string): Headers {
+function mintRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  // Extremely defensive fallback; Workers and modern Node always have randomUUID.
+  return `fb-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+}
+function gatewayHeaders(request: Request, secret: string, requestId: string): Headers {
   const headers = new Headers();
-  for (const name of FORWARDED_HEADERS) { const value = request.headers.get(name); if (value) headers.set(name, value); }
+  for (const name of FORWARDED_HEADERS) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  headers.set(REQUEST_ID_HEADER, requestId);
   headers.set("X-FounderBrain-Origin", secret);
   return headers;
 }
@@ -86,17 +97,26 @@ async function proxyApi(request: Request, env: FounderBrainEdgeEnv, fetchImpl: F
   // secret and it contains nothing private.
   if (inbound.pathname !== `${API_PREFIX}/config` && !request.headers.get(ACCESS_TOKEN_HEADER)) return response(JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }), 401, env);
   const target = new URL(`${inbound.pathname}${inbound.search}`, origin);
+  const requestId = mintRequestId();
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const init: RequestInit = { method: request.method, headers: gatewayHeaders(request, env.ORIGIN_SECRET), redirect: "manual", signal: controller.signal };
+    const init: RequestInit = { method: request.method, headers: gatewayHeaders(request, env.ORIGIN_SECRET, requestId), redirect: "manual", signal: controller.signal };
     if (request.method !== "GET" && request.method !== "HEAD") init.body = request.body;
     const upstream = await fetchImpl(target, init);
-    if (upstream.status >= 300 && upstream.status < 400) return response(JSON.stringify({ error: "upstream_redirect", message: "The API returned an unsupported redirect." }), 502, env);
-    const headers = securityHeaders(upstream.headers, env); headers.set("Cache-Control", "private, no-store");
+    if (upstream.status >= 300 && upstream.status < 400) {
+      const refused = response(JSON.stringify({ error: "upstream_redirect", message: "The API returned an unsupported redirect." }), 502, env);
+      refused.headers.set(REQUEST_ID_HEADER, requestId);
+      return refused;
+    }
+    const headers = securityHeaders(upstream.headers, env);
+    headers.set("Cache-Control", "private, no-store");
+    headers.set(REQUEST_ID_HEADER, requestId);
     return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers });
   } catch (error) {
     const timedOut = controller.signal.aborted; const message = timedOut ? "FounderBrain API timed out." : "FounderBrain API is unavailable.";
-    return response(JSON.stringify({ error: timedOut ? "gateway_timeout" : "gateway_unavailable", message }), timedOut ? 504 : 502, env);
+    const failed = response(JSON.stringify({ error: timedOut ? "gateway_timeout" : "gateway_unavailable", message }), timedOut ? 504 : 502, env);
+    failed.headers.set(REQUEST_ID_HEADER, requestId);
+    return failed;
   } finally { clearTimeout(timeout); }
 }
 async function serveAsset(request: Request, env: FounderBrainEdgeEnv): Promise<Response> {

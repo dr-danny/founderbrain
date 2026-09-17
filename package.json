@@ -1,9 +1,9 @@
 {
-  "name": "launchhouse-app",
+  "name": "founderbrain",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The Launchhouse runtime. Private. Consumes the public growth-engine content repo and never edits it.",
+  "description": "FounderBrain SaaS (Railway + Cloudflare + Hexclave) plus the inherited Launchhouse runtime reference. Public source; no founder data or credentials.",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=22.0.0 <23"
@@ -36,7 +36,8 @@
     "fb:build": "tsc -p tsconfig.founderbrain.json && tsc -p tsconfig.founderbrain-web.json && vite build --config vite.founderbrain.config.ts && tsc -p tsconfig.founderbrain-runtime.json && node scripts/founderbrain-copy-sql.mjs",
     "fb:test": "TZ=UTC node --import tsx --test --test-concurrency=1 src/founderbrain/*.test.ts src/founderbrain-edge/*.test.ts",
     "fb:preview": "vite --config vite.founderbrain.config.ts",
-    "fb:reconcile": "TZ=UTC tsx src/founderbrain/reconcile-main.ts"
+    "fb:reconcile": "TZ=UTC tsx src/founderbrain/reconcile-main.ts",
+    "fb:local-db": "bash scripts/founderbrain-local-db.sh"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.258",

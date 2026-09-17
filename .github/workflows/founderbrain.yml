@@ -1,10 +1,13 @@
 name: FounderBrain build and database proof
 on:
   push:
-    branches: [feat/founderbrain-railway-workers, cursor/launch-provision-runbooks-3684]
+    branches: [main, feat/founderbrain-railway-workers]
   pull_request:
     branches: [main, feat/founderbrain-railway-workers]
   workflow_dispatch:
+concurrency:
+  group: founderbrain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

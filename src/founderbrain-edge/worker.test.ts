@@ -8,7 +8,7 @@ const TOKEN = { "x-stack-access-token": "signed-by-hexclave" };
 test("proxies only a fixed API origin, forwards the Hexclave token and allowlisted headers, drops the rest, no-store", async () => {
   let seen: { url?: string; headers?: Headers; method?: string } = {};
   const worker = createFounderBrainWorker(async (input, init) => { seen = { url: String(input), headers: new Headers(init?.headers), method: init?.method }; return new Response(JSON.stringify({ ok: true }), { headers: { "Cache-Control": "public, max-age=999", "X-From-Upstream": "yes" } }); });
-  const request = new Request("https://app.example.test/api/brain?version=4", { method: "PUT", headers: { ...TOKEN, Authorization: "Bearer stale-token", "Content-Type": "application/json", "X-FounderBrain-Origin": "attacker", "X-Forwarded-Host": "attacker.test", "X-Request-Id": "req-7", Cookie: "stack-refresh-token=browser-cookie" }, body: "{}" });
+  const request = new Request("https://app.example.test/api/brain?version=4", { method: "PUT", headers: { ...TOKEN, Authorization: "Bearer stale-token", "Content-Type": "application/json", "X-FounderBrain-Origin": "attacker", "X-Forwarded-Host": "attacker.test", "X-Request-Id": "client-spoofed", Cookie: "stack-refresh-token=browser-cookie" }, body: "{}" });
   const result = await worker.fetch(request, baseEnv());
   assert.equal(seen.url, "https://founderbrain-api.up.railway.app/api/brain?version=4"); assert.equal(seen.method, "PUT");
   assert.equal(seen.headers?.get("x-stack-access-token"), "signed-by-hexclave");
@@ -16,8 +16,21 @@ test("proxies only a fixed API origin, forwards the Hexclave token and allowlist
   assert.equal(seen.headers?.get("authorization"), null, "nothing reads Authorization, so it does not cross");
   assert.equal(seen.headers?.get("cookie"), null, "the Hexclave refresh cookie stays in the browser; the access token header is what the API verifies");
   assert.equal(seen.headers?.get("x-forwarded-host"), null);
+  assert.notEqual(seen.headers?.get("x-request-id"), "client-spoofed", "edge mints X-Request-Id; never forwards the client value");
+  assert.match(seen.headers?.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/i);
+  assert.equal(result.headers.get("x-request-id"), seen.headers?.get("x-request-id"), "response echoes the minted id for support");
   assert.equal(result.headers.get("cache-control"), "private, no-store");
   assert.match(result.headers.get("content-security-policy") ?? "", /connect-src 'self' https:\/\/api\.hexclave\.com$/);
+});
+test("mints a fresh X-Request-Id when the client omits one", async () => {
+  let upstreamId: string | null = null;
+  const worker = createFounderBrainWorker(async (_input, init) => {
+    upstreamId = new Headers(init?.headers).get("x-request-id");
+    return new Response("{}");
+  });
+  const result = await worker.fetch(new Request("https://app.example.test/api/brain", { headers: TOKEN }), baseEnv());
+  assert.match(upstreamId ?? "", /^[0-9a-f-]{36}$/i);
+  assert.equal(result.headers.get("x-request-id"), upstreamId);
 });
 test("refuses /api without the token header before touching the origin, except /api/config which the browser needs first", async () => {
   let called = 0;
