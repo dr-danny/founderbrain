@@ -1,15 +1,17 @@
 # FounderBrain
 
-The new SaaS mode targets **Railway + Cloudflare Workers**. It is separate from the inherited single-owner Launchhouse app below.
+The SaaS runs on two vendors and no more: **Cloudflare** (Access for sign-in, a Worker for the edge, static assets) and **Railway** (Fastify API, job worker, private Postgres). It is separate from the inherited single-owner Launchhouse app below.
 
 - [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
 - [API/domain contract](docs/founderbrain/CONTRACT.md)
 - Build: `npm run fb:build`
-- Tests: `npm run fb:test`
+- Tests: `npm run fb:test` (set `FB_TEST_DATABASE_URL` to a disposable Postgres to run the storage and API suites; they skip otherwise and say so)
 - API: `railway.json` and `deploy/railway/Dockerfile`
 - Edge: `wrangler.jsonc` (no routes or workers.dev activation by default)
 
-Five guided missions, encrypted versioned Brain storage, managed-auth workspace isolation, history/restore/export, and one private invitation-generation job. No publishing, CRM, shell tools or automatic deployments. AI is disabled until configured with approved budgets.
+Five guided missions, encrypted versioned Brain storage, per-founder workspace isolation keyed on the Cloudflare Access identity, history/restore/export, and one private invitation-generation job. No publishing, CRM, shell tools or automatic deployments. AI is disabled until configured with approved budgets.
+
+**Sign-in** is Cloudflare Access with the One-time PIN provider: a founder types their email on Cloudflare's login page, gets a six-digit code, and is in. Invite-only is an Access Allow policy. There is no sign-in form in this app, no auth SDK in the browser, and no third party auth service. The API verifies the Access JWT itself on every request.
 
 ## Inherited upstream reference
 

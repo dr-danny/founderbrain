@@ -1,11 +1,13 @@
 # FounderBrain on Railway + Cloudflare Workers
 
-Status: implementation branch, not a live deployment. No Cloudflare rules, DNS, custom routes, provider auth settings, or paid services have been activated by this build.
+Status: implementation branch, not a live deployment. No Cloudflare rules, DNS, custom routes, Access applications, or paid services have been activated by this build.
 
 ## Boundary
 
-Browser -> Cloudflare Worker (React static assets + fixed-origin /api gateway) -> Railway Fastify API -> private Railway PostgreSQL.
+Browser -> Cloudflare Access (sign-in) -> Cloudflare Worker (React static assets + fixed-origin /api gateway) -> Railway Fastify API -> private Railway PostgreSQL.
 A separately configured Railway worker process drains durable jobs using the restricted `fb_worker` database role. Cloudflare has no database credentials, private Brain cache, or model key. Railway API has no shell/agent endpoint. The production runtime manifest deliberately excludes Claude Agent SDK, tsx, PGlite and frontend build tools.
+
+Two vendors and no more: Cloudflare (Access, Worker, static assets) and Railway (API, worker, Postgres). There is no separate auth provider and no email sending service of ours. Cloudflare Access sends the one-time PIN emails.
 
 - UI: `src/founderbrain-web/`
 - Edge: `src/founderbrain-edge/worker.ts`, `wrangler.jsonc`
@@ -58,17 +60,29 @@ node src/founderbrain/migrate-main.js
 
 Do not use the embedded-test schema script for a production migration. The inherited migration runner uses multiple native Postgres connections and a migration lock; the embedded fixture intentionally cannot certify that behavior.
 
-### Managed authentication
+### Sign-in: Cloudflare Access with One-time PIN
 
-The implemented adapter uses a dedicated Supabase Auth project for magic-link login; the application's canonical database remains Railway Postgres, not Supabase storage.
+Sign-in is Cloudflare Access (Zero Trust) placed in front of the Worker. A founder opens the app, Access shows its own login page, they type their email, Access emails a six-digit code, they enter it, and Access sets a session cookie for the hostname. Only then does a request reach the Worker. There is no sign-in form in this app and no auth SDK in the browser.
 
-- Configure asymmetric JWT signing supported by the project's JWKS (ES256 or RS256), not a legacy symmetric shared JWT secret.
-- Add only the exact approved app URL to auth redirect allowlists.
-- Invite pilot users in the provider. The UI uses `shouldCreateUser:false`; it will not silently create public accounts.
-- Public/anon key can be exposed in `/api/config`; a service-role/secret key must never be provided to the frontend. Configuration rejects known service-key formats.
-- Backend verifies signature, issuer, audience, expiry, stable subject and authenticated role. Email is not a database identity key.
-- The browser persists only its auth session and opaque pending job ID in sessionStorage. Brain text remains server-side/in memory. Signout clears private in-memory state and pending operations.
-- Provider password recovery/delivery and a real magic-link cycle require staging validation. No real email was sent by local tests.
+What to configure in the Zero Trust dashboard, in this order:
+
+1. **Identity provider:** add **One-time PIN**. No external IdP is needed. Founders authenticate with the email they were invited under. The PIN is single-use and expires after 10 minutes. Cloudflare sends it from `noreply@notify.cloudflare.com`.
+2. **Access application:** either the one-click **Enable Access** on the Worker, or a self-hosted application on the approved custom domain. Set the session duration deliberately (Access default is 24 hours; pick what a pilot needs). Note the **Application Audience (AUD) tag** it shows. That is `CF_ACCESS_AUD`.
+3. **Allow policy:** an **Include** rule listing pilot email addresses (or an email domain if the pilot is one organisation). This is how invite-only is enforced. Access does not email a code to an address that no policy allows, and its login page says the code was sent either way, so addresses cannot be enumerated.
+4. **Team domain:** `https://<team>.cloudflareaccess.com`. That is `CF_ACCESS_TEAM_DOMAIN`, and it is the JWT issuer and the host of the JWKS at `/cdn-cgi/access/certs`.
+5. **Logout:** nothing to configure. `/cdn-cgi/access/logout` on the app hostname clears the Access session. The app's Sign out button navigates there.
+
+What the code does with it:
+
+- Access attaches an RS256-signed JWT to every authenticated request as the `Cf-Access-Jwt-Assertion` header. The Worker forwards that header to the API and refuses `/api/*` without it (401 at the edge, origin never called).
+- The API verifies the token itself with `jose` against the team JWKS: signature, issuer = team domain, audience = AUD tag, `exp` and `nbf`, a non-empty `sub` (service tokens have an empty `sub` and are refused), `type` not `org`, and a well-formed `email` claim. Validation of the header's presence alone is never enough; the signature is what proves it came from Access.
+- The workspace is keyed on `issuer|sub`, an opaque id. The email is returned by `GET /api/me` for display only and is never a database key.
+- The browser holds no token. The Access cookie is HttpOnly and rides along with `credentials: "same-origin"`. Only the opaque pending job id is kept in `sessionStorage`. Brain text remains server-side or in memory. Sign out clears private in-memory state, then navigates to the Access logout path.
+- When the Access session expires mid-edit, an API fetch comes back as a redirect to the Access login page. The client sends `redirect: "manual"`, recognises the opaque redirect, keeps the draft on screen, and tells the founder to sign in again in a new tab and retry. Nothing is lost silently.
+
+Known caveat, on purpose in writing: Access's `sub` is unique to an email within the account and stays stable across sign-ins, but it changes if the person is **removed from the Zero Trust organisation and added again**. That is an operator action, and the recovery is an operator re-binding `fb_user.subject` for that founder. Do not "fix" this by keying on email; email is a display value here. The issue tracker holds the recovery-path task.
+
+A real one-time PIN cycle requires the staging hostname. No email is sent by local tests, and the local demo is not a sign-in demonstration.
 
 ### API environment
 
@@ -81,8 +95,8 @@ Set in Railway secret/variable settings, not source:
 | `GE_MASTER_KEY` | Independently escrowed, generated 32-byte base64 encryption key; never change/remove without migration |
 | `APP_ORIGIN` | Exact approved HTTPS Worker/custom-domain origin |
 | `ORIGIN_SECRET` | Generated secret, at least 32 characters, shared only with the Worker |
-| `SUPABASE_URL` | Dedicated auth project HTTPS URL |
-| `SUPABASE_ANON_KEY` | Auth publishable/anon key, never service-role |
+| `CF_ACCESS_TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com`. JWT issuer and JWKS host. Not a secret |
+| `CF_ACCESS_AUD` | The Access application's 64 character AUD tag. Not a secret, but wrong means nobody signs in |
 | `AI_ENABLED=false` | Default until real API spending is approved |
 | `PORT` | Railway-injected listening port; default 8080 |
 
@@ -107,12 +121,14 @@ To release quarantine, an operator must inspect provider usage, then run `node s
 ### Cloudflare Worker
 
 1. Build assets and dry-run bundle first.
-2. Replace placeholder `API_ORIGIN` with the exact HTTPS Railway API origin, and `AUTH_ORIGIN` with the dedicated auth origin.
+2. Replace placeholder `API_ORIGIN` with the exact HTTPS Railway API origin. It is the only variable.
 3. Set `ORIGIN_SECRET` using Worker secret settings. It must match Railway. Never use a plain-text checked-in variable.
 4. Upload an inactive version if authorized. Activating a workers.dev URL or custom route is a separate approved traffic change. Do not change any existing zone rule, WAF, challenge setting, TLS setting or client route.
-5. On approval, bind the chosen route/domain; update exact `APP_ORIGIN` and auth callbacks. Verify a real login and monitor-shaped requests. Challenge responses are failures, not successful probes.
+5. On approval, bind the chosen route/domain and update the exact `APP_ORIGIN` on Railway.
+6. Then, and only then, put Cloudflare Access in front of it (section above). Until Access is on, the Worker answers every `/api/*` request with 401 because no `Cf-Access-Jwt-Assertion` header arrives. That is the intended fail-closed state, not a bug to work around.
+7. Verify a real one-time PIN login and monitor-shaped requests. Challenge responses are failures, not successful probes.
 
-Worker behavior: same-origin `/api` proxy to a fixed target only; allowlisted headers; injected origin secret; no client-controlled upstream; API redirects rejected; API responses private/no-store; security headers on app assets. The Worker executes for all requests so the asset security headers are applied. No KV, D1, R2, cache or edge data replication is required in v1.
+Worker behavior: same-origin `/api` proxy to a fixed target only; forwards `Cf-Access-Jwt-Assertion`, `Content-Type`, `Accept`, `Origin` and `X-Request-Id` and nothing else (cookies and `Authorization` do not cross); injected origin secret; refuses `/api/*` without the Access header; no client-controlled upstream; API redirects rejected; API responses private/no-store; security headers on app assets with `connect-src 'self'`. The Worker executes for all requests so the asset security headers are applied. No KV, D1, R2, cache or edge data replication is required in v1.
 
 ## Local demonstration
 
@@ -131,7 +147,8 @@ Deletion locks the workspace against writers, removes AI jobs/artifacts before t
 - Native PostgreSQL CI and actual migration runner pass.
 - Production Docker image builds and starts with the restricted runtime role.
 - Worker dry-run succeeds; deployed origin proxy/callbacks verified after approval.
-- Fresh login, save/readback, signout/login, restart, restore and A/B isolation pass on staging.
+- Cloudflare Access application, One-time PIN provider and Allow policy exist on the staging hostname; `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` on Railway match them.
+- Fresh one-time PIN login, save/readback, sign out via `/cdn-cgi/access/logout` then login, restart, restore and A/B isolation pass on staging. An email not in the Allow policy receives nothing.
 - A real provider call (after spend approval) passes source-input and budget verification; no mock result represented as real generation.
 - Backup/key recovery, accessible narrow-screen flow, privacy/data-use disclosure and deletion retention are reviewed.
 - No Oneday logo, proprietary fonts, photographs, endorsement or event-required checklist is shipped without authorization.

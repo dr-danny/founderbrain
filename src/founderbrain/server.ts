@@ -20,7 +20,7 @@ export async function buildApi(config:Config,options:{store?:PgBrainStore;jobs?:
   const jobs=options.jobs??new BrainJobs(store,config);
   const authenticate=options.authenticate??createAuthenticator(config);
   const app=Fastify({logger:false,bodyLimit:128*1024,trustProxy:false,requestTimeout:20000});
-  const contexts=new WeakMap<FastifyRequest,{subject:string;workspace:string}>();
+  const contexts=new WeakMap<FastifyRequest,{subject:string;email:string;workspace:string}>();
   app.addHook('onRequest',async(req,reply)=>{
     reply.header('Cache-Control','private, no-store').header('X-Content-Type-Options','nosniff').header('Referrer-Policy','no-referrer');
     if(!req.url.startsWith('/api/'))return;
@@ -30,14 +30,18 @@ export async function buildApi(config:Config,options:{store?:PgBrainStore;jobs?:
     }
     if(req.headers.origin && req.headers.origin!==config.APP_ORIGIN)throw new DomainError(403,'origin_denied','This origin is not permitted.');
     if(req.url.split('?')[0]==='/api/config')return;
-    const subject=await authenticate(req);
-    const workspace=await store.ensureWorkspace(subject);
-    contexts.set(req,{subject,workspace});
+    const identity=await authenticate(req);
+    const workspace=await store.ensureWorkspace(identity.subject);
+    contexts.set(req,{subject:identity.subject,email:identity.email,workspace});
   });
   const context=(req:FastifyRequest)=>{const c=contexts.get(req);if(!c)throw new DomainError(401,'sign_in_required','Sign in to continue.');return c;};
   app.get('/health/live',async()=>({ok:true,service:'founderbrain-api'}));
   app.get('/health/ready',async(_req,reply)=>{try{await store.scoped('00000000000000000000000000',async tx=>{await tx`select 1 from fb_ai_job limit 0`;});return {ok:true};}catch{reply.code(503);return {ok:false};}});
-  app.get('/api/config',async()=>({authMode:config.FOUNDERBRAIN_LOCAL_DEMO==='true'?'local-demo':'supabase',...(config.SUPABASE_URL?{supabaseUrl:config.SUPABASE_URL,supabaseAnonKey:config.SUPABASE_ANON_KEY}:{}),aiEnabled:config.AI_ENABLED==='true'}));
+  // Sign-in is Cloudflare Access in front of the Worker, so the browser needs no auth
+  // configuration at all. It only needs to know which mode it is in and where to sign out.
+  app.get('/api/config',async()=>({authMode:config.FOUNDERBRAIN_LOCAL_DEMO==='true'?'local-demo':'cloudflare-access',signOutPath:config.FOUNDERBRAIN_LOCAL_DEMO==='true'?null:'/cdn-cgi/access/logout',aiEnabled:config.AI_ENABLED==='true'}));
+  /** Who am I, for the account display. The subject is never returned; it is a storage key. */
+  app.get('/api/me',async req=>({email:context(req).email}));
   app.get('/api/brain',async req=>{
     const query=parse(z.object({version:z.coerce.number().int().positive().optional()}).strict(),req.query);
     const workspace=context(req).workspace;const state=await store.read(workspace,query.version);

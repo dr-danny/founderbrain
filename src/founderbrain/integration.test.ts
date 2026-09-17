@@ -18,7 +18,7 @@ let provider:Provider=async()=>({text:'Hi [Name], could we learn about your work
 let config:Config;
 const full=():Brain=>{const b=emptyBrain();b.identity={name:'Ada',venture:'Northwind',role:'Founder',stage:'exploring',goal:'Find a useful problem',approved:true};b.customer={segment:'Independent shop owners',problem:'Manual appointment follow-ups',outcome:'Fewer missed appointments',workaround:'unknown',evidenceStatus:'hypothesis',evidence:'',approved:true};b.offer={description:'Interview to understand workflows',delivery:'A conversation',outcome:'Learn what matters',cta:'Would you talk with me?',price:'',approved:true};b.voice={tone:'Direct and warm',boundaries:'No invented claims',sample:'I would like to understand your day.',approved:true};return b;};
 async function workspace(label:string){const subject=prefix+'|'+label;const id=await store.ensureWorkspace(subject);tracked.set(subject,id);return id;}
-before(async()=>{if(!url)return;process.env.GE_MASTER_KEY??=randomBytes(32).toString('base64');config={NODE_ENV:'production',DATABASE_URL:url,PORT:8080,APP_ORIGIN:'https://founderbrain.example.test',ORIGIN_SECRET:'test-origin-secret-not-a-live-secret-0000',SUPABASE_URL:'https://auth.example.test',SUPABASE_ANON_KEY:'test-publishable',FOUNDERBRAIN_LOCAL_DEMO:'false',AI_ENABLED:'true',ANTHROPIC_API_KEY:'fixture-not-an-api-key',AI_MODEL:'fixture-model',AI_INPUT_USD_PER_MILLION:1,AI_OUTPUT_USD_PER_MILLION:2,AI_WORKSPACE_DAILY_MICROUSD:1000000,AI_GLOBAL_DAILY_MICROUSD:100000000};store=new PgBrainStore(url);jobs=new BrainJobs(store,config,(...args)=>provider(...args));app=await buildApi(config,{store,jobs,authenticate:async req=>{const user=req.headers['x-test-user'];if(typeof user!=='string')throw new DomainError(401,'sign_in_required','Sign in.');return prefix+'|'+user;}});});
+before(async()=>{if(!url)return;process.env.GE_MASTER_KEY??=randomBytes(32).toString('base64');config={NODE_ENV:'production',DATABASE_URL:url,PORT:8080,APP_ORIGIN:'https://founderbrain.example.test',ORIGIN_SECRET:'test-origin-secret-not-a-live-secret-0000',CF_ACCESS_TEAM_DOMAIN:'https://fixture.cloudflareaccess.com',CF_ACCESS_AUD:'f'.repeat(64),FOUNDERBRAIN_LOCAL_DEMO:'false',AI_ENABLED:'true',ANTHROPIC_API_KEY:'fixture-not-an-api-key',AI_MODEL:'fixture-model',AI_INPUT_USD_PER_MILLION:1,AI_OUTPUT_USD_PER_MILLION:2,AI_WORKSPACE_DAILY_MICROUSD:1000000,AI_GLOBAL_DAILY_MICROUSD:100000000};store=new PgBrainStore(url);jobs=new BrainJobs(store,config,(...args)=>provider(...args));app=await buildApi(config,{store,jobs,authenticate:async req=>{const user=req.headers['x-test-user'];if(typeof user!=='string')throw new DomainError(401,'sign_in_required','Sign in.');return {subject:prefix+'|'+user,email:user+'@example.test'};}});});
 after(async()=>{if(!enabled)return;for(const [subject,id] of tracked)await store.deleteWorkspace(subject,id).catch(()=>{});await app?.close();});
 const headers=(user:string)=>({'x-test-user':user,'x-founderbrain-origin':config.ORIGIN_SECRET!,origin:config.APP_ORIGIN});
 describe('FounderBrain API, durable jobs and failure regressions',()=>{
@@ -27,6 +27,13 @@ describe('FounderBrain API, durable jobs and failure regressions',()=>{
   assert.equal((await app.inject({url:'/api/brain',headers:{'x-founderbrain-origin':config.ORIGIN_SECRET!}})).statusCode,401);
   assert.equal((await app.inject({url:'/auth/owner'})).statusCode,404);
   assert.equal((await app.inject({url:'/api/brain',headers:{...headers('a'),origin:'https://evil.example'}})).statusCode,403);
+ });
+ it('tells the browser it is behind Cloudflare Access and who is signed in, never the subject',{skip},async()=>{
+  const cfg=await app.inject({url:'/api/config',headers:{'x-founderbrain-origin':config.ORIGIN_SECRET!}});
+  assert.equal(cfg.statusCode,200);assert.deepEqual(cfg.json(),{authMode:'cloudflare-access',signOutPath:'/cdn-cgi/access/logout',aiEnabled:true});
+  await workspace('me');const me=await app.inject({url:'/api/me',headers:headers('me')});
+  assert.equal(me.statusCode,200);assert.deepEqual(me.json(),{email:'me@example.test'});
+  assert.equal((await app.inject({url:'/api/me',headers:{'x-founderbrain-origin':config.ORIGIN_SECRET!}})).statusCode,401);
  });
  it('authenticates membership and rejects revoked membership',{skip},async()=>{
   const id=await workspace('revoked');const subject=prefix+'|revoked';
