@@ -2,6 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, FounderBrainApi } from "./api";
 import { createHexclave, type HexclaveSession } from "./hexclave";
 import { emptyBrain, fieldNeedsAttention, sectionWouldApprove, type Artifact, type Brain, type BrainState, type Config, type HistoryItem, type Job, type MissionSection } from "./types";
+import { PENDING_JOB_STORAGE_KEY, nextSaveOperation, patchBrain, settleSaveDecision } from "./lib/brain-draft";
+import {
+  JOB_POLL_DEADLINE_MS,
+  JOB_POLL_INITIAL_WAIT_MS,
+  interpretJobStatus,
+  interpretPollTimeout,
+  nextPollWaitMs,
+  stillRunningNotice,
+  unresolvedJobNotice,
+} from "./lib/job-poll";
 
 type View = "home" | "missions" | "brain";
 type Mission = "identity" | "customer" | "offer" | "voice" | "output";
@@ -39,7 +49,7 @@ export function App() {
   const hexclave = useMemo(() => config?.hexclave ? createHexclave(config.hexclave) : null, [config]);
   const api = useMemo(() => { if (!config) return null; if (config.authMode === "local-demo") return new FounderBrainApi(null, true); return session ? new FounderBrainApi(session.getToken) : null; }, [config, session]);
   const friendlyError = (err: unknown) => { if (err instanceof ApiError && err.code === "session_expired") setSessionExpired(true); return err instanceof ApiError ? err.message : "Something went wrong. Your draft has not been discarded."; };
-  const jobStorage = "founderbrain.pending-job";
+  const jobStorage = PENDING_JOB_STORAGE_KEY;
   const clearPrivate = () => { sessionEpoch.current += 1; saveOperation.current = null; jobOperation.current = null; acceptOperation.current = null; window.sessionStorage.removeItem(jobStorage); setState(null); latestDraft.current = emptyBrain(); setDraft(latestDraft.current); setChanged(false); setHistory([]); setComparison(null); setConflict(null); setArtifact(null); setArtifactText(""); setArtifactStale(false); setGenerating(false); setGenerationRetry(false); setAcceptRetry(false); setJobNeedsReconcile(false); setDeleteOpen(false); setDeleteText(""); };
 
   useEffect(() => { void (async () => { try { setConfig(await new FounderBrainApi().config()); } catch { setError("FounderBrain configuration is unavailable. Try again shortly."); } })(); }, []);
@@ -64,12 +74,65 @@ export function App() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [changed, saving]);
   async function loadWorkspace() { if (!api) return; const epoch = sessionEpoch.current; setError(""); try { const nextState = await api.brain(); if (epoch !== sessionEpoch.current) return; const output = await api.artifact(); if (epoch !== sessionEpoch.current) return; setState(nextState); latestDraft.current = nextState.brain; setDraft(nextState.brain); setChanged(false); setArtifact(output.artifact ?? nextState.artifact ?? null); setArtifactText((output.artifact ?? nextState.artifact)?.text ?? ""); setArtifactStale(output.stale); const pendingJob = window.sessionStorage.getItem(jobStorage); if (pendingJob) void pollJob(pendingJob, epoch); } catch (err) { if (epoch === sessionEpoch.current) setError(friendlyError(err)); } }
-  function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) { if (saving) return; setDraft((current) => { const next = { ...current, [section]: { ...current[section], [field]: value, approved: field === "approved" ? Boolean(value) : false } } as Brain; latestDraft.current = next; return next; }); setChanged(true); setError(""); setNotice(""); }
-  function settleSave(saved: BrainState, operation: { brain: Brain; expectedVersion: number; key: string }, epoch: number, pendingVerification = false) { if (epoch !== sessionEpoch.current) return; if (JSON.stringify(latestDraft.current) === JSON.stringify(operation.brain)) { setState(saved); latestDraft.current = saved.brain; setDraft(saved.brain); setChanged(false); setNotice(pendingVerification ? `Saved as version ${saved.version}; server verification is pending.` : `Saved as version ${saved.version}.`); } else { setState(saved); setNotice(`Saved as version ${saved.version}. New local edits remain unsaved.`); } saveOperation.current = null; }
+  function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) {
+    if (saving) return;
+    setDraft((current) => {
+      const next = patchBrain(current, section, field, value);
+      latestDraft.current = next;
+      return next;
+    });
+    setChanged(true);
+    setError("");
+    setNotice("");
+  }
+  function settleSave(saved: BrainState, operation: { brain: Brain; expectedVersion: number; key: string }, epoch: number, pendingVerification = false) {
+    if (epoch !== sessionEpoch.current) return;
+    const decision = settleSaveDecision(latestDraft.current, saved, operation, pendingVerification);
+    setState(saved);
+    if (decision.draftMatchesSaved) {
+      latestDraft.current = decision.nextDraft;
+      setDraft(decision.nextDraft);
+    }
+    setChanged(decision.changed);
+    setNotice(decision.notice);
+    saveOperation.current = null;
+  }
   async function save(next = draft) {
-    if (!api || !state || saving) return; const epoch = sessionEpoch.current; const existing = saveOperation.current; const operation = existing && JSON.stringify(existing.brain) === JSON.stringify(next) && existing.expectedVersion === state.version ? existing : { brain: structuredClone(next), expectedVersion: state.version, key: crypto.randomUUID() }; saveOperation.current = operation; setSaving(true); setError("");
-    try { const saved = await api.save(operation.brain, operation.expectedVersion, operation.key); settleSave(saved, operation, epoch); }
-    catch (err) { if (epoch !== sessionEpoch.current) return; if (err instanceof ApiError && err.status === 409) { saveOperation.current = null; try { const remote = await api.brain(); if (epoch !== sessionEpoch.current) return; setConflict(remote); setError("A newer version exists. Compare it with your draft before saving again."); } catch { if (epoch === sessionEpoch.current) setError("A newer version exists, but it could not be loaded. Your draft is intact."); } } else if (err instanceof ApiError && err.status === 503 && err.code === "verification_pending" && typeof err.details.committedVersion === "number") { try { const receipt = await api.brain(err.details.committedVersion); settleSave(receipt, operation, epoch, true); } catch { if (epoch === sessionEpoch.current) setError("The saved receipt is still unavailable. Retry the exact saved request; your draft is intact."); } } else { setError(friendlyError(err)); setNotice("Save outcome is unresolved. Retry the exact saved request or continue editing after it resolves."); } } finally { if (epoch === sessionEpoch.current) setSaving(false); }
+    if (!api || !state || saving) return;
+    const epoch = sessionEpoch.current;
+    const operation = nextSaveOperation(saveOperation.current, next, state.version, () => crypto.randomUUID());
+    saveOperation.current = operation;
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await api.save(operation.brain, operation.expectedVersion, operation.key);
+      settleSave(saved, operation, epoch);
+    } catch (err) {
+      if (epoch !== sessionEpoch.current) return;
+      if (err instanceof ApiError && err.status === 409) {
+        saveOperation.current = null;
+        try {
+          const remote = await api.brain();
+          if (epoch !== sessionEpoch.current) return;
+          setConflict(remote);
+          setError("A newer version exists. Compare it with your draft before saving again.");
+        } catch {
+          if (epoch === sessionEpoch.current) setError("A newer version exists, but it could not be loaded. Your draft is intact.");
+        }
+      } else if (err instanceof ApiError && err.status === 503 && err.code === "verification_pending" && typeof err.details.committedVersion === "number") {
+        try {
+          const receipt = await api.brain(err.details.committedVersion);
+          settleSave(receipt, operation, epoch, true);
+        } catch {
+          if (epoch === sessionEpoch.current) setError("The saved receipt is still unavailable. Retry the exact saved request; your draft is intact.");
+        }
+      } else {
+        setError(friendlyError(err));
+        setNotice("Save outcome is unresolved. Retry the exact saved request or continue editing after it resolves.");
+      }
+    } finally {
+      if (epoch === sessionEpoch.current) setSaving(false);
+    }
   }
   async function retrySave() { if (saveOperation.current) await save(saveOperation.current.brain); }
   async function approve(section: MissionSection) {
@@ -91,8 +154,8 @@ export function App() {
   async function pollJob(id: string, epoch = sessionEpoch.current) {
     if (!api || epoch !== sessionEpoch.current) return;
     setGenerating(true);
-    const deadline = Date.now() + 150_000;
-    let waitMs = 2_000;
+    const deadline = Date.now() + JOB_POLL_DEADLINE_MS;
+    let waitMs = JOB_POLL_INITIAL_WAIT_MS;
     let lastStatus: Job["status"] | null = null;
     try {
       while (Date.now() < deadline) {
@@ -101,7 +164,8 @@ export function App() {
         const job = await api.job(id);
         if (epoch !== sessionEpoch.current) return;
         lastStatus = job.status;
-        if (job.status === "completed" && job.artifact) {
+        const outcome = interpretJobStatus(job.status);
+        if (outcome.kind === "completed" && job.artifact) {
           window.sessionStorage.removeItem(jobStorage);
           setArtifact(job.artifact);
           setArtifactText(job.artifact.text);
@@ -110,23 +174,23 @@ export function App() {
           setNotice("A draft output is ready for review.");
           return;
         }
-        if (job.status === "failed") {
+        if (outcome.kind === "failed") {
           window.sessionStorage.removeItem(jobStorage);
           throw new Error(job.error ?? "Generation did not complete.");
         }
-        if (job.status === "uncertain") {
+        if (outcome.kind === "uncertain") {
           window.sessionStorage.removeItem(jobStorage);
           setJobNeedsReconcile(true);
           setNotice("Generation outcome is uncertain. Reconcile by refreshing the output before starting another job.");
           return;
         }
-        waitMs = Math.min(Math.round(waitMs * 1.25), 5_000);
+        waitMs = nextPollWaitMs(waitMs);
       }
-      if (lastStatus === "queued" || lastStatus === "running") {
-        setNotice("Generation is still running on the server. This view stopped waiting after about two and a half minutes; reopen FounderBrain to keep checking. Do not start another job yet.");
-      } else {
+      const timeout = interpretPollTimeout(lastStatus);
+      if (timeout.kind === "still_running") setNotice(stillRunningNotice());
+      else {
         setJobNeedsReconcile(true);
-        setNotice("The job is not resolved in this view. Reopen FounderBrain to check it, or reconcile the output.");
+        setNotice(unresolvedJobNotice());
       }
     } catch (err) {
       if (epoch === sessionEpoch.current) {

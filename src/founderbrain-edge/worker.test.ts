@@ -32,6 +32,29 @@ test("mints a fresh X-Request-Id when the client omits one", async () => {
   assert.match(upstreamId ?? "", /^[0-9a-f-]{36}$/i);
   assert.equal(result.headers.get("x-request-id"), upstreamId);
 });
+test("rate limits bursty /api traffic per connecting IP", async () => {
+  let called = 0;
+  const worker = createFounderBrainWorker(async () => {
+    called += 1;
+    return new Response("{}");
+  });
+  const env = baseEnv();
+  let limited = 0;
+  for (let i = 0; i < 200; i += 1) {
+    const result = await worker.fetch(
+      new Request("https://app.example.test/api/config", { headers: { "CF-Connecting-IP": "203.0.113.9" } }),
+      env,
+    );
+    if (result.status === 429) {
+      limited += 1;
+      assert.ok(result.headers.get("retry-after"));
+      assert.equal((await result.json() as { error: string }).error, "rate_limited");
+      break;
+    }
+  }
+  assert.ok(limited >= 1, "expected a 429 within the burst");
+  assert.ok(called < 200);
+});
 test("refuses /api without the token header before touching the origin, except /api/config which the browser needs first", async () => {
   let called = 0;
   const worker = createFounderBrainWorker(async () => { called += 1; return new Response(JSON.stringify({ authMode: "hexclave" }), { headers: { "Content-Type": "application/json" } }); });

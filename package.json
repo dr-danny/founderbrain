@@ -34,7 +34,7 @@
     "fb:worker": "TZ=UTC tsx src/founderbrain/worker.ts",
     "fb:migrate": "TZ=UTC tsx src/founderbrain/migrate-main.ts",
     "fb:build": "tsc -p tsconfig.founderbrain.json && tsc -p tsconfig.founderbrain-web.json && vite build --config vite.founderbrain.config.ts && tsc -p tsconfig.founderbrain-runtime.json && node scripts/founderbrain-copy-sql.mjs",
-    "fb:test": "TZ=UTC node --import tsx --test --test-concurrency=1 src/founderbrain/*.test.ts src/founderbrain-edge/*.test.ts",
+    "fb:test": "TZ=UTC node --import tsx --test --test-concurrency=1 src/founderbrain/*.test.ts src/founderbrain-edge/*.test.ts src/founderbrain-web/lib/*.test.ts",
     "fb:preview": "vite --config vite.founderbrain.config.ts",
     "fb:reconcile": "TZ=UTC tsx src/founderbrain/reconcile-main.ts",
     "fb:local-db": "bash scripts/founderbrain-local-db.sh"

@@ -34,9 +34,25 @@ async function getPrivate(tx:Tx,workspace:string,sha:string):Promise<string>{
   if(!r[0])throw new DomainError(503,'artifact_unavailable','The saved artifact could not be retrieved.');
   return openBlob(workspace,unwrapDataKey(workspace,r[0].wrapped_key),sha,r[0].ciphertext,r[0].nonce).toString('utf8');
 }
+export type JobEventSink = (event: {
+  jobId: string;
+  workspaceId: string;
+  status: string;
+  providerRequestId?: string | null;
+  inputTokens?: number;
+  outputTokens?: number;
+  costMicroUsd?: number;
+  errorClass?: string;
+}) => void;
+
 export class BrainJobs {
   private dispatcher:ReturnType<typeof postgres>;
-  constructor(private store:PgBrainStore,private config:Config,private provider:Provider=anthropicProvider){this.dispatcher=postgres(config.DATABASE_URL,{max:1,onnotice:()=>{},connect_timeout:5});}
+  constructor(
+    private store:PgBrainStore,
+    private config:Config,
+    private provider:Provider=anthropicProvider,
+    private onEvent: JobEventSink = () => {},
+  ){this.dispatcher=postgres(config.DATABASE_URL,{max:1,onnotice:()=>{},connect_timeout:5});}
   async enqueue(workspace:string,expectedVersion:number,key:string):Promise<{id:string;status:string}>{
     if(this.config.AI_ENABLED!=='true')throw new DomainError(503,'ai_disabled','AI generation is not enabled. Your Brain can still be edited and exported.');
     const state=await this.store.read(workspace);
@@ -110,7 +126,9 @@ export class BrainJobs {
       const j=rows[0];if(!j)return null;
       if(j.status==='running' && new Date(j.lease_until).getTime()<Date.now()){
         await tx`update fb_ai_job set status='uncertain',fence=fence+1,error='Generation interrupted; spend needs operator reconciliation.' where founder_id=${workspace} and id=${j.id}`;
-        await tx`update fb_job_dispatch set status='uncertain' where job_id=${j.id}`;return null;
+        await tx`update fb_job_dispatch set status='uncertain' where job_id=${j.id}`;
+        this.onEvent({ jobId: j.id, workspaceId: workspace, status: 'uncertain', errorClass: 'lease_expired' });
+        return null;
       }
       if(j.status!=='queued')return null;
       const f=await tx`select version from founder where id=${workspace}`;
@@ -138,6 +156,15 @@ export class BrainJobs {
         await tx`update fb_ai_job set status='completed',provider_request_id=${result.requestId},lease_until=null where founder_id=${workspace} and id=${job.id} and fence=${job.fence}`;
         await tx`update fb_job_dispatch set status='completed',lease_until=null where job_id=${job.id}`;
       });
+      this.onEvent({
+        jobId: job.id,
+        workspaceId: workspace,
+        status: 'completed',
+        providerRequestId: result.requestId,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        costMicroUsd: cost,
+      });
     }catch(e){
       const knownNoCharge=(e as {knownNoCharge?:boolean})?.knownNoCharge===true;
       await this.store.scoped(workspace,async(tx:Tx)=>{
@@ -149,6 +176,12 @@ export class BrainJobs {
         const status=knownNoCharge?'failed':'uncertain';
         await tx`update fb_ai_job set status=${status},error=${knownNoCharge?'Provider refused the request. Contact the operator.':'Generation could not be verified. No automatic retry; spend is reserved for reconciliation.'},lease_until=null where founder_id=${workspace} and id=${job.id} and fence=${job.fence}`;
         await tx`update fb_job_dispatch set status=${status},lease_until=null where job_id=${job.id}`;
+      });
+      this.onEvent({
+        jobId: job.id,
+        workspaceId: workspace,
+        status: knownNoCharge ? 'failed' : 'uncertain',
+        errorClass: knownNoCharge ? 'provider_refused' : (e as Error)?.name ?? 'Error',
       });
     }
     return true;

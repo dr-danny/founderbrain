@@ -42,14 +42,14 @@ export class FounderBrainApi {
   private async fetchApi(path: string, init: RequestInit, timeout: number): Promise<Response> {
     const headers = await this.headers(init);
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeout);
+    const timer = globalThis.setTimeout(() => controller.abort(), timeout);
     try {
       return await fetch(`/api${path}`, { ...init, headers, signal: controller.signal, credentials: "omit", redirect: "error" });
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof DOMException && error.name === "AbortError") throw new ApiError(0, "timeout", "The request timed out. Your draft is still here. Check the saved version before retrying.");
       throw new ApiError(0, "network", "Network unavailable. Your draft is still here.");
-    } finally { window.clearTimeout(timer); }
+    } finally { globalThis.clearTimeout(timer); }
   }
 
   private async request<T>(path: string, init: RequestInit = {}, timeout = 12_000): Promise<T> {

@@ -16,6 +16,8 @@
  * The only thing this Worker knows about Hexclave is its API origin, and only so
  * the Content-Security-Policy can let the browser SDK talk to it.
  */
+import { EDGE_IP_LIMIT, SlidingWindowLimiter } from "../founderbrain/rate-limit.ts";
+
 export interface AssetFetcher { fetch(request: Request): Promise<Response>; }
 export interface FounderBrainEdgeEnv {
   ASSETS?: AssetFetcher;
@@ -64,6 +66,16 @@ function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
 }
 function response(body: BodyInit | null, status: number, env: FounderBrainEdgeEnv): Response { return new Response(body, { status, headers: securityHeaders(new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" }), env) }); }
 function isApi(pathname: string): boolean { return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`); }
+
+/** Per-isolate burst shield (#19). Not shared across Cloudflare isolates. */
+const edgeIpLimiter = new SlidingWindowLimiter(EDGE_IP_LIMIT);
+
+function clientIp(request: Request): string {
+  const cf = request.headers.get("cf-connecting-ip");
+  if (cf && /^[0-9a-fA-F:.]+$/.test(cf)) return cf;
+  return "unknown";
+}
+
 function mintRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   // Extremely defensive fallback; Workers and modern Node always have randomUUID.
@@ -90,14 +102,29 @@ export function createFounderBrainWorker(fetchImpl: FetchLike = fetch, options: 
   };
 }
 async function proxyApi(request: Request, env: FounderBrainEdgeEnv, fetchImpl: FetchLike, inbound: URL, timeoutMs: number, allowInsecureApiOrigin: boolean): Promise<Response> {
+  const requestId = mintRequestId();
+  const limited = edgeIpLimiter.take(`edge:${clientIp(request)}`);
+  if (!limited.allowed) {
+    const refused = response(JSON.stringify({ error: "rate_limited", message: "Too many requests. Wait a moment and try again." }), 429, env);
+    refused.headers.set("Retry-After", String(limited.retryAfterSec));
+    refused.headers.set(REQUEST_ID_HEADER, requestId);
+    return refused;
+  }
   const origin = validOrigin(env.API_ORIGIN, allowInsecureApiOrigin);
-  if (!origin || !env.ORIGIN_SECRET) return response(JSON.stringify({ error: "gateway_unavailable", message: "FounderBrain gateway is not configured." }), 503, env);
+  if (!origin || !env.ORIGIN_SECRET) {
+    const unavailable = response(JSON.stringify({ error: "gateway_unavailable", message: "FounderBrain gateway is not configured." }), 503, env);
+    unavailable.headers.set(REQUEST_ID_HEADER, requestId);
+    return unavailable;
+  }
   // `/api/config` is how the browser learns which Hexclave project to sign in to, so it is
   // the one path that must work before there is a token. The API guards it with the origin
   // secret and it contains nothing private.
-  if (inbound.pathname !== `${API_PREFIX}/config` && !request.headers.get(ACCESS_TOKEN_HEADER)) return response(JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }), 401, env);
+  if (inbound.pathname !== `${API_PREFIX}/config` && !request.headers.get(ACCESS_TOKEN_HEADER)) {
+    const auth = response(JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }), 401, env);
+    auth.headers.set(REQUEST_ID_HEADER, requestId);
+    return auth;
+  }
   const target = new URL(`${inbound.pathname}${inbound.search}`, origin);
-  const requestId = mintRequestId();
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const init: RequestInit = { method: request.method, headers: gatewayHeaders(request, env.ORIGIN_SECRET, requestId), redirect: "manual", signal: controller.signal };
