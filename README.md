@@ -1,3 +1,21 @@
+# FounderBrain
+
+The SaaS runs on three vendors: **Cloudflare** (a Worker for the edge, static assets), **Railway** (Fastify API, job worker, private Postgres) and **Hexclave** (identity; the platform formerly named Stack Auth). It is separate from the inherited single-owner Launchhouse app below.
+
+- [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
+- [API/domain contract](docs/founderbrain/CONTRACT.md)
+- Build: `npm run fb:build`
+- Tests: `npm run fb:test` (set `FB_TEST_DATABASE_URL` to a disposable Postgres to run the storage and API suites; they skip otherwise and say so)
+- Browser authentication checks: [local setup and commands](docs/founderbrain/RAILWAY-CLOUDFLARE.md#browser-regression-checks)
+- API: `railway.json` and `deploy/railway/Dockerfile`
+- Edge: `wrangler.jsonc` (no routes or workers.dev activation by default)
+
+Five guided missions, encrypted versioned Brain storage, per-founder workspace isolation keyed on the Hexclave user id, history/restore/export, and one private invitation-generation job. No publishing, CRM, shell tools or automatic deployments. AI is disabled until configured with approved budgets.
+
+**Sign-in** is Hexclave with a one-time code: a founder presses Sign in, types their email on Hexclave's hosted page, gets a code by email, and is in. No passwords. Invite-only is `allowSignUp: false` in `hexclave.config.ts`; the operator creates each pilot user. There is no sign-in form in this app. The browser SDK is confined to one module with analytics and session replays switched off, and the API verifies the Hexclave JWT itself on every request.
+
+## Inherited upstream reference
+
 # launchhouse-app
 
 The runtime. One Fastify process on a Replit Reserved VM. A founder signs in, talks to the
