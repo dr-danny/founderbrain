@@ -4,9 +4,9 @@
   "main":"src/founderbrain-edge/worker.ts",
   "compatibility_date":"2026-09-16",
   // No workers.dev URL, no preview URLs and no routes by default. Binding a hostname is a
-  // separate, approved traffic change. Cloudflare Access is then enabled on that hostname
-  // (or one-click on the Worker) with the One-time PIN identity provider and an Allow
-  // policy listing pilot emails. Access is configured in the Zero Trust dashboard, not here.
+  // separate, approved traffic change. Once bound, that hostname must also be added as a
+  // trusted domain in the Hexclave project, or the hosted sign-in page will refuse to
+  // redirect back to it. Sign-in itself is Hexclave's; this Worker only forwards tokens.
   "workers_dev":false,
   "preview_urls":false,
   "assets":{
@@ -16,7 +16,10 @@
     "run_worker_first":true
   },
   "vars":{
-    "API_ORIGIN":"https://replace-with-approved-railway-origin.invalid"
+    "API_ORIGIN":"https://replace-with-approved-railway-origin.invalid",
+    // Only used to allow the browser SDK in the Content-Security-Policy. Must match the API's
+    // HEXCLAVE_API_URL. Not a secret.
+    "HEXCLAVE_API_URL":"https://api.hexclave.com"
   }
   // ORIGIN_SECRET is a Worker secret (`wrangler secret put ORIGIN_SECRET`), never a var.
 }

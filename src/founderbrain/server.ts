@@ -37,9 +37,13 @@ export async function buildApi(config:Config,options:{store?:PgBrainStore;jobs?:
   const context=(req:FastifyRequest)=>{const c=contexts.get(req);if(!c)throw new DomainError(401,'sign_in_required','Sign in to continue.');return c;};
   app.get('/health/live',async()=>({ok:true,service:'founderbrain-api'}));
   app.get('/health/ready',async(_req,reply)=>{try{await store.scoped('00000000000000000000000000',async tx=>{await tx`select 1 from fb_ai_job limit 0`;});return {ok:true};}catch{reply.code(503);return {ok:false};}});
-  // Sign-in is Cloudflare Access in front of the Worker, so the browser needs no auth
-  // configuration at all. It only needs to know which mode it is in and where to sign out.
-  app.get('/api/config',async()=>({authMode:config.FOUNDERBRAIN_LOCAL_DEMO==='true'?'local-demo':'cloudflare-access',signOutPath:config.FOUNDERBRAIN_LOCAL_DEMO==='true'?null:'/cdn-cgi/access/logout',aiEnabled:config.AI_ENABLED==='true'}));
+  // The browser builds its Hexclave client from this, so one static bundle serves every
+  // environment. Everything here is public by design: the project id is in every token's
+  // audience and the publishable key is, as named, publishable. No secret is ever sent.
+  app.get('/api/config',async()=>{
+    const local=config.FOUNDERBRAIN_LOCAL_DEMO==='true';
+    return {authMode:local?'local-demo':'hexclave',hexclave:local?null:{projectId:config.HEXCLAVE_PROJECT_ID,apiUrl:new URL(config.HEXCLAVE_API_URL).origin,publishableClientKey:config.HEXCLAVE_PUBLISHABLE_CLIENT_KEY??null},aiEnabled:config.AI_ENABLED==='true'};
+  });
   /** Who am I, for the account display. The subject is never returned; it is a storage key. */
   app.get('/api/me',async req=>({email:context(req).email}));
   app.get('/api/brain',async req=>{

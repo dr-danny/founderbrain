@@ -11,11 +11,13 @@ export interface Brain {
 export interface Artifact { id: string; text: string; sourceVersion: number; sourceHash: string; inputHash: string; acceptedAt: string | null; createdAt: string; }
 export interface BrainState { workspaceId: string; version: number; sha: string; updatedAt: string | null; brain: Brain; readiness: { identity: boolean; customer: boolean; offer: boolean; voice: boolean; output: boolean }; verified: boolean; artifact?: Artifact | null; }
 /**
- * What the API tells the browser about its surroundings. Sign-in is Cloudflare Access in
- * front of the Worker, so there is nothing for the browser to configure: the session is a
- * cookie Cloudflare owns, and signing out is a navigation to `signOutPath`.
+ * What the API tells the browser about its surroundings. Sign-in is Hexclave, and the
+ * browser builds its Hexclave client from `hexclave` at runtime so one static bundle serves
+ * staging and production. Everything in here is public: the project id is in every token's
+ * audience and the publishable key is, as named, publishable.
  */
-export interface Config { authMode: "cloudflare-access" | "local-demo"; signOutPath: string | null; aiEnabled: boolean; }
+export interface HexclaveClientConfig { projectId: string; apiUrl: string; publishableClientKey: string | null; }
+export interface Config { authMode: "hexclave" | "local-demo"; hexclave: HexclaveClientConfig | null; aiEnabled: boolean; }
 export interface Me { email: string; }
 export interface HistoryItem { version: number; sha: string; at: string; }
 export interface Job { id: string; status: "queued" | "running" | "completed" | "failed" | "uncertain"; error?: string; artifact?: Artifact; }

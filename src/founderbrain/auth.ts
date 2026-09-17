@@ -1,31 +1,44 @@
 import { timingSafeEqual } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { FastifyRequest } from 'fastify';
-import type { Config } from './config.ts';
+import { hexclaveEndpoints, type Config } from './config.ts';
 import { DomainError } from './domain.ts';
 
 /**
  * src/founderbrain/auth.ts
  *
  * WHAT THIS IS
- *   Turns a request into an identity, or refuses. Cloudflare Access does the
- *   sign-in (One-time PIN to an allowed email) and puts a signed JWT on every
- *   request that reaches the Worker as `Cf-Access-Jwt-Assertion`. The Worker
- *   forwards it here. This module checks the signature against the team's JWKS
- *   and the claims against what we configured, and nothing else is trusted.
+ *   Turns a request into an identity, or refuses. Hexclave does the sign-in
+ *   (a one-time code emailed to an invited founder, on Hexclave's hosted page)
+ *   and the browser SDK hands us the resulting access token. The web app sends
+ *   it as `x-stack-access-token`, the Worker forwards that header and nothing
+ *   else, and this module checks the signature against the project's JWKS and
+ *   the claims against what we configured. Nothing else is trusted.
  *
- * WHY THE API VERIFIES AGAIN
- *   Access already checked the user before the Worker saw the request, and the
- *   Worker refuses `/api/*` without the header. Verifying here anyway means the
- *   API does not depend on the Worker being the only thing that can reach it.
- *   ORIGIN_SECRET guards the network path; this guards the identity. Both hold.
+ * WHY THE API VERIFIES ITSELF
+ *   The Worker refuses `/api/*` without the header, but presence is not proof.
+ *   Verifying here means the API does not depend on the Worker being the only
+ *   thing that can reach it. ORIGIN_SECRET guards the network path; this guards
+ *   the identity. Both hold. `jose` caches the JWKS, avoiding a network call on
+ *   each request. Cold starts, cache expiry and key rotation require a fetch;
+ *   an outage can therefore block verification even for an unexpired token.
  *
  * WHAT IDENTIFIES A FOUNDER
- *   `issuer|sub`. `sub` is Access's stable id for an email within our account.
- *   It is not the email, so the email can be shown but never used as a key. The
- *   caveat, written down in the docs: `sub` changes if a user is removed from the
- *   Zero Trust organisation and added again. That is an operator action with a
- *   recovery path, not something a founder can do to themselves.
+ *   `hexclave|<projectId>|<sub>`. `sub` is Hexclave's user id: stable for the
+ *   life of the user, not the email. The project id is in the key so two
+ *   Hexclave projects (staging, production) can never collide. The API hostname
+ *   is deliberately NOT in the key: the platform renamed from Stack Auth to
+ *   Hexclave and moved hosts once already, and a key that contained the host
+ *   would have orphaned every workspace.
+ *
+ * WHICH TOKENS ARE REFUSED
+ *   Hexclave issues three kinds of access token with different `iss` and `aud`:
+ *   regular (`.../projects/<id>`, aud `<id>`), anonymous
+ *   (`.../projects-anonymous-users/<id>`, aud `<id>:anon`) and restricted
+ *   (`.../projects-restricted-users/<id>`, aud `<id>:restricted`). Pinning issuer
+ *   and audience to the regular form refuses the other two by construction. The
+ *   `is_anonymous`, `is_restricted` and `email_verified` claims are checked as
+ *   well, so the intent is visible and a future token shape cannot slip past.
  */
 
 export interface Identity {
@@ -36,7 +49,8 @@ export interface Identity {
 }
 export type Authenticate = (request: FastifyRequest) => Promise<Identity>;
 
-export const ACCESS_JWT_HEADER = 'cf-access-jwt-assertion';
+/** The header the Hexclave docs use for a user's access token on your own backend. */
+export const ACCESS_TOKEN_HEADER = 'x-stack-access-token';
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -44,6 +58,10 @@ export function constantEqual(a: string, b: string): boolean {
   const aa = Buffer.from(a);
   const bb = Buffer.from(b);
   return aa.length === bb.length && timingSafeEqual(aa, bb);
+}
+
+export function workspaceSubject(projectId: string, sub: string): string {
+  return `hexclave|${projectId}|${sub}`;
 }
 
 export function createAuthenticator(config: Config): Authenticate {
@@ -58,29 +76,31 @@ export function createAuthenticator(config: Config): Authenticate {
     };
   }
 
-  const issuer = config.CF_ACCESS_TEAM_DOMAIN!.replace(/\/$/, '');
-  const audience = config.CF_ACCESS_AUD!;
-  const keys = createRemoteJWKSet(new URL(issuer + '/cdn-cgi/access/certs'), {
-    timeoutDuration: 5000,
-    cooldownDuration: 30000,
-  });
+  const projectId = config.HEXCLAVE_PROJECT_ID;
+  if (!projectId) throw new Error('HEXCLAVE_PROJECT_ID is required outside the local demo.');
+  const { issuer, jwks } = hexclaveEndpoints(config.HEXCLAVE_API_URL, projectId);
+  const keys = createRemoteJWKSet(jwks, { timeoutDuration: 5000, cooldownDuration: 30000 });
 
   return async (req) => {
-    const raw = req.headers[ACCESS_JWT_HEADER];
+    const raw = req.headers[ACCESS_TOKEN_HEADER];
     const token = Array.isArray(raw) ? raw[0] : raw;
     if (typeof token !== 'string' || token.length === 0) {
       throw new DomainError(401, 'sign_in_required', 'Sign in to continue.');
     }
     try {
-      const { payload } = await jwtVerify(token, keys, { issuer, audience, algorithms: ['RS256'], clockTolerance: 5 });
-      // A service token carries an empty `sub`. Only people get a workspace.
+      // Hexclave signs with ES256 only. Listing exactly that closes the algorithm
+      // confusion door: an HS256 token signed with the public key is refused.
+      const { payload } = await jwtVerify(token, keys, { issuer, audience: projectId, algorithms: ['ES256'], clockTolerance: 5 });
       if (typeof payload.sub !== 'string' || payload.sub.length === 0) throw new Error('No subject');
       if (!payload.exp) throw new Error('No expiry');
-      // `type` is `app` for an application token and `org` for the global session token.
-      if (payload.type !== undefined && payload.type !== 'app') throw new Error('Not an application token');
+      if (payload.is_anonymous === true) throw new Error('Anonymous session');
+      if (payload.is_restricted === true) throw new Error('Restricted user');
+      // Sign-in is a code emailed to the address, so a verified email is the
+      // norm. Refusing an unverified one is what makes email safe to display.
+      if (payload.email_verified !== true) throw new Error('Email not verified');
       const email = payload.email;
-      if (typeof email !== 'string' || !EMAIL_SHAPE.test(email)) throw new Error('No verified email');
-      return { subject: issuer + '|' + payload.sub, email: email.toLowerCase() };
+      if (typeof email !== 'string' || !EMAIL_SHAPE.test(email)) throw new Error('No email');
+      return { subject: workspaceSubject(projectId, payload.sub), email: email.toLowerCase() };
     } catch {
       throw new DomainError(401, 'invalid_session', 'Your session has expired or could not be verified. Sign in again.');
     }

@@ -5,13 +5,16 @@
  * ASSETS binding and proxies `/api/*` to one fixed Railway origin. It never chooses
  * an upstream from a request.
  *
- * SIGN-IN IS NOT HERE. Cloudflare Access sits in front of this Worker. By the time
- * a request arrives, Access has already shown the login page, sent the one-time
- * PIN, checked the email against the Allow policy, and attached a signed JWT as
- * `Cf-Access-Jwt-Assertion`. This Worker forwards that header to the API, which
- * verifies the signature itself. A request to `/api/*` with no Access header is
- * refused at the edge, because if Access is not in front of us something is
- * misconfigured and the safe answer is no.
+ * SIGN-IN IS NOT HERE. Hexclave does it: the browser SDK sends the founder to
+ * Hexclave's hosted page, they get a one-time code by email, and the SDK holds
+ * the resulting session. Every API call from the app carries the access token as
+ * `x-stack-access-token`. This Worker forwards that header to the API, which
+ * verifies the signature itself. A request to `/api/*` with no token header is
+ * refused at the edge, because there is nothing the origin could do with it and
+ * the safe answer is no.
+ *
+ * The only thing this Worker knows about Hexclave is its API origin, and only so
+ * the Content-Security-Policy can let the browser SDK talk to it.
  */
 export interface AssetFetcher { fetch(request: Request): Promise<Response>; }
 export interface FounderBrainEdgeEnv {
@@ -20,14 +23,16 @@ export interface FounderBrainEdgeEnv {
   API_ORIGIN?: string;
   /** Shared with the API. Proves a request came through this Worker. */
   ORIGIN_SECRET?: string;
+  /** Hexclave API origin, e.g. `https://api.hexclave.com`. Allowed in `connect-src` and nothing more. */
+  HEXCLAVE_API_URL?: string;
 }
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 const API_PREFIX = "/api";
 const REQUEST_TIMEOUT_MS = 10_000;
-/** The header Cloudflare Access adds to every authenticated request. */
-export const ACCESS_JWT_HEADER = "cf-access-jwt-assertion";
+/** The header the web app puts the Hexclave access token in. Same name the API reads. */
+export const ACCESS_TOKEN_HEADER = "x-stack-access-token";
 /** Request headers that may cross from the browser to the API. Everything else is dropped. */
-const FORWARDED_HEADERS = [ACCESS_JWT_HEADER, "content-type", "accept", "origin", "x-request-id"] as const;
+const FORWARDED_HEADERS = [ACCESS_TOKEN_HEADER, "content-type", "accept", "origin", "x-request-id"] as const;
 
 function validOrigin(value: string | undefined, allowInsecure = false): URL | null {
   if (!value) return null;
@@ -37,17 +42,25 @@ function validOrigin(value: string | undefined, allowInsecure = false): URL | nu
     return permittedProtocol && !parsed.username && !parsed.password && !parsed.search && !parsed.hash && parsed.pathname === "/" ? parsed : null;
   } catch { return null; }
 }
-function securityHeaders(headers: Headers): Headers {
+/**
+ * `connect-src` is same-origin plus the Hexclave API origin, because the browser SDK
+ * fetches tokens and the user from there. If the variable is missing or malformed the
+ * policy stays `'self'` alone: sign-in then fails visibly in the browser rather than
+ * the edge quietly widening the policy to whatever string it was given.
+ */
+function connectSources(env: FounderBrainEdgeEnv): string {
+  const hexclave = validOrigin(env.HEXCLAVE_API_URL);
+  return hexclave ? `'self' ${hexclave.origin}` : "'self'";
+}
+function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
   const result = new Headers(headers);
   result.set("X-Content-Type-Options", "nosniff"); result.set("X-Frame-Options", "DENY"); result.set("Referrer-Policy", "no-referrer");
   result.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
   result.set("Cross-Origin-Opener-Policy", "same-origin"); result.set("Cross-Origin-Resource-Policy", "same-origin");
-  // connect-src is same-origin only. The Access login page lives on Cloudflare's own
-  // hostname and is reached by a full navigation, never by a fetch from this app.
-  result.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'");
+  result.set("Content-Security-Policy", `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ${connectSources(env)}`);
   return result;
 }
-function response(body: BodyInit | null, status: number): Response { return new Response(body, { status, headers: securityHeaders(new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" })) }); }
+function response(body: BodyInit | null, status: number, env: FounderBrainEdgeEnv): Response { return new Response(body, { status, headers: securityHeaders(new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" }), env) }); }
 function isApi(pathname: string): boolean { return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`); }
 function gatewayHeaders(request: Request, secret: string): Headers {
   const headers = new Headers();
@@ -67,29 +80,32 @@ export function createFounderBrainWorker(fetchImpl: FetchLike = fetch, options: 
 }
 async function proxyApi(request: Request, env: FounderBrainEdgeEnv, fetchImpl: FetchLike, inbound: URL, timeoutMs: number, allowInsecureApiOrigin: boolean): Promise<Response> {
   const origin = validOrigin(env.API_ORIGIN, allowInsecureApiOrigin);
-  if (!origin || !env.ORIGIN_SECRET) return response(JSON.stringify({ error: "gateway_unavailable", message: "FounderBrain gateway is not configured." }), 503);
-  if (!request.headers.get(ACCESS_JWT_HEADER)) return response(JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }), 401);
+  if (!origin || !env.ORIGIN_SECRET) return response(JSON.stringify({ error: "gateway_unavailable", message: "FounderBrain gateway is not configured." }), 503, env);
+  // `/api/config` is how the browser learns which Hexclave project to sign in to, so it is
+  // the one path that must work before there is a token. The API guards it with the origin
+  // secret and it contains nothing private.
+  if (inbound.pathname !== `${API_PREFIX}/config` && !request.headers.get(ACCESS_TOKEN_HEADER)) return response(JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }), 401, env);
   const target = new URL(`${inbound.pathname}${inbound.search}`, origin);
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const init: RequestInit = { method: request.method, headers: gatewayHeaders(request, env.ORIGIN_SECRET), redirect: "manual", signal: controller.signal };
     if (request.method !== "GET" && request.method !== "HEAD") init.body = request.body;
     const upstream = await fetchImpl(target, init);
-    if (upstream.status >= 300 && upstream.status < 400) return response(JSON.stringify({ error: "upstream_redirect", message: "The API returned an unsupported redirect." }), 502);
-    const headers = securityHeaders(upstream.headers); headers.set("Cache-Control", "private, no-store");
+    if (upstream.status >= 300 && upstream.status < 400) return response(JSON.stringify({ error: "upstream_redirect", message: "The API returned an unsupported redirect." }), 502, env);
+    const headers = securityHeaders(upstream.headers, env); headers.set("Cache-Control", "private, no-store");
     return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers });
   } catch (error) {
     const timedOut = controller.signal.aborted; const message = timedOut ? "FounderBrain API timed out." : "FounderBrain API is unavailable.";
-    return response(JSON.stringify({ error: timedOut ? "gateway_timeout" : "gateway_unavailable", message }), timedOut ? 504 : 502);
+    return response(JSON.stringify({ error: timedOut ? "gateway_timeout" : "gateway_unavailable", message }), timedOut ? 504 : 502, env);
   } finally { clearTimeout(timeout); }
 }
 async function serveAsset(request: Request, env: FounderBrainEdgeEnv): Promise<Response> {
-  if (!env.ASSETS) return new Response("FounderBrain assets are unavailable.", { status: 503, headers: securityHeaders(new Headers({ "Content-Type": "text/plain" })) });
+  if (!env.ASSETS) return new Response("FounderBrain assets are unavailable.", { status: 503, headers: securityHeaders(new Headers({ "Content-Type": "text/plain" }), env) });
   let asset = await env.ASSETS.fetch(request);
   if (asset.status === 404 && (request.method === "GET" || request.method === "HEAD") && request.headers.get("accept")?.includes("text/html")) {
     const index = new URL("/index.html", request.url); asset = await env.ASSETS.fetch(new Request(index, { method: request.method, headers: request.headers }));
   }
-  return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers: securityHeaders(asset.headers) });
+  return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers: securityHeaders(asset.headers, env) });
 }
 
 export default createFounderBrainWorker();
