@@ -29,7 +29,11 @@ export function interpretPollTimeout(lastStatus: JobStatus | null): PollOutcome 
 }
 
 export function stillRunningNotice(): string {
-  return "Generation is still running on the server. This view stopped waiting after about two and a half minutes; reopen FounderBrain to keep checking. Do not start another job yet.";
+  return (
+    "Generation is still running on the server. This view stopped waiting after " +
+    "about two and a half minutes; reopen FounderBrain to keep checking. " +
+    "Do not start another job yet."
+  );
 }
 
 export function unresolvedJobNotice(): string {

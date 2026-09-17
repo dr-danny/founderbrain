@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { emptyBrain } from "../types";
-import {
-  brainsEqual,
-  nextSaveOperation,
-  patchBrain,
-  settleSaveDecision,
-} from "./brain-draft.ts";
+import { brainsEqual, nextSaveOperation, patchBrain, settleSaveDecision } from "./brain-draft.ts";
 import {
   interpretJobStatus,
   interpretPollTimeout,
@@ -59,7 +54,11 @@ test("settleSaveDecision keeps local edits when draft moved on during save", () 
     readiness: { identity: false, customer: false, offer: false, voice: false, output: false },
     verified: true,
   };
-  const decision = settleSaveDecision(latest, saved, { brain: sent, expectedVersion: 2, key: "k2" });
+  const decision = settleSaveDecision(latest, saved, {
+    brain: sent,
+    expectedVersion: 2,
+    key: "k2",
+  });
   assert.equal(decision.changed, true);
   assert.equal(decision.nextDraft.identity.name, "Ada Lovelace");
   assert.match(decision.notice, /New local edits remain unsaved/);

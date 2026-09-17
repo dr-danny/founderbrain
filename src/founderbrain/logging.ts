@@ -1,3 +1,11 @@
+/**
+ * src/founderbrain/logging.ts
+ *
+ * WHAT THIS IS. Pino for FounderBrain API and worker. Redacts Brain text, tokens, and keys.
+ *
+ * WHY IT EXISTS. console.log is banned under src/; structured logs are what operators read.
+ * Level comes from the caller (usually Config / boot), never from process.env here.
+ */
 import { createHash } from "node:crypto";
 import pino, { type Logger } from "pino";
 
@@ -6,11 +14,7 @@ export function subjectLogHash(subject: string): string {
   return createHash("sha256").update(subject).digest("hex").slice(0, 16);
 }
 
-/**
- * Pino for FounderBrain. Redacts anything that could be Brain text, tokens, or keys.
- * Request metadata (method, path, status, latency, request id, subject hash) is fine.
- */
-export function createFounderBrainLogger(service: "api" | "worker", level = process.env.LOG_LEVEL ?? "info"): Logger {
+export function createFounderBrainLogger(service: "api" | "worker", level = "info"): Logger {
   return pino({
     level,
     base: { service: `founderbrain-${service}` },
@@ -18,8 +22,8 @@ export function createFounderBrainLogger(service: "api" | "worker", level = proc
       paths: [
         "req.headers.authorization",
         "req.headers.cookie",
-        "req.headers[\"x-stack-access-token\"]",
-        "req.headers[\"x-founderbrain-origin\"]",
+        'req.headers["x-stack-access-token"]',
+        'req.headers["x-founderbrain-origin"]',
         "req.body",
         "brain",
         "prompt",

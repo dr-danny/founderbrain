@@ -37,6 +37,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --include=dev --ignore-scripts --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run fb:check-runtime-deps
       - name: Create restricted disposable runtime roles
         run: |
           psql "$MIGRATION_DATABASE_URL" -c "CREATE ROLE fb_runtime LOGIN PASSWORD 'ci-runtime-only' NOSUPERUSER NOBYPASSRLS;"

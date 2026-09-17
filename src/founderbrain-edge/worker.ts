@@ -18,7 +18,9 @@
  */
 import { EDGE_IP_LIMIT, SlidingWindowLimiter } from "../founderbrain/rate-limit.ts";
 
-export interface AssetFetcher { fetch(request: Request): Promise<Response>; }
+export interface AssetFetcher {
+  fetch(request: Request): Promise<Response>;
+}
 export interface FounderBrainEdgeEnv {
   ASSETS?: AssetFetcher;
   /** Exact HTTPS origin of the Railway API. Nothing after the host. */
@@ -42,9 +44,22 @@ function validOrigin(value: string | undefined, allowInsecure = false): URL | nu
   if (!value) return null;
   try {
     const parsed = new URL(value);
-    const permittedProtocol = parsed.protocol === "https:" || (allowInsecure && parsed.protocol === "http:" && (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost"));
-    return permittedProtocol && !parsed.username && !parsed.password && !parsed.search && !parsed.hash && parsed.pathname === "/" ? parsed : null;
-  } catch { return null; }
+    const permittedProtocol =
+      parsed.protocol === "https:" ||
+      (allowInsecure &&
+        parsed.protocol === "http:" &&
+        (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost"));
+    return permittedProtocol &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash &&
+      parsed.pathname === "/"
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
 }
 /**
  * `connect-src` is same-origin plus the Hexclave API origin, because the browser SDK
@@ -58,14 +73,40 @@ function connectSources(env: FounderBrainEdgeEnv): string {
 }
 function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
   const result = new Headers(headers);
-  result.set("X-Content-Type-Options", "nosniff"); result.set("X-Frame-Options", "DENY"); result.set("Referrer-Policy", "no-referrer");
+  result.set("X-Content-Type-Options", "nosniff");
+  result.set("X-Frame-Options", "DENY");
+  result.set("Referrer-Policy", "no-referrer");
   result.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-  result.set("Cross-Origin-Opener-Policy", "same-origin"); result.set("Cross-Origin-Resource-Policy", "same-origin");
-  result.set("Content-Security-Policy", `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ${connectSources(env)}`);
+  result.set("Cross-Origin-Opener-Policy", "same-origin");
+  result.set("Cross-Origin-Resource-Policy", "same-origin");
+  result.set(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data:",
+      `connect-src ${connectSources(env)}`,
+    ].join("; "),
+  );
   return result;
 }
-function response(body: BodyInit | null, status: number, env: FounderBrainEdgeEnv): Response { return new Response(body, { status, headers: securityHeaders(new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" }), env) }); }
-function isApi(pathname: string): boolean { return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`); }
+function response(body: BodyInit | null, status: number, env: FounderBrainEdgeEnv): Response {
+  return new Response(body, {
+    status,
+    headers: securityHeaders(
+      new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" }),
+      env,
+    ),
+  });
+}
+function isApi(pathname: string): boolean {
+  return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
+}
 
 /** Per-isolate burst shield (#19). Not shared across Cloudflare isolates. */
 const edgeIpLimiter = new SlidingWindowLimiter(EDGE_IP_LIMIT);
@@ -77,7 +118,8 @@ function clientIp(request: Request): string {
 }
 
 function mintRequestId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    return crypto.randomUUID();
   // Extremely defensive fallback; Workers and modern Node always have randomUUID.
   return `fb-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 }
@@ -92,27 +134,59 @@ function gatewayHeaders(request: Request, secret: string, requestId: string): He
   return headers;
 }
 
-export function createFounderBrainWorker(fetchImpl: FetchLike = fetch, options: { timeoutMs?: number; allowInsecureApiOrigin?: boolean } = {}) {
+export function createFounderBrainWorker(
+  fetchImpl: FetchLike = fetch,
+  options: { timeoutMs?: number; allowInsecureApiOrigin?: boolean } = {},
+) {
   return {
     async fetch(request: Request, env: FounderBrainEdgeEnv): Promise<Response> {
       const inbound = new URL(request.url);
-      if (isApi(inbound.pathname)) return proxyApi(request, env, fetchImpl, inbound, options.timeoutMs ?? REQUEST_TIMEOUT_MS, options.allowInsecureApiOrigin === true);
+      if (isApi(inbound.pathname))
+        return proxyApi(
+          request,
+          env,
+          fetchImpl,
+          inbound,
+          options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+          options.allowInsecureApiOrigin === true,
+        );
       return serveAsset(request, env);
     },
   };
 }
-async function proxyApi(request: Request, env: FounderBrainEdgeEnv, fetchImpl: FetchLike, inbound: URL, timeoutMs: number, allowInsecureApiOrigin: boolean): Promise<Response> {
+async function proxyApi(
+  request: Request,
+  env: FounderBrainEdgeEnv,
+  fetchImpl: FetchLike,
+  inbound: URL,
+  timeoutMs: number,
+  allowInsecureApiOrigin: boolean,
+): Promise<Response> {
   const requestId = mintRequestId();
   const limited = edgeIpLimiter.take(`edge:${clientIp(request)}`);
   if (!limited.allowed) {
-    const refused = response(JSON.stringify({ error: "rate_limited", message: "Too many requests. Wait a moment and try again." }), 429, env);
+    const refused = response(
+      JSON.stringify({
+        error: "rate_limited",
+        message: "Too many requests. Wait a moment and try again.",
+      }),
+      429,
+      env,
+    );
     refused.headers.set("Retry-After", String(limited.retryAfterSec));
     refused.headers.set(REQUEST_ID_HEADER, requestId);
     return refused;
   }
   const origin = validOrigin(env.API_ORIGIN, allowInsecureApiOrigin);
   if (!origin || !env.ORIGIN_SECRET) {
-    const unavailable = response(JSON.stringify({ error: "gateway_unavailable", message: "FounderBrain gateway is not configured." }), 503, env);
+    const unavailable = response(
+      JSON.stringify({
+        error: "gateway_unavailable",
+        message: "FounderBrain gateway is not configured.",
+      }),
+      503,
+      env,
+    );
     unavailable.headers.set(REQUEST_ID_HEADER, requestId);
     return unavailable;
   }
@@ -120,39 +194,82 @@ async function proxyApi(request: Request, env: FounderBrainEdgeEnv, fetchImpl: F
   // the one path that must work before there is a token. The API guards it with the origin
   // secret and it contains nothing private.
   if (inbound.pathname !== `${API_PREFIX}/config` && !request.headers.get(ACCESS_TOKEN_HEADER)) {
-    const auth = response(JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }), 401, env);
+    const auth = response(
+      JSON.stringify({ error: "sign_in_required", message: "Sign in to continue." }),
+      401,
+      env,
+    );
     auth.headers.set(REQUEST_ID_HEADER, requestId);
     return auth;
   }
   const target = new URL(`${inbound.pathname}${inbound.search}`, origin);
-  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const init: RequestInit = { method: request.method, headers: gatewayHeaders(request, env.ORIGIN_SECRET, requestId), redirect: "manual", signal: controller.signal };
+    const init: RequestInit = {
+      method: request.method,
+      headers: gatewayHeaders(request, env.ORIGIN_SECRET, requestId),
+      redirect: "manual",
+      signal: controller.signal,
+    };
     if (request.method !== "GET" && request.method !== "HEAD") init.body = request.body;
     const upstream = await fetchImpl(target, init);
     if (upstream.status >= 300 && upstream.status < 400) {
-      const refused = response(JSON.stringify({ error: "upstream_redirect", message: "The API returned an unsupported redirect." }), 502, env);
+      const refused = response(
+        JSON.stringify({
+          error: "upstream_redirect",
+          message: "The API returned an unsupported redirect.",
+        }),
+        502,
+        env,
+      );
       refused.headers.set(REQUEST_ID_HEADER, requestId);
       return refused;
     }
     const headers = securityHeaders(upstream.headers, env);
     headers.set("Cache-Control", "private, no-store");
     headers.set(REQUEST_ID_HEADER, requestId);
-    return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers });
-  } catch (error) {
-    const timedOut = controller.signal.aborted; const message = timedOut ? "FounderBrain API timed out." : "FounderBrain API is unavailable.";
-    const failed = response(JSON.stringify({ error: timedOut ? "gateway_timeout" : "gateway_unavailable", message }), timedOut ? 504 : 502, env);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers,
+    });
+  } catch {
+    const timedOut = controller.signal.aborted;
+    const message = timedOut ? "FounderBrain API timed out." : "FounderBrain API is unavailable.";
+    const failed = response(
+      JSON.stringify({ error: timedOut ? "gateway_timeout" : "gateway_unavailable", message }),
+      timedOut ? 504 : 502,
+      env,
+    );
     failed.headers.set(REQUEST_ID_HEADER, requestId);
     return failed;
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 async function serveAsset(request: Request, env: FounderBrainEdgeEnv): Promise<Response> {
-  if (!env.ASSETS) return new Response("FounderBrain assets are unavailable.", { status: 503, headers: securityHeaders(new Headers({ "Content-Type": "text/plain" }), env) });
+  if (!env.ASSETS)
+    return new Response("FounderBrain assets are unavailable.", {
+      status: 503,
+      headers: securityHeaders(new Headers({ "Content-Type": "text/plain" }), env),
+    });
   let asset = await env.ASSETS.fetch(request);
-  if (asset.status === 404 && (request.method === "GET" || request.method === "HEAD") && request.headers.get("accept")?.includes("text/html")) {
-    const index = new URL("/index.html", request.url); asset = await env.ASSETS.fetch(new Request(index, { method: request.method, headers: request.headers }));
+  if (
+    asset.status === 404 &&
+    (request.method === "GET" || request.method === "HEAD") &&
+    request.headers.get("accept")?.includes("text/html")
+  ) {
+    const index = new URL("/index.html", request.url);
+    asset = await env.ASSETS.fetch(
+      new Request(index, { method: request.method, headers: request.headers }),
+    );
   }
-  return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers: securityHeaders(asset.headers, env) });
+  return new Response(asset.body, {
+    status: asset.status,
+    statusText: asset.statusText,
+    headers: securityHeaders(asset.headers, env),
+  });
 }
 
 export default createFounderBrainWorker();

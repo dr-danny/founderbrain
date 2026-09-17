@@ -9,27 +9,43 @@ import { z } from "zod";
 const text = z.string().max(2000);
 const section = { approved: z.boolean() };
 
-export const brainSchema = z.object({
-  schemaVersion: z.literal(1),
-  identity: z
-    .object({ name: text, venture: text, role: text, stage: z.enum(["exploring", "building", "launched", "growing"]), goal: text, ...section })
-    .strict(),
-  customer: z
-    .object({
-      segment: text,
-      problem: text,
-      outcome: text,
-      workaround: text,
-      evidenceStatus: z.enum(["hypothesis", "supported"]),
-      evidence: text,
-      ...section,
-    })
-    .strict(),
-  offer: z
-    .object({ description: text, delivery: text, outcome: text, cta: text, price: text, ...section })
-    .strict(),
-  voice: z.object({ tone: text, boundaries: text, sample: text, ...section }).strict(),
-}).strict();
+export const brainSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    identity: z
+      .object({
+        name: text,
+        venture: text,
+        role: text,
+        stage: z.enum(["exploring", "building", "launched", "growing"]),
+        goal: text,
+        ...section,
+      })
+      .strict(),
+    customer: z
+      .object({
+        segment: text,
+        problem: text,
+        outcome: text,
+        workaround: text,
+        evidenceStatus: z.enum(["hypothesis", "supported"]),
+        evidence: text,
+        ...section,
+      })
+      .strict(),
+    offer: z
+      .object({
+        description: text,
+        delivery: text,
+        outcome: text,
+        cta: text,
+        price: text,
+        ...section,
+      })
+      .strict(),
+    voice: z.object({ tone: text, boundaries: text, sample: text, ...section }).strict(),
+  })
+  .strict();
 
 export type Brain = z.infer<typeof brainSchema>;
 export type Stage = Brain["identity"]["stage"];
@@ -95,7 +111,9 @@ export function emptyBrain(): Brain {
 
 /** Non-empty and not a placeholder the contract rejects (`unknown`, `n/a`, `tbd`, `not sure`). */
 export function present(...values: string[]): boolean {
-  return values.every((v) => v.trim().length > 0 && !/^(unknown|n\/a|tbd|not sure)$/i.test(v.trim()));
+  return values.every(
+    (v) => v.trim().length > 0 && !/^(unknown|n\/a|tbd|not sure)$/i.test(v.trim()),
+  );
 }
 
 export function isPlaceholder(value: string): boolean {
@@ -111,11 +129,20 @@ export function fieldNeedsAttention(value: string): boolean {
  * Section readiness. `sourceHash` is optional so the browser can hint without hashing;
  * when omitted, `output` is false even if an artifact exists.
  */
-export function readiness(brain: Brain, artifact?: Artifact | null, sourceHash?: string | null): Readiness {
+export function readiness(
+  brain: Brain,
+  artifact?: Artifact | null,
+  sourceHash?: string | null,
+): Readiness {
   return {
     identity:
       brain.identity.approved &&
-      present(brain.identity.name, brain.identity.venture, brain.identity.role, brain.identity.goal),
+      present(
+        brain.identity.name,
+        brain.identity.venture,
+        brain.identity.role,
+        brain.identity.goal,
+      ),
     customer:
       brain.customer.approved &&
       present(brain.customer.segment, brain.customer.problem, brain.customer.outcome) &&
@@ -123,7 +150,8 @@ export function readiness(brain: Brain, artifact?: Artifact | null, sourceHash?:
     offer:
       brain.offer.approved &&
       present(brain.offer.description, brain.offer.delivery, brain.offer.outcome, brain.offer.cta),
-    voice: brain.voice.approved && present(brain.voice.tone, brain.voice.boundaries, brain.voice.sample),
+    voice:
+      brain.voice.approved && present(brain.voice.tone, brain.voice.boundaries, brain.voice.sample),
     output: Boolean(artifact?.acceptedAt && sourceHash && artifact.sourceHash === sourceHash),
   };
 }

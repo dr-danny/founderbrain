@@ -11,11 +11,11 @@
  *   1. `shell: true` never appears anywhere. ge is spawned with an argv array, so anything
  *      a founder types arrives as one argument and cannot be read as shell. That is the
  *      injection boundary and it is one property on one call.
- *   2. process.env is read in exactly one place, src/server/env.ts. Anywhere else and a
+ *   2. process.env is read in exactly one place per product surface: src/server/env.ts for
+ *      Launchhouse, src/founderbrain/config.ts for FounderBrain. Anywhere else and a
  *      missing variable is found at 3am instead of at boot.
- *   3. fetch against a vendor happens in exactly one function. Every founder credential
- *      flows through it, and the read back, the ledger write, the audit row and the rate
- *      limit all live there. A second call site is a second place with none of that.
+ *   3. fetch against a vendor happens in exactly one function per surface. Launchhouse uses
+ *      src/server/integrations/http.ts; FounderBrain uses src/founderbrain/provider.ts.
  *   4. Inside the GoHighLevel modules, nothing formats a date except the one conversion
  *      function. The founder means 09:30 where they are. If any other file reaches for
  *      toISOString, a post lands at the wrong hour for 130 people.
@@ -67,7 +67,15 @@ const NOT_THE_APP = [
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "vendor/**", "coverage/**", "**/*.d.ts"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "vendor/**",
+      "coverage/**",
+      "**/*.d.ts",
+      // Node CLIs for local DB fixtures; not application code.
+      "scripts/**/*.mjs",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -80,9 +88,9 @@ export default tseslint.config(
     },
   },
   {
-    // Rule 2. process.env is read once, at boot, and checked there.
+    // Rule 2. process.env is read once per product surface, at boot, and checked there.
     files: ["src/**/*.ts", "src/**/*.tsx", "app/**/*.ts"],
-    ignores: ["src/server/env.ts"],
+    ignores: ["src/server/env.ts", "src/founderbrain/config.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -90,7 +98,7 @@ export default tseslint.config(
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
           message:
-            "Read the environment through src/server/env.ts. It validates at boot, names the variable when it fails, and keeps secrets out of logs. Values read after boot come from lateSettings().",
+            "Read the environment through src/server/env.ts (Launchhouse) or src/founderbrain/config.ts (FounderBrain). It validates at boot, names the variable when it fails, and keeps secrets out of logs. Values read after boot come from lateSettings().",
         },
       ],
     },
@@ -128,6 +136,33 @@ export default tseslint.config(
           { name: "node:http", message: "Vendor calls go through vendorFetch in src/server/integrations/http.ts." },
           { name: "node:https", message: "Vendor calls go through vendorFetch in src/server/integrations/http.ts." },
         ] },
+      ],
+    },
+  },
+  {
+    // FounderBrain Rule 3. Anthropic (and any future vendor) is called only from provider.ts.
+    files: ["src/founderbrain/**/*.ts"],
+    ignores: ["src/founderbrain/provider.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "fetch",
+          message:
+            "Vendor calls go through anthropicProvider in src/founderbrain/provider.ts, which is the only FounderBrain module that calls a vendor host.",
+        },
+      ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            { name: "axios", message: "Vendor calls go through src/founderbrain/provider.ts." },
+            { name: "got", message: "Vendor calls go through src/founderbrain/provider.ts." },
+            { name: "undici", message: "Vendor calls go through src/founderbrain/provider.ts." },
+            { name: "node:http", message: "Vendor calls go through src/founderbrain/provider.ts." },
+            { name: "node:https", message: "Vendor calls go through src/founderbrain/provider.ts." },
+          ],
+        },
       ],
     },
   },

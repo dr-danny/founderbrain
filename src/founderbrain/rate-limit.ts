@@ -19,7 +19,10 @@ export type RateLimitResult =
 export class SlidingWindowLimiter {
   private readonly hits = new Map<string, number[]>();
 
-  constructor(private readonly cfg: RateLimitConfig, private readonly now: () => number = () => Date.now()) {}
+  constructor(
+    private readonly cfg: RateLimitConfig,
+    private readonly now: () => number = () => Date.now(),
+  ) {}
 
   check(key: string): RateLimitResult {
     const now = this.now();
@@ -72,6 +75,7 @@ export const MUTATION_PATHS = new Set([
 
 export function mutationKey(method: string, path: string): string {
   const bare = path.split("?")[0] ?? path;
-  if (method === "POST" && /^\/api\/artifact\/[^/]+\/accept$/.test(bare)) return "POST /api/artifact/:id/accept";
+  if (method === "POST" && /^\/api\/artifact\/[^/]+\/accept$/.test(bare))
+    return "POST /api/artifact/:id/accept";
   return `${method} ${bare}`;
 }
