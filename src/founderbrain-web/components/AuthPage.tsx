@@ -111,7 +111,7 @@ export function AuthPage(props: AuthPageProps) {
     // An expiry mid-edit does NOT come here: the draft stays on screen with a banner instead.
     return (
       <EntryShell
-        kicker="Private workspace · Atlanta"
+        kicker="Automated setup · Atlanta"
         title={
           props.sessionExpired
             ? "Your sign-in has expired."
@@ -136,7 +136,7 @@ export function AuthPage(props: AuthPageProps) {
   // We have a session claim but the API has not confirmed it yet, or refused it.
   return (
     <EntryShell
-      kicker="Private workspace"
+      kicker="Automated setup"
       title="Checking your sign-in…"
       lede="One moment. Your workspace is private to the email you signed in with."
       error={props.error}
