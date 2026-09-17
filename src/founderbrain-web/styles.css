@@ -1,11 +1,14 @@
 :root {
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  --ink: #120c14;
+  --ink-soft: #1a121c;
+  --paper: #f7efe6;
+  --paper-muted: #d8cbbd;
+  --ember: #e0894a;
+  --ember-deep: #c45d2e;
+  --font-brand: "Syne", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
+  --font-body: "Figtree", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   color: #111;
   background: #f4f6f9;
   font-synthesis: none;
@@ -564,43 +567,263 @@ select:focus-visible {
   background: #8f231d;
   color: #fff;
 }
+
+/* —— Entry / auth stage: full-bleed Atlanta, split editorial panel —— */
+.entry-stage {
+  --entry-pad: clamp(1.5rem, 4vw, 3.5rem);
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  overflow: hidden;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.entry-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.entry-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 58% 42%;
+  transform: scale(1.08);
+  animation: entry-drift 18s ease-out forwards;
+}
+
+.entry-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      105deg,
+      rgba(18, 12, 20, 0.92) 0%,
+      rgba(18, 12, 20, 0.78) 34%,
+      rgba(18, 12, 20, 0.28) 58%,
+      rgba(18, 12, 20, 0.12) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(18, 12, 20, 0.2) 0%,
+      transparent 28%,
+      transparent 62%,
+      rgba(18, 12, 20, 0.55) 100%
+    );
+}
+
+.entry-panel {
+  position: relative;
+  z-index: 2;
+  grid-column: 1;
+  align-self: end;
+  width: min(100%, 34rem);
+  padding: var(--entry-pad);
+  padding-bottom: clamp(2rem, 6vh, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry-brand-block {
+  margin-bottom: 1.75rem;
+}
+
+.entry-brand {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 5.4vw, 3.6rem);
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+  color: var(--paper);
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+
+.entry-product {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ember);
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.entry-product span {
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.entry-kicker {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
+}
+
+.entry-title {
+  margin: 0;
+  max-width: 14ch;
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: clamp(2.35rem, 5.2vw, 3.55rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.entry-lede {
+  margin: 1.15rem 0 0;
+  max-width: 34ch;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--paper-muted);
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.26s both;
+}
+
+.entry-cta {
+  margin-top: 1.85rem;
+  appearance: none;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  padding: 0.95rem 1.45rem;
+  min-height: 3.15rem;
+  border-radius: 2px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+  animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
+}
+
+.entry-cta:hover {
+  background: var(--ember);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.entry-cta:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}
+
+.entry-notice,
+.entry-error {
+  margin: 1.1rem 0 0;
+  max-width: 36ch;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  animation: entry-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry-notice {
+  color: var(--paper-muted);
+}
+
+.entry-error {
+  color: #ffb4a8;
+}
+
+@keyframes entry-drift {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes entry-rise {
+  from {
+    transform: translateY(18px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-photo,
+  .entry-panel,
+  .entry-brand,
+  .entry-product,
+  .entry-kicker,
+  .entry-title,
+  .entry-lede,
+  .entry-cta,
+  .entry-notice,
+  .entry-error {
+    animation: none;
+  }
+  .entry-photo {
+    transform: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .entry-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-veil {
+    background: linear-gradient(
+      180deg,
+      rgba(18, 12, 20, 0.35) 0%,
+      rgba(18, 12, 20, 0.2) 32%,
+      rgba(18, 12, 20, 0.72) 68%,
+      rgba(18, 12, 20, 0.94) 100%
+    );
+  }
+
+  .entry-panel {
+    grid-column: 1;
+    width: 100%;
+    align-self: end;
+    padding-top: 30vh;
+  }
+
+  .entry-photo {
+    object-position: 62% 38%;
+  }
+
+  .entry-title {
+    max-width: 12ch;
+  }
+}
+
+/* Legacy auth/boot names kept as aliases so stray class refs still layout. */
 .auth-page,
 .boot {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 20px;
 }
 .auth-card {
-  width: min(100%, 480px);
-  background: #fff;
-  border-radius: 32px;
-  padding: clamp(28px, 6vw, 56px);
-  box-shadow: 0 15px 45px rgba(16, 24, 30, 0.07);
-}
-.auth-card h1 {
-  font-size: 43px;
-  letter-spacing: -0.06em;
-  line-height: 1;
-  margin: 20px 0;
-}
-.auth-card > p:not(.eyebrow) {
-  line-height: 1.5;
-  color: #677277;
-}
-.auth-card form {
-  display: grid;
-  gap: 16px;
-  margin-top: 28px;
+  display: contents;
 }
 .mark {
-  height: 52px;
-  width: 52px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background: #60dbb3;
-  font-weight: 900;
+  display: none;
 }
 @media (max-width: 760px) {
   .topbar {
