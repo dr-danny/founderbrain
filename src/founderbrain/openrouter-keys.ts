@@ -110,6 +110,86 @@ export function keyIsUsable(row: StoredOpenRouterKey, now = new Date()): void {
   }
 }
 
+/** Validate live OpenRouter key settings before persisting a provisioned key. */
+export function assertProvisionedKeyContract(
+  status: {
+    limit: number | null;
+    limitReset: string | null;
+    disabled: boolean;
+    expiresAt: string | null;
+  },
+  expectedExpiresAt?: string | null,
+): void {
+  if (status.disabled) {
+    throw new DomainError(
+      503,
+      "openrouter_provision_failed",
+      "AI key provisioning returned a disabled key and was rejected.",
+    );
+  }
+  if (status.limit !== OPENROUTER_LIFETIME_USD) {
+    throw new DomainError(
+      503,
+      "openrouter_provision_failed",
+      "AI key provisioning returned an unexpected spend limit and was rejected.",
+    );
+  }
+  if (status.limitReset !== null) {
+    throw new DomainError(
+      503,
+      "openrouter_provision_failed",
+      "AI key provisioning returned a renewable limit and was rejected.",
+    );
+  }
+  if (!status.expiresAt) {
+    throw new DomainError(
+      503,
+      "openrouter_provision_failed",
+      "AI key provisioning returned a key without expiry and was rejected.",
+    );
+  }
+  if (expectedExpiresAt) {
+    const live = Date.parse(status.expiresAt);
+    const expected = Date.parse(expectedExpiresAt);
+    if (
+      !Number.isFinite(live) ||
+      !Number.isFinite(expected) ||
+      Math.abs(live - expected) > 120_000
+    ) {
+      throw new DomainError(
+        503,
+        "openrouter_provision_failed",
+        "AI key provisioning returned an unexpected expiry and was rejected.",
+      );
+    }
+  }
+}
+
+function rowFromDb(r: {
+  founder_id: string;
+  key_hash: string;
+  key_name: string;
+  expires_at: Date | string;
+  lifetime_limit_usd: number | string;
+  spent_microusd: number | string;
+  revoked_at: Date | string | null;
+}): StoredOpenRouterKey {
+  return {
+    founderId: r.founder_id,
+    keyHash: r.key_hash,
+    keyName: r.key_name,
+    expiresAt: asDate(r.expires_at),
+    lifetimeLimitUsd: Number(r.lifetime_limit_usd),
+    spentMicroUsd: Number(r.spent_microusd),
+    revokedAt: r.revoked_at ? asDate(r.revoked_at) : null,
+  };
+}
+
+// postgres.js Row is structurally matching but not nominally typed for our helper.
+function keyRow(r: object): StoredOpenRouterKey {
+  return rowFromDb(r as Parameters<typeof rowFromDb>[0]);
+}
+
 export async function ensureOpenRouterKey(
   store: PgBrainStore,
   config: Config,
@@ -130,6 +210,7 @@ export async function ensureOpenRouterKey(
     );
   }
   const existing = await store.scoped(workspace, async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtext(${"or-key:" + workspace}))`;
     const rows = await tx`
       select founder_id, key_hash, key_name, expires_at, lifetime_limit_usd, spent_microusd, revoked_at
       from fb_openrouter_key
@@ -139,77 +220,82 @@ export async function ensureOpenRouterKey(
     return rows[0] ?? null;
   });
   if (existing) {
-    const row: StoredOpenRouterKey = {
-      founderId: existing.founder_id,
-      keyHash: existing.key_hash,
-      keyName: existing.key_name,
-      expiresAt: asDate(existing.expires_at),
-      lifetimeLimitUsd: Number(existing.lifetime_limit_usd),
-      spentMicroUsd: Number(existing.spent_microusd),
-      revokedAt: existing.revoked_at ? asDate(existing.revoked_at) : null,
-    };
+    const row = keyRow(existing);
     if (!row.revokedAt) return row;
     throw new DomainError(403, "openrouter_key_revoked", "AI access for this account was revoked.");
   }
 
   const created = await client.createUserKey(email);
-  if (created.limitReset !== null) {
-    // Refuse keys that would renew; delete immediately so spend cannot reset.
+  try {
+    if (created.limitReset !== null) {
+      throw new DomainError(
+        503,
+        "openrouter_provision_failed",
+        "AI key provisioning returned a renewable limit and was rejected.",
+      );
+    }
+    const verified = await client.getKey(created.hash);
+    assertProvisionedKeyContract(verified, created.expiresAt);
+  } catch (error) {
     await client.deleteKey(created.hash).catch(() => {});
-    throw new DomainError(
-      503,
-      "openrouter_provision_failed",
-      "AI key provisioning returned a renewable limit and was rejected.",
-    );
+    throw error;
   }
 
-  return store.scoped(workspace, async (tx) => {
-    const raced = await tx`select key_hash from fb_openrouter_key where founder_id = ${workspace}`;
-    if (raced[0]) {
-      // Another request won; discard the unused remote key.
-      await client.deleteKey(created.hash).catch(() => {});
-      const rows = await tx`
+  try {
+    return await store.scoped(workspace, async (tx) => {
+      await tx`select pg_advisory_xact_lock(hashtext(${"or-key:" + workspace}))`;
+      const raced = await tx`
         select founder_id, key_hash, key_name, expires_at, lifetime_limit_usd, spent_microusd, revoked_at
-        from fb_openrouter_key where founder_id = ${workspace}
+        from fb_openrouter_key
+        where founder_id = ${workspace}
+        for update
       `;
-      const r = rows[0]!;
-      return {
-        founderId: r.founder_id,
-        keyHash: r.key_hash,
-        keyName: r.key_name,
-        expiresAt: asDate(r.expires_at),
-        lifetimeLimitUsd: Number(r.lifetime_limit_usd),
-        spentMicroUsd: Number(r.spent_microusd),
-        revokedAt: r.revoked_at ? asDate(r.revoked_at) : null,
-      };
-    }
-    const sha = await putKeyBlob(tx, workspace, created.key);
-    const expiresAt =
-      created.expiresAt ??
-      new Date(Date.now() + OPENROUTER_KEY_TTL_DAYS * 864e5).toISOString();
-    await tx`
-      insert into fb_openrouter_key (
-        founder_id, key_hash, key_name, key_blob_sha, expires_at, lifetime_limit_usd, spent_microusd
-      ) values (
-        ${workspace},
-        ${created.hash},
-        ${created.name || openRouterKeyName(email)},
-        ${sha},
-        ${expiresAt},
-        ${OPENROUTER_LIFETIME_USD},
-        0
-      )
-    `;
-    return {
-      founderId: workspace,
-      keyHash: created.hash,
-      keyName: created.name || openRouterKeyName(email),
-      expiresAt: asDate(expiresAt),
-      lifetimeLimitUsd: OPENROUTER_LIFETIME_USD,
-      spentMicroUsd: 0,
-      revokedAt: null,
-    };
-  });
+      if (raced[0]) {
+        await client.deleteKey(created.hash).catch(() => {});
+        return keyRow(raced[0]);
+      }
+      const sha = await putKeyBlob(tx, workspace, created.key);
+      const expiresAt =
+        created.expiresAt ??
+        new Date(Date.now() + OPENROUTER_KEY_TTL_DAYS * 864e5).toISOString();
+      const inserted = await tx`
+        insert into fb_openrouter_key (
+          founder_id, key_hash, key_name, key_blob_sha, expires_at, lifetime_limit_usd, spent_microusd
+        ) values (
+          ${workspace},
+          ${created.hash},
+          ${created.name || openRouterKeyName(email)},
+          ${sha},
+          ${expiresAt},
+          ${OPENROUTER_LIFETIME_USD},
+          0
+        )
+        on conflict (founder_id) do nothing
+        returning founder_id, key_hash, key_name, expires_at, lifetime_limit_usd, spent_microusd, revoked_at
+      `;
+      if (!inserted[0]) {
+        await client.deleteKey(created.hash).catch(() => {});
+        const winner = await tx`
+          select founder_id, key_hash, key_name, expires_at, lifetime_limit_usd, spent_microusd, revoked_at
+          from fb_openrouter_key
+          where founder_id = ${workspace}
+        `;
+        if (!winner[0]) {
+          throw new DomainError(
+            503,
+            "openrouter_provision_failed",
+            "AI key provisioning raced and could not be completed. Try again shortly.",
+          );
+        }
+        return keyRow(winner[0]);
+      }
+      return keyRow(inserted[0]);
+    });
+  } catch (error) {
+    // Persist failed after remote create (and we were not a clean race-loss return).
+    await client.deleteKey(created.hash).catch(() => {});
+    throw error;
+  }
 }
 
 export async function loadOpenRouterApiKey(
@@ -252,19 +338,29 @@ export async function recordOpenRouterSpend(
   store: PgBrainStore,
   workspace: string,
   costMicroUsd: number,
+  options: { allowOverLifetime?: boolean } = {},
 ): Promise<void> {
   if (!Number.isSafeInteger(costMicroUsd) || costMicroUsd < 0) {
     throw new DomainError(503, "openrouter_spend_invalid", "Spend could not be recorded.");
   }
+  if (costMicroUsd === 0) return;
   await store.scoped(workspace, async (tx) => {
-    const updated = await tx`
-      update fb_openrouter_key
-      set spent_microusd = spent_microusd + ${costMicroUsd}
-      where founder_id = ${workspace}
-        and revoked_at is null
-        and spent_microusd + ${costMicroUsd} <= ${LIFETIME_MICROUSD}
-      returning spent_microusd
-    `;
+    const updated = options.allowOverLifetime
+      ? await tx`
+          update fb_openrouter_key
+          set spent_microusd = spent_microusd + ${costMicroUsd}
+          where founder_id = ${workspace}
+            and revoked_at is null
+          returning spent_microusd
+        `
+      : await tx`
+          update fb_openrouter_key
+          set spent_microusd = spent_microusd + ${costMicroUsd}
+          where founder_id = ${workspace}
+            and revoked_at is null
+            and spent_microusd + ${costMicroUsd} <= ${LIFETIME_MICROUSD}
+          returning spent_microusd
+        `;
     if (!updated.length) {
       throw new DomainError(
         429,

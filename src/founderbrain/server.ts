@@ -66,6 +66,8 @@ export async function buildApi(
     openRouterManagement?: OpenRouterManagement;
   } = {},
 ) {
+  const ownsStore = options.store === undefined;
+  const ownsJobs = options.jobs === undefined;
   const store =
     options.store ?? new PgBrainStore(config.DATABASE_URL, config.NODE_ENV === "production");
   if (config.NODE_ENV === "production") {
@@ -326,14 +328,8 @@ export async function buildApi(
   app.delete("/api/workspace", async (req) => {
     parse(z.object({ confirmation: z.literal("DELETE") }).strict(), req.body);
     const c = context(req);
-    try {
-      await revokeOpenRouterKey(store, config, c.workspace, options.openRouterManagement);
-    } catch {
-      log.warn(
-        { errorClass: "openrouter_revoke_deferred" },
-        "OpenRouter key revoke deferred during workspace delete.",
-      );
-    }
+    // Fail closed: never delete local workspace while a live OpenRouter key may remain.
+    await revokeOpenRouterKey(store, config, c.workspace, options.openRouterManagement);
     await store.deleteWorkspace(c.subject, c.workspace);
     return { deleted: true };
   });
@@ -370,8 +366,8 @@ export async function buildApi(
     await app.register(staticFiles, { root: resolve("dist/founderbrain-web"), prefix: "/" });
   }
   app.addHook("onClose", async () => {
-    await jobs.close();
-    await store.close();
+    if (ownsJobs) await jobs.close();
+    if (ownsStore) await store.close();
   });
   return app;
 }
