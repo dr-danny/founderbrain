@@ -227,7 +227,6 @@ export async function orchestrateInvitation(
       plan.inputRate,
       plan.outputRate,
     );
-    spent += rewrite.costMicroUsd;
     roleUsage.push({
       role: "runner",
       model: rewrite.model,
