@@ -21,7 +21,6 @@ export function MissionStage(props: {
   accepting: boolean;
   acceptRetry: boolean;
   jobNeedsReconcile: boolean;
-  verified: boolean;
   canRetrySave: boolean;
   onPatch: (section: Exclude<Mission, "output">, field: string, value: string | boolean) => void;
   onSave: () => void;
@@ -42,7 +41,6 @@ export function MissionStage(props: {
     <article className="mission-card">
       <div className="mission-heading">
         <div>
-          <p className="eyebrow">MISSION {active.number}</p>
           <h1>{active.title}</h1>
           <p>{active.note}</p>
         </div>
@@ -67,7 +65,6 @@ export function MissionStage(props: {
           accepting={props.accepting}
           acceptRetry={props.acceptRetry}
           jobNeedsReconcile={props.jobNeedsReconcile}
-          verified={props.verified}
           onText={props.onText}
           onGenerate={props.onGenerate}
           onRetryGenerate={props.onGenerate}

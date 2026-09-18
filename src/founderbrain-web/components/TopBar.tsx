@@ -35,7 +35,7 @@ export function TopBar({
             ? "Draft not saved"
             : state.version === 0
               ? "Not saved yet"
-              : `Saved · v${state.version}`}
+              : "Saved"}
         {state.updatedAt && <small>{stamp(state.updatedAt)}</small>}
       </div>
       <div className="account">

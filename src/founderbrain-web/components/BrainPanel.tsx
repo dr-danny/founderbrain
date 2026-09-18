@@ -38,8 +38,8 @@ export function BrainPanel({
       <div className="brain-heading">
         <div>
           <p className="eyebrow">YOUR BRAIN</p>
-          <h1>Versioned, not guessed.</h1>
-          <p>Server state is authoritative. Compare before restoring.</p>
+          <h1>Your saved copies.</h1>
+          <p>Compare a saved copy before you restore it.</p>
         </div>
         <div className="exports">
           <button className="button secondary" onClick={() => onDownload("markdown")}>
@@ -61,9 +61,7 @@ export function BrainPanel({
                 <li key={item.version}>
                   <div>
                     <b>v{item.version}</b>
-                    <small>
-                      {stamp(item.at)} · {item.sha.slice(0, 8)}
-                    </small>
+                    <small>{stamp(item.at)}</small>
                   </div>
                   <button className="quiet" onClick={() => onCompare(item.version)}>
                     Compare
