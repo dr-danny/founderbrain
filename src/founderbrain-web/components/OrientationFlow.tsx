@@ -3,6 +3,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { TypeformShell } from "./TypeformShell";
+import { VoiceField } from "./VoiceField";
 
 const NAME_KEY = "founderbrain.what-to-call-you";
 const YES_KEY = "founderbrain.welcome-yes";
@@ -147,27 +148,17 @@ export function OrientationFlow({
         onContinue={() => void continueWithName()}
         saving={saving}
       >
-        <label className="typeform-name">
-          <span className="visually-hidden">What should we call you?</span>
-          <input
-            ref={inputRef}
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value.slice(0, 40));
-              setLocalError("");
-            }}
-            maxLength={40}
-            autoComplete="nickname"
-            spellCheck={false}
-            placeholder="Your first name"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void continueWithName();
-              }
-            }}
-          />
-        </label>
+        <VoiceField
+          label="What should we call you?"
+          value={name}
+          maxLength={40}
+          placeholder="Your first name"
+          onChange={(value) => {
+            setName(value);
+            setLocalError("");
+          }}
+          onEnter={() => void continueWithName()}
+        />
         {(error || localError) && (
           <p className="entry-error" role="alert">
             {error || localError}
@@ -223,22 +214,14 @@ export function OrientationFlow({
         onContinue={() => void commitIdentity("venture", draft.venture)}
         saving={saving}
       >
-        <label className="typeform-name">
-          <span className="visually-hidden">Venture</span>
-          <input
-            ref={inputRef}
-            value={draft.venture}
-            onChange={(event) => setDraft((current) => ({ ...current, venture: event.target.value.slice(0, 120) }))}
-            maxLength={120}
-            placeholder="The venture"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void commitIdentity("venture", draft.venture);
-              }
-            }}
-          />
-        </label>
+        <VoiceField
+          label="Venture"
+          value={draft.venture}
+          maxLength={120}
+          placeholder="The venture"
+          onChange={(value) => setDraft((current) => ({ ...current, venture: value }))}
+          onEnter={() => void commitIdentity("venture", draft.venture)}
+        />
         {(error || localError) && (
           <p className="entry-error" role="alert">
             {error || localError}
@@ -263,22 +246,14 @@ export function OrientationFlow({
         onContinue={() => void commitIdentity("role", draft.role)}
         saving={saving}
       >
-        <label className="typeform-name">
-          <span className="visually-hidden">Role</span>
-          <input
-            ref={inputRef}
-            value={draft.role}
-            onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value.slice(0, 80) }))}
-            maxLength={80}
-            placeholder="Founder, operator, builder"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void commitIdentity("role", draft.role);
-              }
-            }}
-          />
-        </label>
+        <VoiceField
+          label="Role"
+          value={draft.role}
+          maxLength={80}
+          placeholder="Founder, operator, builder"
+          onChange={(value) => setDraft((current) => ({ ...current, role: value }))}
+          onEnter={() => void commitIdentity("role", draft.role)}
+        />
         {(error || localError) && (
           <p className="entry-error" role="alert">
             {error || localError}
@@ -339,17 +314,14 @@ export function OrientationFlow({
         onContinue={() => void commitIdentity("goal", draft.goal)}
         saving={saving}
       >
-        <label className="typeform-name">
-          <span className="visually-hidden">What needs to change?</span>
-          <textarea
-            ref={areaRef}
-            value={draft.goal}
-            rows={3}
-            onChange={(event) => setDraft((current) => ({ ...current, goal: event.target.value.slice(0, 400) }))}
-            maxLength={400}
-            placeholder="The shift you need"
-          />
-        </label>
+        <VoiceField
+          label="What needs to change?"
+          value={draft.goal}
+          maxLength={400}
+          placeholder="The shift you need"
+          multiline
+          onChange={(value) => setDraft((current) => ({ ...current, goal: value }))}
+        />
         {(error || localError) && (
           <p className="entry-error" role="alert">
             {error || localError}
