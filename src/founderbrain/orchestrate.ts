@@ -26,14 +26,32 @@ export interface OrchestrationPlan {
   outputRate: number;
 }
 
+export interface OrchestrationRoleUsage {
+  role: OrchestrationRole;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costMicroUsd: number;
+  requestId: string | null;
+}
+
 export interface OrchestrationResult extends ProviderResult {
-  roleUsage: Array<{
+  roleUsage: OrchestrationRoleUsage[];
+  /** Every provider request id collected during this run (including rewrite). */
+  requestIds: string[];
+}
+
+/** Hooks so the job runner can renew leases and persist partial spend evidence. */
+export interface OrchestrationHooks {
+  /** Invoked before each role attempt (primary and fallback share one beforeRole). */
+  beforeRole?: (role: OrchestrationRole) => Promise<void>;
+  /** Invoked after a role attempt succeeds; includes cumulative roleUsage so far. */
+  afterRole?: (progress: {
     role: OrchestrationRole;
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-    costMicroUsd: number;
-  }>;
+    roleUsage: OrchestrationRoleUsage[];
+    requestIds: string[];
+    spentMicroUsd: number;
+  }) => Promise<void>;
 }
 
 function costOf(
@@ -45,6 +63,14 @@ function costOf(
   return Math.ceil(inputTokens * inputRate + outputTokens * outputRate);
 }
 
+function collectRequestIds(roleUsage: OrchestrationRoleUsage[]): string[] {
+  const ids: string[] = [];
+  for (const usage of roleUsage) {
+    if (usage.requestId && !ids.includes(usage.requestId)) ids.push(usage.requestId);
+  }
+  return ids;
+}
+
 async function callRole(
   provider: Provider,
   apiKey: string,
@@ -54,11 +80,13 @@ async function callRole(
   budgetMicroUsd: number,
   inputRate: number,
   outputRate: number,
+  hooks?: OrchestrationHooks,
 ): Promise<{
   result: ProviderResult;
   model: string;
   costMicroUsd: number;
 }> {
+  await hooks?.beforeRole?.(role);
   const attempts = [models.primary, models.fallback];
   let lastError: unknown;
   for (const model of attempts) {
@@ -78,6 +106,13 @@ async function callRole(
       return { result, model, costMicroUsd: cost };
     } catch (error) {
       lastError = error;
+      // Ambiguous failures may already have been billed. Do not try the fallback
+      // model; jobs.ts quarantines the job instead of retrying.
+      const knownNoCharge =
+        typeof error === "object" &&
+        error !== null &&
+        (error as { knownNoCharge?: boolean }).knownNoCharge === true;
+      if (!knownNoCharge) break;
     }
   }
   if (lastError instanceof DomainError) throw lastError;
@@ -88,13 +123,31 @@ async function callRole(
   );
 }
 
+async function recordRole(
+  hooks: OrchestrationHooks | undefined,
+  roleUsage: OrchestrationRoleUsage[],
+  entry: OrchestrationRoleUsage,
+  spent: number,
+): Promise<number> {
+  roleUsage.push(entry);
+  const nextSpent = spent + entry.costMicroUsd;
+  await hooks?.afterRole?.({
+    role: entry.role,
+    roleUsage: [...roleUsage],
+    requestIds: collectRequestIds(roleUsage),
+    spentMicroUsd: nextSpent,
+  });
+  return nextSpent;
+}
+
 export async function orchestrateInvitation(
   plan: OrchestrationPlan,
   apiKey: string,
   provider: Provider,
+  hooks?: OrchestrationHooks,
 ): Promise<OrchestrationResult> {
   const roles = plan.roles;
-  const roleUsage: OrchestrationResult["roleUsage"] = [];
+  const roleUsage: OrchestrationRoleUsage[] = [];
   let spent = 0;
 
   const thinkerBudget = Math.floor(plan.reservedMicroUsd * roles.thinker.budgetShare);
@@ -113,15 +166,21 @@ export async function orchestrateInvitation(
     thinkerBudget,
     plan.inputRate,
     plan.outputRate,
+    hooks,
   );
-  spent += thinker.costMicroUsd;
-  roleUsage.push({
-    role: "thinker",
-    model: thinker.model,
-    inputTokens: thinker.result.inputTokens,
-    outputTokens: thinker.result.outputTokens,
-    costMicroUsd: thinker.costMicroUsd,
-  });
+  spent = await recordRole(
+    hooks,
+    roleUsage,
+    {
+      role: "thinker",
+      model: thinker.model,
+      inputTokens: thinker.result.inputTokens,
+      outputTokens: thinker.result.outputTokens,
+      costMicroUsd: thinker.costMicroUsd,
+      requestId: thinker.result.requestId,
+    },
+    spent,
+  );
 
   const runnerBudget = Math.floor(plan.reservedMicroUsd * roles.runner.budgetShare);
   const runner = await callRole(
@@ -145,15 +204,21 @@ export async function orchestrateInvitation(
     runnerBudget,
     plan.inputRate,
     plan.outputRate,
+    hooks,
   );
-  spent += runner.costMicroUsd;
-  roleUsage.push({
-    role: "runner",
-    model: runner.model,
-    inputTokens: runner.result.inputTokens,
-    outputTokens: runner.result.outputTokens,
-    costMicroUsd: runner.costMicroUsd,
-  });
+  spent = await recordRole(
+    hooks,
+    roleUsage,
+    {
+      role: "runner",
+      model: runner.model,
+      inputTokens: runner.result.inputTokens,
+      outputTokens: runner.result.outputTokens,
+      costMicroUsd: runner.costMicroUsd,
+      requestId: runner.result.requestId,
+    },
+    spent,
+  );
 
   const verifierBudget = Math.floor(plan.reservedMicroUsd * roles.verifier.budgetShare);
   const verifier = await callRole(
@@ -181,15 +246,21 @@ export async function orchestrateInvitation(
     verifierBudget,
     plan.inputRate,
     plan.outputRate,
+    hooks,
   );
-  spent += verifier.costMicroUsd;
-  roleUsage.push({
-    role: "verifier",
-    model: verifier.model,
-    inputTokens: verifier.result.inputTokens,
-    outputTokens: verifier.result.outputTokens,
-    costMicroUsd: verifier.costMicroUsd,
-  });
+  spent = await recordRole(
+    hooks,
+    roleUsage,
+    {
+      role: "verifier",
+      model: verifier.model,
+      inputTokens: verifier.result.inputTokens,
+      outputTokens: verifier.result.outputTokens,
+      costMicroUsd: verifier.costMicroUsd,
+      requestId: verifier.result.requestId,
+    },
+    spent,
+  );
 
   const verdict = verifier.result.text.trim().toUpperCase();
   if (!verdict.startsWith("PASS")) {
@@ -226,30 +297,40 @@ export async function orchestrateInvitation(
       remaining,
       plan.inputRate,
       plan.outputRate,
+      hooks,
     );
-    spent += rewrite.costMicroUsd;
-    roleUsage.push({
-      role: "runner",
-      model: rewrite.model,
-      inputTokens: rewrite.result.inputTokens,
-      outputTokens: rewrite.result.outputTokens,
-      costMicroUsd: rewrite.costMicroUsd,
-    });
+    await recordRole(
+      hooks,
+      roleUsage,
+      {
+        role: "runner",
+        model: rewrite.model,
+        inputTokens: rewrite.result.inputTokens,
+        outputTokens: rewrite.result.outputTokens,
+        costMicroUsd: rewrite.costMicroUsd,
+        requestId: rewrite.result.requestId,
+      },
+      spent,
+    );
+    const requestIds = collectRequestIds(roleUsage);
     return {
       text: rewrite.result.text,
       inputTokens: roleUsage.reduce((n, u) => n + u.inputTokens, 0),
       outputTokens: roleUsage.reduce((n, u) => n + u.outputTokens, 0),
       requestId: rewrite.result.requestId ?? runner.result.requestId,
       roleUsage,
+      requestIds,
     };
   }
 
+  const requestIds = collectRequestIds(roleUsage);
   return {
     text: runner.result.text,
     inputTokens: roleUsage.reduce((n, u) => n + u.inputTokens, 0),
     outputTokens: roleUsage.reduce((n, u) => n + u.outputTokens, 0),
     requestId: runner.result.requestId ?? thinker.result.requestId,
     roleUsage,
+    requestIds,
   };
 }
 

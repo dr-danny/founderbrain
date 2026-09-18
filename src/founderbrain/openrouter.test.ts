@@ -16,7 +16,11 @@ import {
   isPrivacyEligibleModel,
   resolveOrchestration,
 } from "./openrouter-privacy.ts";
-import { keyIsUsable, type StoredOpenRouterKey } from "./openrouter-keys.ts";
+import {
+  assertProvisionedKeyContract,
+  keyIsUsable,
+  type StoredOpenRouterKey,
+} from "./openrouter-keys.ts";
 import { orchestrateInvitation } from "./orchestrate.ts";
 import type { Provider } from "./provider.ts";
 import { DomainError } from "./domain.ts";
@@ -83,6 +87,65 @@ describe("openrouter lifetime and expiry gates", () => {
   });
 });
 
+describe("provisioned key contract (getKey verification)", () => {
+  const expiresAt = openRouterKeyExpiresAt(new Date("2026-09-18T12:00:00Z"));
+
+  it("accepts a live key with $20 limit, no reset, enabled, matching expiry", () => {
+    assertProvisionedKeyContract(
+      {
+        limit: OPENROUTER_LIFETIME_USD,
+        limitReset: null,
+        disabled: false,
+        expiresAt,
+      },
+      expiresAt,
+    );
+  });
+
+  it("rejects disabled, wrong limit, reset policy, or missing expiry", () => {
+    assert.throws(
+      () =>
+        assertProvisionedKeyContract({
+          limit: OPENROUTER_LIFETIME_USD,
+          limitReset: null,
+          disabled: true,
+          expiresAt,
+        }),
+      (e: DomainError) => e.code === "openrouter_provision_failed",
+    );
+    assert.throws(
+      () =>
+        assertProvisionedKeyContract({
+          limit: 50,
+          limitReset: null,
+          disabled: false,
+          expiresAt,
+        }),
+      (e: DomainError) => e.code === "openrouter_provision_failed",
+    );
+    assert.throws(
+      () =>
+        assertProvisionedKeyContract({
+          limit: OPENROUTER_LIFETIME_USD,
+          limitReset: "monthly",
+          disabled: false,
+          expiresAt,
+        }),
+      (e: DomainError) => e.code === "openrouter_provision_failed",
+    );
+    assert.throws(
+      () =>
+        assertProvisionedKeyContract({
+          limit: OPENROUTER_LIFETIME_USD,
+          limitReset: null,
+          disabled: false,
+          expiresAt: null,
+        }),
+      (e: DomainError) => e.code === "openrouter_provision_failed",
+    );
+  });
+});
+
 describe("invitation orchestration", () => {
   it("runs thinker → runner → verifier and returns the draft on PASS", async () => {
     const calls: string[] = [];
@@ -107,6 +170,8 @@ describe("invitation orchestration", () => {
       };
     };
     const roles = resolveOrchestration({});
+    const beforeRoles: string[] = [];
+    const afterRequestIds: string[][] = [];
     const result = await orchestrateInvitation(
       {
         roles,
@@ -118,6 +183,14 @@ describe("invitation orchestration", () => {
       },
       "sk-test",
       provider,
+      {
+        beforeRole: async (role) => {
+          beforeRoles.push(role);
+        },
+        afterRole: async (progress) => {
+          afterRequestIds.push([...progress.requestIds]);
+        },
+      },
     );
     assert.match(result.text, /appointment follow-ups/);
     assert.equal(result.roleUsage.length, 3);
@@ -125,6 +198,10 @@ describe("invitation orchestration", () => {
       result.roleUsage.map((u) => u.role),
       ["thinker", "runner", "verifier"],
     );
+    assert.deepEqual(result.requestIds, ["t1", "r1", "v1"]);
+    assert.deepEqual(beforeRoles, ["thinker", "runner", "verifier"]);
+    assert.equal(afterRequestIds.length, 3);
+    assert.deepEqual(afterRequestIds[2], ["t1", "r1", "v1"]);
     assert.equal(calls.length, 3);
   });
 
@@ -144,7 +221,7 @@ describe("invitation orchestration", () => {
         text: runnerCount === 1 ? "Urgent!!! buy now" : "Hi [Name], may we learn your workflow?",
         inputTokens: 10,
         outputTokens: 8,
-        requestId: "r",
+        requestId: "r" + runnerCount,
       };
     };
     const result = await orchestrateInvitation(
@@ -162,5 +239,6 @@ describe("invitation orchestration", () => {
     assert.equal(verifyCount, 1);
     assert.equal(runnerCount, 2);
     assert.match(result.text, /workflow/);
+    assert.deepEqual(result.requestIds, ["t", "r1", "v", "r2"]);
   });
 });

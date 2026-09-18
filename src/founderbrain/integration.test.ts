@@ -14,6 +14,7 @@ import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { OPENROUTER_LIFETIME_USD, openRouterKeyName } from "./openrouter-management.ts";
 
 const url = process.env.FB_TEST_DATABASE_URL;
+const migrationUrl = process.env.FB_TEST_MIGRATION_DATABASE_URL ?? url;
 const enabled = !!url;
 const skip = enabled ? undefined : "Disposable database not configured";
 let store: PgBrainStore;
@@ -112,9 +113,11 @@ async function workspace(label: string) {
 before(async () => {
   if (!url) return;
   process.env.GE_MASTER_KEY ??= randomBytes(32).toString("base64");
-  await migrateJobs(url);
-  await migrateOpenRouterKeys(url);
-  await migrateOrientation(url);
+  // Schema changes need the migration role. The runtime role is intentionally
+  // not allowed to CREATE in public, which is what CI connects as.
+  await migrateJobs(migrationUrl!);
+  await migrateOpenRouterKeys(migrationUrl!);
+  await migrateOrientation(migrationUrl!);
   config = {
     NODE_ENV: "production",
     DATABASE_URL: url,
@@ -152,6 +155,8 @@ after(async () => {
   if (!enabled) return;
   for (const [subject, id] of tracked) await store.deleteWorkspace(subject, id).catch(() => {});
   await app?.close();
+  await jobs?.close();
+  await store?.close();
 });
 const headers = (user: string) => ({
   "x-test-user": user,
@@ -372,6 +377,86 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       assert.equal((await store.scoped(id, (tx) => tx`select * from ge_blob`)).length, 0);
     },
   );
+  it("fails closed when OpenRouter revoke fails during workspace delete", { skip }, async () => {
+    const user = "revoke-fail";
+    await workspace(user);
+    const failingManagement: OpenRouterManagement = {
+      ...fakeManagement,
+      async deleteKey() {
+        throw new DomainError(
+          503,
+          "openrouter_revoke_failed",
+          "AI key revocation is temporarily unavailable. Try again shortly.",
+        );
+      },
+    };
+    const locked = await buildApi(config, {
+      store,
+      jobs,
+      openRouterManagement: failingManagement,
+      authenticate: async (req) => {
+        const header = req.headers["x-test-user"];
+        if (typeof header !== "string") throw new DomainError(401, "sign_in_required", "Sign in.");
+        return { subject: prefix + "|" + header, email: header + "@example.test" };
+      },
+    });
+    try {
+      const deleted = await locked.inject({
+        method: "DELETE",
+        url: "/api/workspace",
+        headers: headers(user),
+        payload: { confirmation: "DELETE" },
+      });
+      assert.equal(deleted.statusCode, 503);
+      assert.equal(deleted.json().error, "openrouter_revoke_failed");
+      assert.equal(
+        (await app.inject({ url: "/api/brain", headers: headers(user) })).statusCode,
+        200,
+      );
+    } finally {
+      await locked.close();
+    }
+  });
+  it("persists partial provider request ids and key spend when orchestration is interrupted", {
+    skip,
+  }, async () => {
+    const id = await workspace("partial-spend");
+    await store.commit(id, full(), 0, "partial-source");
+    const previous = provider;
+    let calls = 0;
+    provider = async (body) => {
+      calls += 1;
+      if (body.system.includes("plan one short") || body.system.includes("You plan")) {
+        return { text: "- angle: workflow", inputTokens: 10, outputTokens: 5, requestId: "partial-t" };
+      }
+      throw new Error("runner ambiguous timeout");
+    };
+    try {
+      const job = await jobs.enqueue(id, 1, "partial-spend-job");
+      await jobs.tick(id);
+      const result = await jobs.read(id, job.id);
+      assert.equal(result.status, "uncertain");
+      assert.ok(calls >= 2);
+      const row = await store.scoped(
+        id,
+        (tx) =>
+          tx`
+            select provider_request_id, openrouter_spend_recorded_microusd, spent_microusd
+            from fb_ai_job j
+            join fb_openrouter_key k on k.founder_id = j.founder_id
+            where j.id = ${job.id}
+          `,
+      );
+      assert.equal(row[0]?.provider_request_id, "partial-t");
+      assert.ok(Number(row[0]?.openrouter_spend_recorded_microusd) > 0);
+      assert.equal(
+        Number(row[0]?.spent_microusd),
+        Number(row[0]?.openrouter_spend_recorded_microusd),
+      );
+    } finally {
+      provider = previous;
+    }
+  });
   it("rejects stale proposal acceptance without deleting old artifact", { skip }, async () => {
     const id = await workspace("stale");
     await store.commit(id, full(), 0, "stale-source");

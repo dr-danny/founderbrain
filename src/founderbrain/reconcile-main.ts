@@ -12,7 +12,8 @@ const sql = postgres(url, { max: 1, onnotice: () => {} });
 try {
   await sql.begin(async (tx) => {
     const jobs = await tx`
-      select id, founder_id, status, reserved, budget_day
+      select id, founder_id, status, reserved, budget_day,
+             coalesce(openrouter_spend_recorded_microusd, 0) as openrouter_spend_recorded_microusd
       from fb_ai_job
       where id = ${id}
       for update
@@ -47,6 +48,29 @@ try {
       if (!changed.length) {
         throw new Error("Reservation accounting is inconsistent; no changes were committed.");
       }
+    }
+    // Lifetime key spend must track provider-confirmed cost even when the job
+    // never completed successfully. Only add the delta above any spend already
+    // recorded on the uncertain/partial path so reconcile cannot double-count.
+    if (cost > 0 && j) {
+      const already = Number(j.openrouter_spend_recorded_microusd ?? 0);
+      const delta = Math.max(0, cost - (Number.isSafeInteger(already) ? already : 0));
+      if (delta > 0) {
+        await tx`
+          update fb_openrouter_key
+          set spent_microusd = spent_microusd + ${delta}
+          where founder_id = ${j.founder_id}
+            and revoked_at is null
+        `;
+      }
+      await tx`
+        update fb_ai_job
+        set openrouter_spend_recorded_microusd = greatest(
+          coalesce(openrouter_spend_recorded_microusd, 0),
+          ${cost}
+        )
+        where id = ${id}
+      `;
     }
     if (j) {
       await tx`

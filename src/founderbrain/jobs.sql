@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS fb_ai_job (
  UNIQUE(founder_id,idempotency_key), UNIQUE(founder_id,id),
  FOREIGN KEY(founder_id,input_blob_sha) REFERENCES ge_blob(founder_id,sha)
 );
+-- Lifetime key spend already applied for this job (uncertain/partial paths). Reconcile adds only the delta.
+ALTER TABLE fb_ai_job ADD COLUMN IF NOT EXISTS openrouter_spend_recorded_microusd bigint NOT NULL DEFAULT 0
+  CHECK (openrouter_spend_recorded_microusd >= 0);
 CREATE TABLE IF NOT EXISTS fb_job_dispatch (
  job_id text PRIMARY KEY REFERENCES fb_ai_job(id) ON DELETE CASCADE,
  founder_id text NOT NULL REFERENCES founder(id) ON DELETE CASCADE,
