@@ -305,7 +305,20 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
   );
 }
 
-export function GhlChapter({ orientation, saving, error, onPatch, onFinished }: ChapterProps) {
+export function GhlChapter({
+  orientation,
+  saving,
+  error,
+  onPatch,
+  onFinished,
+  connectEnabled = false,
+  connecting = false,
+  onConnect,
+}: ChapterProps & {
+  connectEnabled?: boolean;
+  connecting?: boolean;
+  onConnect?: () => void | Promise<void>;
+}) {
   const screens = useMemo(
     () => ghlScreens(orientation.ghlAnswers.hasAccount),
     [orientation.ghlAnswers.hasAccount],
@@ -314,6 +327,8 @@ export function GhlChapter({ orientation, saving, error, onPatch, onFinished }: 
   const current = screens[screen - 1]!;
   const [localError, setLocalError] = useState("");
   const isChoice = Boolean(current.choices?.length);
+  const isConnect = current.id === "ghl-connect";
+  const connected = orientation.ghlAnswers.connected === true;
 
   async function persist(patch: OrientationPatch) {
     setLocalError("");
@@ -370,12 +385,26 @@ export function GhlChapter({ orientation, saving, error, onPatch, onFinished }: 
       screen={screen}
       total={ghlTotal}
       title={current.title}
-      continueLabel={current.continueLabel ?? (isChoice ? "Choose below" : "Continue")}
-      continueDisabled={isChoice}
+      continueLabel={
+        isConnect
+          ? connected
+            ? "Back to Home"
+            : connectEnabled
+              ? "Connect HighLevel"
+              : "Connect is not configured"
+          : (current.continueLabel ?? (isChoice ? "Choose below" : "Continue"))
+      }
+      continueDisabled={isChoice || (isConnect && !connected && !connectEnabled)}
       showBack={screen > 1}
       onBack={() => void goBack()}
-      onContinue={() => void continueForward()}
-      saving={saving}
+      onContinue={() => {
+        if (isConnect && !connected && onConnect) {
+          void onConnect();
+          return;
+        }
+        void continueForward();
+      }}
+      saving={saving || connecting}
     >
       <ScreenBody
         screen={current}
@@ -384,6 +413,9 @@ export function GhlChapter({ orientation, saving, error, onPatch, onFinished }: 
         confirmValue={false}
         onConfirm={() => undefined}
       />
+      {isConnect && connected ? (
+        <p className="entry-lede typeform-lede">Connected. You can leave this chapter.</p>
+      ) : null}
       {current.choices ? (
         <div className="typeform-choices">
           {current.choices.map((choice) => (

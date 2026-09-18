@@ -258,8 +258,8 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
       id: "ghl-connect",
       title: "Connect HighLevel",
       body: [
-        "Next step is Connect. One click will install the public FounderBrain app on your HighLevel sub-account.",
-        "Connect is not live in this build yet. Have the account ready. Come back here to connect.",
+        "One click opens HighLevel. Pick your sub-account. You come back connected.",
+        "Nothing is published or sent in that click. It only authorizes FounderBrain to push later.",
       ],
       continueLabel: "Back to Home",
     },

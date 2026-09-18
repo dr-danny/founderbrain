@@ -130,6 +130,9 @@ export function App() {
         orientation={orientation}
         saving={orientationSaving}
         error={error}
+        connectEnabled={Boolean(config.crmConnectEnabled)}
+        connecting={app.connecting}
+        onConnect={() => app.startConnect()}
         onPatch={async (patch) => {
           await app.saveOrientation(patch);
         }}

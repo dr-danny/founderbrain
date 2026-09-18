@@ -86,7 +86,7 @@ test("atlanta ready map is green only when all artifacts are ready", () => {
     },
     outreachAnswers: { copyFinalised: true, prospectList: true },
     ghlComplete: true,
-    ghlAnswers: { hasAccount: true },
+    ghlAnswers: { hasAccount: true, connected: true },
   });
   const partial = atlantaReadyMap(
     { identity: true, customer: true, offer: true, voice: true, output: false },

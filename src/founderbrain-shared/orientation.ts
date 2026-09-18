@@ -33,6 +33,7 @@ export const outreachAnswersSchema = z
 export const ghlAnswersSchema = z
   .object({
     hasAccount: z.boolean().optional(),
+    connected: z.boolean().optional(),
   })
   .strict();
 
@@ -230,9 +231,9 @@ export function atlantaReadyMap(
     },
     {
       key: "ghlAccount",
-      label: "HighLevel account ready (Starter or existing)",
+      label: "HighLevel connected",
       day: "sunday",
-      ready: orientation.ghlCompletedAt !== null,
+      ready: orientation.ghlAnswers.connected === true,
     },
   ];
   const readyCount = artifacts.filter((a) => a.ready).length;

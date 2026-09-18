@@ -35,6 +35,7 @@ export interface Config {
   authMode: "hexclave" | "local-demo";
   hexclave: HexclaveClientConfig | null;
   aiEnabled: boolean;
+  crmConnectEnabled?: boolean;
 }
 export interface Me {
   email: string;
