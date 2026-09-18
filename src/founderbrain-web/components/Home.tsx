@@ -15,6 +15,7 @@ export function Home({
   onAtlanta,
   onContent,
   onOutreach,
+  onGhl,
 }: {
   state: BrainState;
   draft: Brain;
@@ -24,6 +25,7 @@ export function Home({
   onAtlanta: () => void;
   onContent: () => void;
   onOutreach: () => void;
+  onGhl: () => void;
 }) {
   const complete = Object.values(state.readiness).filter(Boolean).length;
   const atlanta = atlantaReadyMap(state.readiness, orientation);
@@ -66,6 +68,9 @@ export function Home({
         </button>
         <button className="button secondary" type="button" onClick={onOutreach}>
           Outreach chapter
+        </button>
+        <button className="button secondary" type="button" onClick={onGhl}>
+          HighLevel chapter
         </button>
         <button className="button secondary" type="button" onClick={onHistory}>
           See Brain history

@@ -5,7 +5,15 @@
 import type { BrainState } from "../types";
 import { missionCopy, missions, type Mission } from "../mission-copy";
 
-export type View = "home" | "missions" | "brain" | "privacy" | "atlanta" | "content" | "outreach";
+export type View =
+  | "home"
+  | "missions"
+  | "brain"
+  | "privacy"
+  | "atlanta"
+  | "content"
+  | "outreach"
+  | "ghl";
 
 export function MissionRail({
   view,
@@ -18,6 +26,7 @@ export function MissionRail({
   onAtlanta,
   onContent,
   onOutreach,
+  onGhl,
   onSelectMission,
 }: {
   view: View;
@@ -30,6 +39,7 @@ export function MissionRail({
   onAtlanta: () => void;
   onContent: () => void;
   onOutreach: () => void;
+  onGhl: () => void;
   onSelectMission: (key: Mission) => void;
 }) {
   return (
@@ -70,6 +80,13 @@ export function MissionRail({
             aria-current={view === "outreach" ? "page" : undefined}
           >
             Outreach
+          </button>
+          <button
+            className={view === "ghl" ? "nav active" : "nav"}
+            onClick={onGhl}
+            aria-current={view === "ghl" ? "page" : undefined}
+          >
+            HighLevel
           </button>
         </>
       ) : null}

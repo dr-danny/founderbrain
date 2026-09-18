@@ -13,7 +13,7 @@ import { BrainPanel } from "./components/BrainPanel";
 import { ConflictDialog } from "./components/ConflictDialog";
 import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
-import { ContentChapter, OutreachChapter } from "./components/ChapterFlows";
+import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
 import { AtlantaReady } from "./components/AtlantaReady";
 
 export function App() {
@@ -124,6 +124,20 @@ export function App() {
     );
   }
 
+  if (view === "ghl") {
+    return (
+      <GhlChapter
+        orientation={orientation}
+        saving={orientationSaving}
+        error={error}
+        onPatch={async (patch) => {
+          await app.saveOrientation(patch);
+        }}
+        onFinished={() => setView("home")}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <TopBar
@@ -147,6 +161,7 @@ export function App() {
           onAtlanta={() => setView("atlanta")}
           onContent={() => setView("content")}
           onOutreach={() => setView("outreach")}
+          onGhl={() => setView("ghl")}
           onSelectMission={(key) => {
             setMission(key);
             setView("missions");
@@ -186,6 +201,7 @@ export function App() {
               onAtlanta={() => setView("atlanta")}
               onContent={() => setView("content")}
               onOutreach={() => setView("outreach")}
+              onGhl={() => setView("ghl")}
             />
           )}
           {view === "atlanta" && (
@@ -194,6 +210,7 @@ export function App() {
               orientation={orientation}
               onContent={() => setView("content")}
               onOutreach={() => setView("outreach")}
+              onGhl={() => setView("ghl")}
               onMissions={() => {
                 const first = missions.find((key) => !state.readiness[key]) ?? "output";
                 setMission(first);

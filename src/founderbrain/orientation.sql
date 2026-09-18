@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS fb_orientation (
     CHECK (outreach_screen BETWEEN 1 AND 3),
   outreach_completed_at timestamptz,
   outreach_answers jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ghl_screen smallint NOT NULL DEFAULT 1,
+  ghl_completed_at timestamptz,
+  ghl_answers jsonb NOT NULL DEFAULT '{}'::jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -23,3 +26,7 @@ DROP POLICY IF EXISTS fb_orientation_tenant ON fb_orientation;
 CREATE POLICY fb_orientation_tenant ON fb_orientation
   USING (founder_id = current_setting('app.founder_id', true))
   WITH CHECK (founder_id = current_setting('app.founder_id', true));
+
+ALTER TABLE fb_orientation ADD COLUMN IF NOT EXISTS ghl_screen smallint NOT NULL DEFAULT 1;
+ALTER TABLE fb_orientation ADD COLUMN IF NOT EXISTS ghl_completed_at timestamptz;
+ALTER TABLE fb_orientation ADD COLUMN IF NOT EXISTS ghl_answers jsonb NOT NULL DEFAULT '{}'::jsonb;

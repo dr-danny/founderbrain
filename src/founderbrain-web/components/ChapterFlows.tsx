@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   ContentAnswers,
   FounderTrack,
+  GhlAnswers,
   OrientationPatch,
   OrientationState,
   OutreachAnswers,
@@ -13,6 +14,8 @@ import type {
 import {
   contentScreens,
   contentTotal,
+  ghlScreens,
+  ghlTotal,
   outreachScreens,
   outreachTotal,
   type TypeformScreen,
@@ -68,6 +71,16 @@ function ScreenBody({
             maxLength={500}
           />
         </label>
+      ) : null}
+      {screen.externalLink ? (
+        <a
+          className="typeform-external"
+          href={screen.externalLink.href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {screen.externalLink.label}
+        </a>
       ) : null}
     </>
   );
@@ -283,6 +296,109 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
         confirmValue={confirm}
         onConfirm={setConfirm}
       />
+      {(error || localError) && (
+        <p className="entry-error" role="alert">
+          {error || localError}
+        </p>
+      )}
+    </TypeformShell>
+  );
+}
+
+export function GhlChapter({ orientation, saving, error, onPatch, onFinished }: ChapterProps) {
+  const screens = useMemo(
+    () => ghlScreens(orientation.ghlAnswers.hasAccount),
+    [orientation.ghlAnswers.hasAccount],
+  );
+  const screen = Math.min(Math.max(orientation.ghlScreen, 1), ghlTotal);
+  const current = screens[screen - 1]!;
+  const [localError, setLocalError] = useState("");
+  const isChoice = Boolean(current.choices?.length);
+
+  async function persist(patch: OrientationPatch) {
+    setLocalError("");
+    try {
+      await onPatch(patch);
+    } catch {
+      setLocalError("Could not save progress. Try again.");
+      throw new Error("save_failed");
+    }
+  }
+
+  async function continueForward() {
+    try {
+      if (isChoice) return;
+      if (screen >= ghlTotal) {
+        await persist({
+          ghlScreen: ghlTotal,
+          ghlComplete: true,
+          ghlAnswers: orientation.ghlAnswers,
+        });
+        onFinished();
+        return;
+      }
+      await persist({ ghlScreen: screen + 1, ghlAnswers: orientation.ghlAnswers });
+    } catch {
+      /* localError set */
+    }
+  }
+
+  async function choose(value: string) {
+    try {
+      const answers: GhlAnswers = {
+        ...orientation.ghlAnswers,
+        hasAccount: value === "yes",
+      };
+      await persist({ ghlScreen: screen + 1, ghlAnswers: answers });
+    } catch {
+      /* localError set */
+    }
+  }
+
+  async function goBack() {
+    if (screen <= 1) return;
+    try {
+      await persist({ ghlScreen: screen - 1 });
+    } catch {
+      /* localError set */
+    }
+  }
+
+  return (
+    <TypeformShell
+      kicker="Atlanta prep · HighLevel"
+      screen={screen}
+      total={ghlTotal}
+      title={current.title}
+      continueLabel={current.continueLabel ?? (isChoice ? "Choose below" : "Continue")}
+      continueDisabled={isChoice}
+      showBack={screen > 1}
+      onBack={() => void goBack()}
+      onContinue={() => void continueForward()}
+      saving={saving}
+    >
+      <ScreenBody
+        screen={current}
+        textValue=""
+        onText={() => undefined}
+        confirmValue={false}
+        onConfirm={() => undefined}
+      />
+      {current.choices ? (
+        <div className="typeform-choices">
+          {current.choices.map((choice) => (
+            <button
+              key={choice.value}
+              type="button"
+              className="typeform-choice"
+              disabled={saving}
+              onClick={() => void choose(choice.value)}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {(error || localError) && (
         <p className="entry-error" role="alert">
           {error || localError}

@@ -1187,6 +1187,21 @@ button:not(.link-button) {
   border-color: var(--ember);
   background: rgba(224, 137, 74, 0.16);
 }
+.typeform-external {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 1.2rem;
+  padding: 0.95rem 1.15rem;
+  border-radius: 2px;
+  background: var(--ember);
+  color: #1a120c;
+  font-weight: 700;
+  text-decoration: none;
+  max-width: 28rem;
+}
+.typeform-external:hover {
+  filter: brightness(1.05);
+}
 .typeform-confirm,
 .typeform-field {
   display: grid;
