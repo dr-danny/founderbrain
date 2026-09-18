@@ -25,7 +25,7 @@ import type { PgBrainStore } from "./store.ts";
 import { openRouterProvider, type Provider } from "./provider.ts";
 import { sealBlob, openBlob, unwrapDataKey } from "../server/storage/crypto.ts";
 import { buildOrchestrationFromConfig, orchestrateInvitation } from "./orchestrate.ts";
-import { keyIsUsable, loadOpenRouterApiKey } from "./openrouter-keys.ts";
+import { keyIsUsable, loadOpenRouterApiKey, recordOpenRouterSpend } from "./openrouter-keys.ts";
 import type { OrchestrationRole, RoleModels } from "./openrouter-privacy.ts";
 import { OPENROUTER_LIFETIME_USD } from "./openrouter-management.ts";
 
@@ -53,6 +53,11 @@ interface Pinned {
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 const MAX_OUTPUT = 700;
+/** Per-role lease window. Provider calls time out at 90s; renew between roles. */
+function encodeProviderRequestIds(ids: string[]): string | null {
+  const unique = ids.filter((id, i) => id && ids.indexOf(id) === i);
+  return unique.length ? unique.join(",") : null;
+}
 
 export async function migrateJobs(url: string): Promise<void> {
   const sql = postgres(url, { max: 1, onnotice: () => {} });
@@ -446,14 +451,14 @@ export class BrainJobs {
         update fb_ai_job
         set status = 'running',
             fence = fence + 1,
-            lease_until = now() + interval '120 seconds'
+            lease_until = now() + interval '180 seconds'
         where founder_id = ${workspace} and id = ${j.id}
         returning *
       `;
       await tx`
         update fb_job_dispatch
         set status = 'running',
-            lease_until = now() + interval '120 seconds'
+            lease_until = now() + interval '180 seconds'
         where job_id = ${j.id}
       `;
       const pinned = JSON.parse(await getPrivate(tx, workspace, j.input_blob_sha)) as Pinned;
@@ -466,6 +471,8 @@ export class BrainJobs {
     });
     if (!claim) return true;
     const { job, pinned } = claim;
+    let partialRequestIds: string[] = [];
+    let billedMicroUsd = 0;
     try {
       const { apiKey } = await loadOpenRouterApiKey(this.store, workspace);
       const result = await orchestrateInvitation(
@@ -479,10 +486,31 @@ export class BrainJobs {
         },
         apiKey,
         this.provider,
+        {
+          beforeRole: async () => {
+            await this.extendJobLease(workspace, job.id, Number(job.fence));
+          },
+          afterRole: async (progress) => {
+            partialRequestIds = progress.requestIds;
+            billedMicroUsd = progress.spentMicroUsd;
+            await this.persistJobProgress(
+              workspace,
+              job.id,
+              Number(job.fence),
+              progress.requestIds,
+            );
+          },
+        },
       );
       const cost = Math.ceil(
         result.inputTokens * pinned.inputRate + result.outputTokens * pinned.outputRate,
       );
+      billedMicroUsd = cost;
+      partialRequestIds = result.requestIds.length
+        ? result.requestIds
+        : result.requestId
+          ? [result.requestId]
+          : partialRequestIds;
       if (
         !Number.isSafeInteger(cost) ||
         cost < 0 ||
@@ -491,6 +519,7 @@ export class BrainJobs {
       ) {
         throw new Error("Invalid provider result");
       }
+      let completed = false;
       await this.store.scoped(workspace, async (tx: Tx) => {
         await tx`select pg_advisory_xact_lock(hashtext(${workspace}))`;
         await tx`select id from founder where id=${workspace} for update`;
@@ -503,7 +532,13 @@ export class BrainJobs {
             and lease_until > now()
           for update
         `;
-        if (!alive.length) return;
+        if (!alive.length) {
+          throw new DomainError(
+            503,
+            "job_lease_lost",
+            "Generation lost its lease after provider spend; quarantining for reconciliation.",
+          );
+        }
         const lifetime = await tx`
           update fb_openrouter_key
           set spent_microusd = spent_microusd + ${cost}
@@ -530,10 +565,11 @@ export class BrainJobs {
           on conflict (founder_id, job_id) do nothing
         `;
         await this.settle(tx, workspace, job as JobBudgetRow, cost);
+        const requestId = encodeProviderRequestIds(partialRequestIds) ?? result.requestId;
         await tx`
           update fb_ai_job
           set status = 'completed',
-              provider_request_id = ${result.requestId},
+              provider_request_id = ${requestId},
               lease_until = null
           where founder_id = ${workspace}
             and id = ${job.id}
@@ -544,18 +580,48 @@ export class BrainJobs {
           set status = 'completed', lease_until = null
           where job_id = ${job.id}
         `;
+        completed = true;
       });
+      if (!completed) {
+        throw new DomainError(
+          503,
+          "job_lease_lost",
+          "Generation lost its lease after provider spend; quarantining for reconciliation.",
+        );
+      }
+      // Completion succeeded; spend already applied in-tx. Clear so catch does not double-count.
+      billedMicroUsd = 0;
       this.onEvent({
         jobId: job.id,
         workspaceId: workspace,
         status: "completed",
-        providerRequestId: result.requestId,
+        providerRequestId: encodeProviderRequestIds(partialRequestIds) ?? result.requestId,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         costMicroUsd: cost,
       });
     } catch (e) {
       const knownNoCharge = (e as { knownNoCharge?: boolean })?.knownNoCharge === true;
+      // Billed OpenRouter calls that never reached a durable completion still need
+      // lifetime spend recorded (uncertain / completion-tx failure after inference).
+      if (!knownNoCharge && billedMicroUsd > 0) {
+        try {
+          await recordOpenRouterSpend(this.store, workspace, billedMicroUsd, {
+            allowOverLifetime: true,
+          });
+          await this.store.scoped(workspace, async (tx: Tx) => {
+            await tx`
+              update fb_ai_job
+              set openrouter_spend_recorded_microusd = ${billedMicroUsd}
+              where founder_id = ${workspace}
+                and id = ${job.id}
+                and fence = ${job.fence}
+            `;
+          });
+        } catch {
+          // Quarantine still proceeds; operator reconcile can apply confirmed spend.
+        }
+      }
       await this.store.scoped(workspace, async (tx: Tx) => {
         await tx`select pg_advisory_xact_lock(hashtext(${workspace}))`;
         await tx`select id from founder where id=${workspace} for update`;
@@ -573,9 +639,13 @@ export class BrainJobs {
         const error = knownNoCharge
           ? "Provider refused the request. Contact the operator."
           : "Generation could not be verified. No automatic retry; spend is reserved for reconciliation.";
+        const requestId = encodeProviderRequestIds(partialRequestIds);
         await tx`
           update fb_ai_job
-          set status = ${status}, error = ${error}, lease_until = null
+          set status = ${status},
+              error = ${error},
+              lease_until = null,
+              provider_request_id = coalesce(${requestId}, provider_request_id)
           where founder_id = ${workspace}
             and id = ${job.id}
             and fence = ${job.fence}
@@ -590,10 +660,64 @@ export class BrainJobs {
         jobId: job.id,
         workspaceId: workspace,
         status: knownNoCharge ? "failed" : "uncertain",
+        providerRequestId: encodeProviderRequestIds(partialRequestIds),
+        costMicroUsd: knownNoCharge ? 0 : billedMicroUsd || undefined,
         errorClass: knownNoCharge ? "provider_refused" : ((e as Error)?.name ?? "Error"),
       });
     }
     return true;
+  }
+
+  /** Renew the running job lease so multi-step orchestration cannot expire mid-flight. */
+  private async extendJobLease(
+    workspace: string,
+    jobId: string,
+    fence: number,
+  ): Promise<void> {
+    await this.store.scoped(workspace, async (tx: Tx) => {
+      const extended = await tx`
+        update fb_ai_job
+        set lease_until = now() + interval '180 seconds'
+        where founder_id = ${workspace}
+          and id = ${jobId}
+          and fence = ${fence}
+          and status = 'running'
+        returning id
+      `;
+      if (!extended.length) {
+        throw new DomainError(
+          503,
+          "job_lease_lost",
+          "Generation lost its lease and cannot continue safely.",
+        );
+      }
+      await tx`
+        update fb_job_dispatch
+        set lease_until = now() + interval '180 seconds'
+        where job_id = ${jobId}
+      `;
+    });
+  }
+
+  /** Persist partial provider request ids so reconcile can recover interrupted runs. */
+  private async persistJobProgress(
+    workspace: string,
+    jobId: string,
+    fence: number,
+    requestIds: string[],
+  ): Promise<void> {
+    const encoded = encodeProviderRequestIds(requestIds);
+    if (!encoded) return;
+    await this.store.scoped(workspace, async (tx: Tx) => {
+      await tx`
+        update fb_ai_job
+        set provider_request_id = ${encoded}
+        where founder_id = ${workspace}
+          and id = ${jobId}
+          and fence = ${fence}
+          and status = 'running'
+      `;
+    });
   }
 
   private async settle(tx: Tx, workspace: string, job: JobBudgetRow, cost: number): Promise<void> {
