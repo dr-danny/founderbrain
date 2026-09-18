@@ -13,6 +13,7 @@ import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { OPENROUTER_LIFETIME_USD, openRouterKeyName } from "./openrouter-management.ts";
 
 const url = process.env.FB_TEST_DATABASE_URL;
+const migrationUrl = process.env.FB_TEST_MIGRATION_DATABASE_URL ?? url;
 const enabled = !!url;
 const skip = enabled ? undefined : "Disposable database not configured";
 let store: PgBrainStore;
@@ -111,8 +112,10 @@ async function workspace(label: string) {
 before(async () => {
   if (!url) return;
   process.env.GE_MASTER_KEY ??= randomBytes(32).toString("base64");
-  await migrateJobs(url);
-  await migrateOpenRouterKeys(url);
+  // Schema changes need the migration role. The runtime role is intentionally
+  // not allowed to CREATE in public, which is what CI connects as.
+  await migrateJobs(migrationUrl!);
+  await migrateOpenRouterKeys(migrationUrl!);
   config = {
     NODE_ENV: "production",
     DATABASE_URL: url,
