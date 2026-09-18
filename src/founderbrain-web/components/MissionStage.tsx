@@ -1,5 +1,5 @@
 /**
- * Mission stage: heading, form or output, and save/approve footer.
+ * Mission stage: heading, form or output, and save/approve actions.
  */
 import { sectionWouldApprove, type Brain, type Config, type MissionSection } from "../types";
 import { missionCopy, missions, type Mission } from "../mission-copy";
@@ -41,7 +41,6 @@ export function MissionStage(props: {
   return (
     <article className="mission-card">
       <div className="mission-heading">
-        <span className="mission-number">{active.number}</span>
         <div>
           <p className="eyebrow">MISSION {active.number}</p>
           <h1>{active.title}</h1>
@@ -76,44 +75,46 @@ export function MissionStage(props: {
           onAccept={props.onAccept}
         />
       )}
-      <footer className="mission-actions">
-        {section && (
-          <button
-            className="button secondary"
-            onClick={props.onSave}
-            disabled={!props.changed || props.saving}
-          >
-            Save draft
-          </button>
-        )}
-        {props.canRetrySave && !props.saving && (
-          <button className="button secondary" onClick={props.onRetrySave}>
-            Retry save
-          </button>
-        )}
-        {section && (
-          <button
-            className="button primary"
-            onClick={() => props.onApprove(props.mission as MissionSection)}
-            disabled={
-              props.saving ||
-              (!section.approved &&
-                !sectionWouldApprove(props.draft, props.mission as MissionSection))
-            }
-          >
-            {section.approved
-              ? "Remove approval"
-              : sectionWouldApprove(props.draft, props.mission as MissionSection)
-                ? "Approve mission"
-                : "Complete required fields"}
-          </button>
-        )}
-        {next && (
-          <button className="button ghost" onClick={() => props.onNext(next)}>
-            Next: {missionCopy[next].title}
-          </button>
-        )}
-      </footer>
+      {(section || props.canRetrySave || next) && (
+        <div className="mission-actions">
+          {section && (
+            <button
+              className="button secondary"
+              onClick={props.onSave}
+              disabled={!props.changed || props.saving}
+            >
+              Save draft
+            </button>
+          )}
+          {props.canRetrySave && !props.saving && (
+            <button className="button secondary" onClick={props.onRetrySave}>
+              Retry save
+            </button>
+          )}
+          {section && (
+            <button
+              className="button primary"
+              onClick={() => props.onApprove(props.mission as MissionSection)}
+              disabled={
+                props.saving ||
+                (!section.approved &&
+                  !sectionWouldApprove(props.draft, props.mission as MissionSection))
+              }
+            >
+              {section.approved
+                ? "Remove approval"
+                : sectionWouldApprove(props.draft, props.mission as MissionSection)
+                  ? "Approve mission"
+                  : "Complete required fields"}
+            </button>
+          )}
+          {next && (
+            <button className="button ghost" onClick={() => props.onNext(next)}>
+              Next: {missionCopy[next].title}
+            </button>
+          )}
+        </div>
+      )}
     </article>
   );
 }
