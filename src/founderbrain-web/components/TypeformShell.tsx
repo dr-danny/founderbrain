@@ -68,9 +68,9 @@ export function TypeformShell({
       <div className="entry-veil" aria-hidden="true" />
       <section className="entry-panel typeform-panel" aria-labelledby="typeform-title">
         <header className="entry-brand-block">
-          <p className="entry-brand">OneDay</p>
+          <BrandMark size={56} className="entry-mark" />
           <p className="entry-product">
-            Founder<span>Brain</span>
+            <span>Founder</span>Brain
           </p>
         </header>
         <p className="entry-kicker">{kicker}</p>
@@ -108,6 +108,10 @@ export function TypeformShell({
           </button>
         </div>
       </section>
+    </main>
+  );
+}
+  </section>
     </main>
   );
 }

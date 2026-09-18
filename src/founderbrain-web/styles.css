@@ -1174,9 +1174,30 @@ button:not(.link-button) {
   overflow: auto;
 }
 
-/* Typeform orientation / chapters — Atlanta entry language */
 .typeform-stage .typeform-panel {
-  max-width: 28rem;
+  align-self: center;
+  width: min(100%, 46rem);
+  max-width: 46rem;
+  padding-top: clamp(2rem, 8vh, 5rem);
+  padding-bottom: clamp(2rem, 8vh, 5rem);
+}
+.typeform-stage .entry-title {
+  max-width: 12ch;
+  font-size: clamp(3.4rem, 8vw, 6.1rem);
+  line-height: 0.92;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+.typeform-stage .typeform-lede,
+.typeform-stage .typeform-body .entry-lede {
+  max-width: 28ch;
+  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  line-height: 1.4;
+}
+.typeform-stage .entry-cta {
+  margin-top: 2.25rem;
+  font-size: 1.15rem;
+  padding: 1.1rem 1.75rem;
 }
 .typeform-progress {
   margin: 0 0 0.55rem;
