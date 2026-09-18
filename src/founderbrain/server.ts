@@ -26,6 +26,8 @@ import {
   SlidingWindowLimiter,
   mutationKey,
 } from "./rate-limit.ts";
+import { ensureOpenRouterKey, revokeOpenRouterKey } from "./openrouter-keys.ts";
+import type { OpenRouterManagement } from "./openrouter-management.ts";
 
 const key = z
   .string()
@@ -61,6 +63,7 @@ export async function buildApi(
     authenticate?: Authenticate;
     serveWeb?: boolean;
     logger?: boolean;
+    openRouterManagement?: OpenRouterManagement;
   } = {},
 ) {
   const store =
@@ -132,6 +135,25 @@ export async function buildApi(
     const identity = await authenticate(req);
     const workspace = await store.ensureWorkspace(identity.subject);
     contexts.set(req, { subject: identity.subject, email: identity.email, workspace });
+    // Provision per-user OpenRouter key on first authenticated request (signup path).
+    if (config.OPENROUTER_MANAGEMENT_KEY || options.openRouterManagement) {
+      try {
+        await ensureOpenRouterKey(
+          store,
+          config,
+          workspace,
+          identity.email,
+          options.openRouterManagement,
+        );
+      } catch (error) {
+        if (error instanceof DomainError && error.code === "openrouter_key_revoked") throw error;
+        // Soft-fail provisioning so Brain edit/export still work if OpenRouter is down.
+        log.warn(
+          { errorClass: "openrouter_provision_deferred" },
+          "OpenRouter key provisioning deferred.",
+        );
+      }
+    }
 
     const path = req.url.split("?")[0] ?? req.url;
     const mut = mutationKey(req.method, path);
@@ -304,6 +326,14 @@ export async function buildApi(
   app.delete("/api/workspace", async (req) => {
     parse(z.object({ confirmation: z.literal("DELETE") }).strict(), req.body);
     const c = context(req);
+    try {
+      await revokeOpenRouterKey(store, config, c.workspace, options.openRouterManagement);
+    } catch {
+      log.warn(
+        { errorClass: "openrouter_revoke_deferred" },
+        "OpenRouter key revoke deferred during workspace delete.",
+      );
+    }
     await store.deleteWorkspace(c.subject, c.workspace);
     return { deleted: true };
   });

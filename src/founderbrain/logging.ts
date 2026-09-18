@@ -29,6 +29,7 @@ export function createFounderBrainLogger(service: "api" | "worker", level = "inf
         "prompt",
         "text",
         "ANTHROPIC_API_KEY",
+        "OPENROUTER_MANAGEMENT_KEY",
         "ORIGIN_SECRET",
         "GE_MASTER_KEY",
       ],

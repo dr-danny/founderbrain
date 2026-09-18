@@ -134,14 +134,14 @@ The API requires the gateway secret for `/api/*` and denies foreign browser orig
 Use the same compiled image with `node src/founderbrain/worker.js`. Its `DATABASE_URL` uses `fb_worker`. Also configure:
 
 - `AI_ENABLED=true`
-- `ANTHROPIC_API_KEY`
-- `AI_MODEL` chosen from the actual provider account
-- `AI_INPUT_USD_PER_MILLION`, `AI_OUTPUT_USD_PER_MILLION`: verified current rates for that exact model
-- `AI_WORKSPACE_DAILY_MICROUSD`, `AI_GLOBAL_DAILY_MICROUSD`: approved limits, in millionths of a dollar
+- `OPENROUTER_MANAGEMENT_KEY` on the API (creates/revokes per-user keys named `OneDay-Founderbrain-{email}`, $20 lifetime / no reset, 30-day expiry)
+- Privacy-allowlisted `AI_MODEL_THINKER` / `AI_MODEL_RUNNER` (or `AI_MODEL`) / `AI_MODEL_VERIFIER`, or accept code defaults
+- `AI_INPUT_USD_PER_MILLION`, `AI_OUTPUT_USD_PER_MILLION`: verified current rates for the runner model
+- `AI_WORKSPACE_DAILY_MICROUSD`, `AI_GLOBAL_DAILY_MICROUSD`: approved daily limits, in millionths of a dollar
 
-The API needs the same approved model/rate/cap settings for job admission. The worker needs the provider key. Neither key nor full prompts appear in logs/browser responses. No calls occur merely by opening a mission; job creation is explicit. Do not start the worker service while AI is disabled.
+The API needs the same approved model/rate/cap settings for job admission. The worker loads each founder’s encrypted OpenRouter inference key from Postgres (never from the browser). Neither key nor full prompts appear in logs/browser responses. No calls occur merely by opening a mission; job creation is explicit. Do not start the worker service while AI is disabled.
 
-The app reserves a conservative maximum before dispatch and settles actual reported token usage. Provider pricing must be kept current; application caps cannot override provider billing. Generation uses one attempt per job. An ambiguous response or expired in-flight lease becomes `uncertain`, retains its budget reservation and blocks new workspace jobs until operator reconciliation. There is deliberately no automatic retry of potentially billed calls.
+Generation auto-orchestrates thinker → runner → verifier with ZDR / deny-data-collection routing. The app reserves a conservative maximum before dispatch and settles actual reported token usage. Provider pricing must be kept current; application caps cannot override provider billing. Generation uses one attempt per job. An ambiguous response or expired in-flight lease becomes `uncertain`, retains its budget reservation and blocks new workspace jobs until operator reconciliation. There is deliberately no automatic retry of potentially billed calls.
 
 To release quarantine, an operator must inspect provider usage, then follow [RUNBOOK.md](./RUNBOOK.md) (reconcile uncertain job). In short: run `npm run fb:reconcile` with the admin URL in `MIGRATION_DATABASE_URL`, the exact `JOB_ID`, verified `CONFIRMED_COST_MICROUSD`, and `RECONCILIATION_CONFIRMED=yes`. The command settles accounting atomically and never calls the model. It refuses active/completed/already-reconciled jobs. Do not infer zero cost from an elapsed lease.
 

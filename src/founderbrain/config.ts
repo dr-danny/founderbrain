@@ -32,8 +32,14 @@ const envSchema = z.object({
     .optional(),
   FOUNDERBRAIN_LOCAL_DEMO: z.enum(["true", "false"]).default("false"),
   AI_ENABLED: z.enum(["true", "false"]).default("false"),
-  ANTHROPIC_API_KEY: z.string().optional(),
+  /** Management key for per-user OpenRouter key create/revoke. Never an inference key. */
+  OPENROUTER_MANAGEMENT_KEY: z.string().min(16).optional(),
+  /** Optional role model overrides; must be privacy-allowlisted. Defaults in openrouter-privacy.ts. */
+  AI_MODEL_THINKER: z.string().optional(),
+  AI_MODEL_RUNNER: z.string().optional(),
+  /** Alias for AI_MODEL_RUNNER when only one model id is configured. */
   AI_MODEL: z.string().optional(),
+  AI_MODEL_VERIFIER: z.string().optional(),
   AI_INPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
   AI_OUTPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
   AI_WORKSPACE_DAILY_MICROUSD: positive.optional(),
@@ -99,16 +105,20 @@ export function loadConfig(raw: NodeJS.ProcessEnv = process.env): Config {
       "HEXCLAVE_API_URL must be a bare HTTPS origin such as https://api.hexclave.com.",
     );
   }
-  if (
-    c.AI_ENABLED === "true" &&
-    (!c.ANTHROPIC_API_KEY ||
-      !c.AI_MODEL ||
+  if (c.AI_ENABLED === "true") {
+    const runner = c.AI_MODEL_RUNNER ?? c.AI_MODEL;
+    if (
+      !c.OPENROUTER_MANAGEMENT_KEY ||
+      !runner ||
       !c.AI_INPUT_USD_PER_MILLION ||
       !c.AI_OUTPUT_USD_PER_MILLION ||
       !c.AI_WORKSPACE_DAILY_MICROUSD ||
-      !c.AI_GLOBAL_DAILY_MICROUSD)
-  ) {
-    throw new Error("AI requires a model, key, explicit prices and approved daily budget caps.");
+      !c.AI_GLOBAL_DAILY_MICROUSD
+    ) {
+      throw new Error(
+        "AI requires OPENROUTER_MANAGEMENT_KEY, a runner model, explicit prices and approved daily budget caps.",
+      );
+    }
   }
   assertMasterKeyPresent();
   return c;

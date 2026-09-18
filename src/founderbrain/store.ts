@@ -525,6 +525,10 @@ export class PgBrainStore {
           }
           await tx`delete from fb_ai_job where founder_id=${workspaceId}`;
         }
+        const openRouterSchema = await tx`select to_regclass('public.fb_openrouter_key') as present`;
+        if (openRouterSchema[0]?.present) {
+          await tx`delete from fb_openrouter_key where founder_id = ${workspaceId}`;
+        }
         await tx`delete from fb_receipt where founder_id = ${workspaceId}`;
         await tx`delete from ge_file_version where founder_id = ${workspaceId}`;
         await tx`delete from ge_file where founder_id = ${workspaceId}`;

@@ -15,12 +15,19 @@ need() {
   fi
 }
 
-need AI_MODEL
+# Runner model may be AI_MODEL_RUNNER or legacy AI_MODEL alias.
+if [[ -z "${AI_MODEL_RUNNER:-}" && -z "${AI_MODEL:-}" ]]; then
+  echo "MISSING AI_MODEL_RUNNER (or AI_MODEL alias)"
+  fail=1
+else
+  echo "OK      AI_MODEL_RUNNER/AI_MODEL (set, value withheld)"
+fi
+
 need AI_INPUT_USD_PER_MILLION
 need AI_OUTPUT_USD_PER_MILLION
 need AI_WORKSPACE_DAILY_MICROUSD
 need AI_GLOBAL_DAILY_MICROUSD
-need ANTHROPIC_API_KEY
+need OPENROUTER_MANAGEMENT_KEY
 
 # Numeric sanity without printing values
 for name in AI_INPUT_USD_PER_MILLION AI_OUTPUT_USD_PER_MILLION; do
@@ -57,4 +64,6 @@ if [[ "$fail" -ne 0 ]]; then
 fi
 
 echo "AI enablement check PASSED. Set identical model/rate/cap vars on API + worker,"
-echo "ANTHROPIC_API_KEY on worker only, AI_ENABLED=true on both, then start the worker service."
+echo "OPENROUTER_MANAGEMENT_KEY on API (provision/revoke) and worker can read per-user keys from DB,"
+echo "AI_ENABLED=true on both, then start the worker service."
+echo "Per-user keys: OneDay-Founderbrain-{email}, \$20 lifetime (no reset), 30-day expiry."

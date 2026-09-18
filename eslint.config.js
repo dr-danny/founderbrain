@@ -140,16 +140,17 @@ export default tseslint.config(
     },
   },
   {
-    // FounderBrain Rule 3. Anthropic (and any future vendor) is called only from provider.ts.
+    // FounderBrain Rule 3. OpenRouter inference is called only from provider.ts;
+    // Management API only from openrouter-management.ts.
     files: ["src/founderbrain/**/*.ts"],
-    ignores: ["src/founderbrain/provider.ts"],
+    ignores: ["src/founderbrain/provider.ts", "src/founderbrain/openrouter-management.ts"],
     rules: {
       "no-restricted-globals": [
         "error",
         {
           name: "fetch",
           message:
-            "Vendor calls go through anthropicProvider in src/founderbrain/provider.ts, which is the only FounderBrain module that calls a vendor host.",
+            "Inference goes through openRouterProvider in provider.ts; key admin goes through openrouter-management.ts.",
         },
       ],
       "no-restricted-imports": [

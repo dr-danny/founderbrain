@@ -2,8 +2,8 @@
  * src/founderbrain/jobs.ts
  *
  * WHAT THIS IS. Generation queue, lease, fence, budget reserve/settle, and
- * artifact accept. The money path lives here; the Anthropic HTTP call does not
- * (see provider.ts).
+ * artifact accept. The money path lives here; OpenRouter inference does not
+ * (see provider.ts / orchestrate.ts).
  *
  * WHY IT EXISTS. One paid attempt per job. Ambiguous outcomes quarantine as
  * `uncertain` and never auto-retry. Editing and export stay available when AI
@@ -22,13 +22,16 @@ import {
 } from "./domain.ts";
 import type { Config } from "./config.ts";
 import type { PgBrainStore } from "./store.ts";
-import { anthropicProvider, type Provider, type ProviderCall } from "./provider.ts";
+import { openRouterProvider, type Provider } from "./provider.ts";
 import { sealBlob, openBlob, unwrapDataKey } from "../server/storage/crypto.ts";
+import { buildOrchestrationFromConfig, orchestrateInvitation } from "./orchestrate.ts";
+import { keyIsUsable, loadOpenRouterApiKey } from "./openrouter-keys.ts";
+import type { OrchestrationRole, RoleModels } from "./openrouter-privacy.ts";
+import { OPENROUTER_LIFETIME_USD } from "./openrouter-management.ts";
 
 export type { Provider, ProviderResult } from "./provider.ts";
 
 type Tx = TransactionSql;
-type Call = ProviderCall;
 type ArtifactRow = {
   id: string;
   accepted_sha: string | null;
@@ -41,7 +44,9 @@ type ArtifactRow = {
 };
 type JobBudgetRow = { reserved: number; budget_day: string };
 interface Pinned {
-  api: Call;
+  roles: Record<OrchestrationRole, RoleModels>;
+  system: string;
+  userContent: string;
   inputRate: number;
   outputRate: number;
 }
@@ -118,7 +123,7 @@ export class BrainJobs {
   constructor(
     private store: PgBrainStore,
     private config: Config,
-    private provider: Provider = anthropicProvider,
+    private provider: Provider = openRouterProvider,
     private onEvent: JobEventSink = () => {},
   ) {
     this.dispatcher = postgres(config.DATABASE_URL, {
@@ -145,12 +150,22 @@ export class BrainJobs {
     if (!ready.identity || !ready.customer || !ready.offer || !ready.voice) {
       throw new DomainError(422, "brain_incomplete", "Approve the four input missions first.");
     }
-    const api: Call = {
-      model: this.config.AI_MODEL!,
-      max_tokens: MAX_OUTPUT,
-      ...generationPayload(state.brain),
+    const { meta } = await loadOpenRouterApiKey(this.store, workspace);
+    keyIsUsable(meta);
+    const payload = generationPayload(state.brain);
+    const roles = buildOrchestrationFromConfig({
+      thinker: this.config.AI_MODEL_THINKER,
+      runner: this.config.AI_MODEL_RUNNER ?? this.config.AI_MODEL,
+      verifier: this.config.AI_MODEL_VERIFIER,
+    });
+    const pinned: Pinned = {
+      roles,
+      system: payload.system,
+      userContent: payload.messages[0]!.content,
+      inputRate: this.config.AI_INPUT_USD_PER_MILLION!,
+      outputRate: this.config.AI_OUTPUT_USD_PER_MILLION!,
     };
-    const body = canonicalize(api);
+    const body = canonicalize(pinned);
     if (Buffer.byteLength(body) > 32000) {
       throw new DomainError(
         422,
@@ -158,14 +173,9 @@ export class BrainJobs {
         "Shorten your Brain before generating an invitation.",
       );
     }
-    const pinned: Pinned = {
-      api,
-      inputRate: this.config.AI_INPUT_USD_PER_MILLION!,
-      outputRate: this.config.AI_OUTPUT_USD_PER_MILLION!,
-    };
-    // UTF-8 byte count plus framing allowance deliberately over-reserves input tokens.
+    // UTF-8 byte count plus framing allowance deliberately over-reserves for three roles.
     const reserve = Math.ceil(
-      (Buffer.byteLength(body) + 2048) * pinned.inputRate + MAX_OUTPUT * pinned.outputRate,
+      (Buffer.byteLength(body) + 4096) * pinned.inputRate + MAX_OUTPUT * 3 * pinned.outputRate,
     );
     return this.store.scoped(workspace, async (tx: Tx) => {
       await tx`select pg_advisory_xact_lock(hashtext(${workspace}))`;
@@ -447,7 +457,7 @@ export class BrainJobs {
         where job_id = ${j.id}
       `;
       const pinned = JSON.parse(await getPrivate(tx, workspace, j.input_blob_sha)) as Pinned;
-      if (hash(canonicalize(pinned.api)) !== j.input_hash) {
+      if (hash(canonicalize(pinned)) !== j.input_hash) {
         throw new DomainError(503, "input_corrupt", "The generation input failed verification.");
       }
       const claimedJob = claimed[0];
@@ -457,7 +467,19 @@ export class BrainJobs {
     if (!claim) return true;
     const { job, pinned } = claim;
     try {
-      const result = await this.provider(pinned.api, this.config.ANTHROPIC_API_KEY!);
+      const { apiKey } = await loadOpenRouterApiKey(this.store, workspace);
+      const result = await orchestrateInvitation(
+        {
+          roles: pinned.roles,
+          system: pinned.system,
+          userContent: pinned.userContent,
+          reservedMicroUsd: Number(job.reserved),
+          inputRate: pinned.inputRate,
+          outputRate: pinned.outputRate,
+        },
+        apiKey,
+        this.provider,
+      );
       const cost = Math.ceil(
         result.inputTokens * pinned.inputRate + result.outputTokens * pinned.outputRate,
       );
@@ -482,6 +504,21 @@ export class BrainJobs {
           for update
         `;
         if (!alive.length) return;
+        const lifetime = await tx`
+          update fb_openrouter_key
+          set spent_microusd = spent_microusd + ${cost}
+          where founder_id = ${workspace}
+            and revoked_at is null
+            and spent_microusd + ${cost} <= ${OPENROUTER_LIFETIME_USD * 1_000_000}
+          returning spent_microusd
+        `;
+        if (!lifetime.length) {
+          throw new DomainError(
+            429,
+            "openrouter_lifetime_limit",
+            "The lifetime AI budget for this account is spent. Editing and exports remain available.",
+          );
+        }
         const sha = await putPrivate(tx, workspace, result.text);
         await tx`
           insert into fb_artifact (

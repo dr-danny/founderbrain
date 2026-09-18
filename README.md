@@ -94,7 +94,7 @@ Nothing in section 5 of the build document should be written before the probe ha
 |---|---|
 | Node 22 | Required by `engines` / `.nvmrc`. The Agent SDK ships a Linux CLI binary for the inherited app; FounderBrain CI also pins 22 |
 | Postgres | The record. Everything else is a cache |
-| An Anthropic API key | Only when enabling AI (#24). Not required for local demo with `AI_ENABLED=false` |
+| An OpenRouter Management API key | Only when enabling AI (#24). Creates per-user keys automatically. Not required for local demo with `AI_ENABLED=false` |
 | Vendored content in `vendor/` | Already in the tree. There is no git submodule |
 
 ## Running it locally

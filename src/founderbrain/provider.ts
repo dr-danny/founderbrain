@@ -1,16 +1,22 @@
 /**
  * src/founderbrain/provider.ts
  *
- * WHAT THIS IS. The one FounderBrain module that calls a vendor host. Anthropic
- * messages go out from here and nowhere else under src/founderbrain/.
+ * WHAT THIS IS. The one FounderBrain module that calls a vendor inference host.
+ * OpenRouter chat completions go out from here and nowhere else under
+ * src/founderbrain/ (Management API lives in openrouter-management.ts).
  *
  * WHY IT EXISTS. The money path (reserve, lease, fence, settle) lives in jobs.ts.
- * Keeping the HTTP call in a single file means a second vendor endpoint cannot
+ * Keeping the HTTP call in a single file means a second inference endpoint cannot
  * appear without failing the lint rule that points at this file.
  *
- * WHAT CALLS IT. BrainJobs, via the default `anthropicProvider` or a test double.
+ * WHAT CALLS IT. BrainJobs / orchestrateInvitation, via `openRouterProvider` or a
+ * test double.
  */
 import { canonicalize } from "./domain.ts";
+import {
+  assertPrivacyEligibleModel,
+  OPENROUTER_PRIVACY_PROVIDER,
+} from "./openrouter-privacy.ts";
 
 export interface ProviderCall {
   model: string;
@@ -30,15 +36,24 @@ export type Provider = (body: ProviderCall, key: string) => Promise<ProviderResu
 
 const KNOWN_NO_CHARGE = new Set([400, 401, 403, 404, 413, 422, 429]);
 
-export const anthropicProvider: Provider = async (body, key) => {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+export const openRouterProvider: Provider = async (body, key) => {
+  assertPrivacyEligibleModel(body.model);
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${key}`,
+      "HTTP-Referer": "https://founderbrain.app",
+      "X-OpenRouter-Title": "FounderBrain",
     },
-    body: canonicalize(body),
+    body: canonicalize({
+      model: body.model,
+      max_tokens: body.max_tokens,
+      messages: [{ role: "system", content: body.system }, ...body.messages],
+      provider: OPENROUTER_PRIVACY_PROVIDER,
+      // Refuse provider-side prompt publication / public ranking opt-in.
+      stream: false,
+    }),
     signal: AbortSignal.timeout(90000),
   });
   if (!response.ok) {
@@ -47,26 +62,37 @@ export const anthropicProvider: Provider = async (body, key) => {
     throw err;
   }
   const data = (await response.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-    usage?: { input_tokens: number; output_tokens: number };
+    id?: string;
+    choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
-  const text = data.content
-    ?.filter((x) => x.type === "text")
-    .map((x) => x.text ?? "")
-    .join("\n")
-    .trim();
+  const raw = data.choices?.[0]?.message?.content;
+  const text =
+    typeof raw === "string"
+      ? raw.trim()
+      : Array.isArray(raw)
+        ? raw
+            .map((part) => (typeof part === "object" && part && "text" in part ? part.text ?? "" : ""))
+            .join("\n")
+            .trim()
+        : "";
+  const inputTokens = data.usage?.prompt_tokens;
+  const outputTokens = data.usage?.completion_tokens;
   if (
     !text ||
     text.length > 12000 ||
-    !Number.isInteger(data.usage?.input_tokens) ||
-    !Number.isInteger(data.usage?.output_tokens)
+    !Number.isInteger(inputTokens) ||
+    !Number.isInteger(outputTokens)
   ) {
     throw new Error("Provider response could not be verified");
   }
   return {
     text,
-    inputTokens: data.usage!.input_tokens,
-    outputTokens: data.usage!.output_tokens,
-    requestId: response.headers.get("request-id"),
+    inputTokens: inputTokens!,
+    outputTokens: outputTokens!,
+    requestId: data.id ?? response.headers.get("x-request-id"),
   };
 };
+
+/** @deprecated Use openRouterProvider. Kept as an alias for older test imports. */
+export const anthropicProvider = openRouterProvider;

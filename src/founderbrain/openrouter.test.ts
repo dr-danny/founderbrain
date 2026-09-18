@@ -1,0 +1,166 @@
+/**
+ * Unit tests for OpenRouter privacy allowlist, key naming/expiry, lifetime
+ * gates, and thinker/runner/verifier orchestration.
+ */
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  OPENROUTER_KEY_NAME_PREFIX,
+  OPENROUTER_KEY_TTL_DAYS,
+  OPENROUTER_LIFETIME_USD,
+  openRouterKeyExpiresAt,
+  openRouterKeyName,
+} from "./openrouter-management.ts";
+import {
+  assertPrivacyEligibleModel,
+  isPrivacyEligibleModel,
+  resolveOrchestration,
+} from "./openrouter-privacy.ts";
+import { keyIsUsable, type StoredOpenRouterKey } from "./openrouter-keys.ts";
+import { orchestrateInvitation } from "./orchestrate.ts";
+import type { Provider } from "./provider.ts";
+import { DomainError } from "./domain.ts";
+
+describe("openrouter privacy allowlist", () => {
+  it("accepts reviewed models and rejects unknowns", () => {
+    assert.equal(isPrivacyEligibleModel("anthropic/claude-sonnet-4"), true);
+    assert.equal(isPrivacyEligibleModel("evil/train-on-me"), false);
+    assert.throws(() => assertPrivacyEligibleModel("evil/train-on-me"));
+  });
+
+  it("resolves role defaults and rejects non-allowlisted overrides", () => {
+    const roles = resolveOrchestration({});
+    assert.equal(roles.thinker.primary, "anthropic/claude-3.5-haiku");
+    assert.equal(roles.runner.primary, "anthropic/claude-sonnet-4");
+    assert.equal(roles.verifier.primary, "anthropic/claude-3.5-haiku");
+    assert.throws(() => resolveOrchestration({ runner: "not-allowed/model" }));
+  });
+});
+
+describe("openrouter key naming and expiry", () => {
+  it("names keys OneDay-Founderbrain-{email}", () => {
+    assert.equal(
+      openRouterKeyName("Ada@Example.TEST"),
+      `${OPENROUTER_KEY_NAME_PREFIX}ada@example.test`,
+    );
+    assert.equal(OPENROUTER_LIFETIME_USD, 20);
+    assert.equal(OPENROUTER_KEY_TTL_DAYS, 30);
+  });
+
+  it("sets 30-day expiry with second precision", () => {
+    const now = new Date("2026-09-18T12:00:00.123Z");
+    const expires = openRouterKeyExpiresAt(now);
+    assert.equal(expires, "2026-10-18T12:00:00Z");
+    assert.match(expires, /T\d{2}:\d{2}:\d{2}Z$/);
+  });
+});
+
+describe("openrouter lifetime and expiry gates", () => {
+  const base = (): StoredOpenRouterKey => ({
+    founderId: "WS",
+    keyHash: "hash",
+    keyName: "OneDay-Founderbrain-a@example.test",
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+    lifetimeLimitUsd: 20,
+    spentMicroUsd: 0,
+    revokedAt: null,
+  });
+
+  it("blocks expired, revoked, and lifetime-exhausted keys", () => {
+    assert.throws(
+      () => keyIsUsable({ ...base(), expiresAt: new Date("2020-01-01T00:00:00Z") }),
+      (e: DomainError) => e.code === "openrouter_key_expired",
+    );
+    assert.throws(
+      () => keyIsUsable({ ...base(), revokedAt: new Date() }),
+      (e: DomainError) => e.code === "openrouter_key_revoked",
+    );
+    assert.throws(
+      () => keyIsUsable({ ...base(), spentMicroUsd: 20_000_000 }),
+      (e: DomainError) => e.code === "openrouter_lifetime_limit",
+    );
+    keyIsUsable(base());
+  });
+});
+
+describe("invitation orchestration", () => {
+  it("runs thinker → runner → verifier and returns the draft on PASS", async () => {
+    const calls: string[] = [];
+    const provider: Provider = async (body) => {
+      calls.push(body.system.slice(0, 24));
+      if (body.system.includes("plan one short")) {
+        return {
+          text: "- angle: workflow\n- tone: warm",
+          inputTokens: 10,
+          outputTokens: 5,
+          requestId: "t1",
+        };
+      }
+      if (body.system.includes("Verify")) {
+        return { text: "PASS", inputTokens: 8, outputTokens: 1, requestId: "v1" };
+      }
+      return {
+        text: "Hi [Name], could we talk about your appointment follow-ups?",
+        inputTokens: 20,
+        outputTokens: 15,
+        requestId: "r1",
+      };
+    };
+    const roles = resolveOrchestration({});
+    const result = await orchestrateInvitation(
+      {
+        roles,
+        system: "Write one short invitation.",
+        userContent: '{"identity":{"name":"Ada"}}',
+        reservedMicroUsd: 1_000_000,
+        inputRate: 1,
+        outputRate: 2,
+      },
+      "sk-test",
+      provider,
+    );
+    assert.match(result.text, /appointment follow-ups/);
+    assert.equal(result.roleUsage.length, 3);
+    assert.deepEqual(
+      result.roleUsage.map((u) => u.role),
+      ["thinker", "runner", "verifier"],
+    );
+    assert.equal(calls.length, 3);
+  });
+
+  it("rewrites once when verifier fails and budget remains", async () => {
+    let verifyCount = 0;
+    let runnerCount = 0;
+    const provider: Provider = async (body) => {
+      if (body.system.includes("plan one short")) {
+        return { text: "notes", inputTokens: 5, outputTokens: 2, requestId: "t" };
+      }
+      if (body.system.includes("Verify")) {
+        verifyCount += 1;
+        return { text: "FAIL: invented urgency", inputTokens: 5, outputTokens: 2, requestId: "v" };
+      }
+      runnerCount += 1;
+      return {
+        text: runnerCount === 1 ? "Urgent!!! buy now" : "Hi [Name], may we learn your workflow?",
+        inputTokens: 10,
+        outputTokens: 8,
+        requestId: "r",
+      };
+    };
+    const result = await orchestrateInvitation(
+      {
+        roles: resolveOrchestration({}),
+        system: "Write one short invitation.",
+        userContent: "{}",
+        reservedMicroUsd: 1_000_000,
+        inputRate: 1,
+        outputRate: 1,
+      },
+      "sk-test",
+      provider,
+    );
+    assert.equal(verifyCount, 1);
+    assert.equal(runnerCount, 2);
+    assert.match(result.text, /workflow/);
+  });
+});

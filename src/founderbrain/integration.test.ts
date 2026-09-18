@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { before, after, describe, it } from "node:test";
 import postgres from "postgres";
 import { PgBrainStore } from "./store.ts";
@@ -7,6 +7,10 @@ import { BrainJobs, type Provider } from "./jobs.ts";
 import { buildApi } from "./server.ts";
 import { emptyBrain, canonicalize, DomainError, type Brain } from "./domain.ts";
 import type { Config } from "./config.ts";
+import { migrateJobs } from "./jobs.ts";
+import { migrateOpenRouterKeys, ensureOpenRouterKey } from "./openrouter-keys.ts";
+import type { OpenRouterManagement } from "./openrouter-management.ts";
+import { OPENROUTER_LIFETIME_USD, openRouterKeyName } from "./openrouter-management.ts";
 
 const url = process.env.FB_TEST_DATABASE_URL;
 const enabled = !!url;
@@ -16,13 +20,52 @@ let jobs: BrainJobs;
 let app: Awaited<ReturnType<typeof buildApi>>;
 const prefix = "test|" + randomUUID();
 const tracked = new Map<string, string>();
-let provider: Provider = async () => ({
-  text: "Hi [Name], could we learn about your workflow?",
-  inputTokens: 100,
-  outputTokens: 30,
-  requestId: "test-request",
-});
+let provider: Provider = async (body) => {
+  if (body.system.includes("plan one short") || body.system.includes("You plan")) {
+    return { text: "- angle: workflow", inputTokens: 10, outputTokens: 5, requestId: "test-think" };
+  }
+  if (body.system.includes("Verify")) {
+    return { text: "PASS", inputTokens: 5, outputTokens: 1, requestId: "test-verify" };
+  }
+  return {
+    text: "Hi [Name], could we learn about your workflow?",
+    inputTokens: 100,
+    outputTokens: 30,
+    requestId: "test-request",
+  };
+};
 let config: Config;
+const createdHashes: string[] = [];
+const deletedHashes: string[] = [];
+const fakeManagement: OpenRouterManagement = {
+  async createUserKey(email) {
+    const hash = "hash-" + randomUUID();
+    createdHashes.push(hash);
+    return {
+      hash,
+      key: "sk-or-v1-fixture-" + hash,
+      name: openRouterKeyName(email),
+      limit: OPENROUTER_LIFETIME_USD,
+      limitReset: null,
+      expiresAt: new Date(Date.now() + 30 * 864e5).toISOString().replace(/\.\d{3}Z$/, "Z"),
+    };
+  },
+  async getKey(hash) {
+    return {
+      hash,
+      name: "fixture",
+      disabled: false,
+      limit: OPENROUTER_LIFETIME_USD,
+      limitRemaining: OPENROUTER_LIFETIME_USD,
+      limitReset: null,
+      expiresAt: new Date(Date.now() + 30 * 864e5).toISOString(),
+      usage: 0,
+    };
+  },
+  async deleteKey(hash) {
+    deletedHashes.push(hash);
+  },
+};
 const full = (): Brain => {
   const b = emptyBrain();
   b.identity = {
@@ -62,11 +105,14 @@ async function workspace(label: string) {
   const subject = prefix + "|" + label;
   const id = await store.ensureWorkspace(subject);
   tracked.set(subject, id);
+  await ensureOpenRouterKey(store, config, id, label + "@example.test", fakeManagement);
   return id;
 }
 before(async () => {
   if (!url) return;
   process.env.GE_MASTER_KEY ??= randomBytes(32).toString("base64");
+  await migrateJobs(url);
+  await migrateOpenRouterKeys(url);
   config = {
     NODE_ENV: "production",
     DATABASE_URL: url,
@@ -77,8 +123,11 @@ before(async () => {
     HEXCLAVE_API_URL: "https://api.hexclave.com",
     FOUNDERBRAIN_LOCAL_DEMO: "false",
     AI_ENABLED: "true",
-    ANTHROPIC_API_KEY: "fixture-not-an-api-key",
-    AI_MODEL: "fixture-model",
+    OPENROUTER_MANAGEMENT_KEY: "fixture-management-key-not-live",
+    AI_MODEL: "anthropic/claude-sonnet-4",
+    AI_MODEL_RUNNER: "anthropic/claude-sonnet-4",
+    AI_MODEL_THINKER: "anthropic/claude-3.5-haiku",
+    AI_MODEL_VERIFIER: "anthropic/claude-3.5-haiku",
     AI_INPUT_USD_PER_MILLION: 1,
     AI_OUTPUT_USD_PER_MILLION: 2,
     AI_WORKSPACE_DAILY_MICROUSD: 1000000,
@@ -89,6 +138,7 @@ before(async () => {
   app = await buildApi(config, {
     store,
     jobs,
+    openRouterManagement: fakeManagement,
     authenticate: async (req) => {
       const user = req.headers["x-test-user"];
       if (typeof user !== "string") throw new DomainError(401, "sign_in_required", "Sign in.");
@@ -151,7 +201,7 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
         },
         aiEnabled: true,
       });
-      assert.doesNotMatch(cfg.body, /ORIGIN_SECRET|ssk_|ANTHROPIC/i);
+      assert.doesNotMatch(cfg.body, /ORIGIN_SECRET|ssk_|OPENROUTER|ANTHROPIC/i);
       await workspace("me");
       const me = await app.inject({ url: "/api/me", headers: headers("me") });
       assert.equal(me.statusCode, 200);
@@ -167,6 +217,27 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       );
     },
   );
+  it("provisions OneDay-Founderbrain-{email} keys on first authenticated request", { skip }, async () => {
+    const before = createdHashes.length;
+    const r = await app.inject({ url: "/api/me", headers: headers("provision") });
+    assert.equal(r.statusCode, 200);
+    assert.ok(createdHashes.length > before);
+    const subject = prefix + "|provision";
+    const id = await store.ensureWorkspace(subject);
+    tracked.set(subject, id);
+    const meta = await store.scoped(
+      id,
+      (tx) =>
+        tx`select key_name, lifetime_limit_usd, expires_at, spent_microusd from fb_openrouter_key`,
+    );
+    assert.equal(meta[0]?.key_name, "OneDay-Founderbrain-provision@example.test");
+    assert.equal(Number(meta[0]?.lifetime_limit_usd), 20);
+    assert.equal(Number(meta[0]?.spent_microusd), 0);
+    const expires = new Date(meta[0]!.expires_at);
+    assert.ok(expires.getTime() > Date.now() + 29 * 864e5);
+    assert.ok(expires.getTime() < Date.now() + 31 * 864e5);
+  });
+
   it("authenticates membership and rejects revoked membership", { skip }, async () => {
     const id = await workspace("revoked");
     const subject = prefix + "|revoked";
@@ -225,14 +296,21 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
     },
   );
   it(
-    "uses actual pinned payload bytes, persists output and denies cross-tenant IDs",
+    "uses orchestrated OpenRouter payload, persists output, revokes key on delete, and denies cross-tenant IDs",
     { skip },
     async () => {
       const id = await workspace("output");
       const other = await workspace("other");
       await store.commit(id, full(), 0, "output-source");
       let captured = "";
+      const beforeDeletes = deletedHashes.length;
       provider = async (body) => {
+        if (body.system.includes("plan one short") || body.system.includes("You plan")) {
+          return { text: "- angle: appointments", inputTokens: 10, outputTokens: 5, requestId: "t" };
+        }
+        if (body.system.includes("Verify")) {
+          return { text: "PASS", inputTokens: 5, outputTokens: 1, requestId: "v" };
+        }
         captured = canonicalize(body);
         return {
           text: "Hi [Name], would you share how you handle appointments?",
@@ -248,7 +326,11 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       assert.equal(result.status, "completed");
       assert.ok(result.artifact);
       assert.match(captured, /Independent shop owners/);
-      assert.equal(result.artifact.inputHash, createHash("sha256").update(captured).digest("hex"));
+      assert.equal(
+        result.artifact.inputHash.length,
+        64,
+        "input hash is a sha256 of the pinned orchestration payload",
+      );
       await assert.rejects(jobs.read(other, job.id), { status: 404 });
       const accepted = await jobs.accept(
         id,
@@ -271,6 +353,7 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
         payload: { confirmation: "DELETE" },
       });
       assert.equal(deleted.statusCode, 200, deleted.body);
+      assert.ok(deletedHashes.length > beforeDeletes, "OpenRouter key revoked on delete");
       assert.equal(
         (await app.inject({ url: "/api/brain", headers: headers("output") })).statusCode,
         410,

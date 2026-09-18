@@ -31,7 +31,7 @@ order by updated_at nulls last, created_at;
 ### Confirm actual provider usage
 
 1. Take `provider_request_id` from the row (it may be null if the lease expired before a request id was stored).
-2. Look up that id in the provider console (Anthropic usage / request log for the model in use).
+2. Look up that id in the OpenRouter activity / generation log for the model in use.
 3. Decide the confirmed cost in **micro-USD** (millionths of a dollar), matching how `fb_budget` stores amounts.
 4. If no request landed and the provider shows nothing billable, confirmed cost is `0`. Do **not** infer zero from an elapsed lease alone when a request id exists or usage is unclear. Stop and investigate.
 
@@ -103,4 +103,4 @@ There is no automatic merge of two workspaces. That remains a human data decisio
 | Cloudflare Worker route | #15 | Live Cloudflare account |
 | Staging acceptance | #16 | After #13–#15 |
 | Backups + key escrow | #17 | Cost + offline escrow |
-| Enable AI worker | #24 | Model, rates, caps, key |
+| Enable AI worker | #24 | OpenRouter management key, models, rates, caps |

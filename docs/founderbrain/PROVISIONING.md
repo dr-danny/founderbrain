@@ -2,7 +2,7 @@
 
 Operator checklist for launch blockers **#13** (Railway), **#14** (Hexclave), **#15** (Cloudflare Worker), **#24** (AI spend). Cost and traffic are **approved to proceed** for staging; this document is how to execute without putting secrets in git or chat.
 
-**Do not** paste role passwords, `GE_MASTER_KEY`, `ORIGIN_SECRET`, Hexclave `ssk_` keys, or Anthropic keys into GitHub issues, PR descriptions, or agent transcripts. Generate them locally and store them in a password manager / Railway / Wrangler secrets only.
+**Do not** paste role passwords, `GE_MASTER_KEY`, `ORIGIN_SECRET`, Hexclave `ssk_` keys, or OpenRouter management/inference keys into GitHub issues, PR descriptions, or agent transcripts. Generate them locally and store them in a password manager / Railway / Wrangler secrets only.
 
 Companion scripts (fail closed; print no secret values):
 
@@ -143,28 +143,30 @@ Browser → Worker → API for `GET /api/config` works; assets carry CSP/securit
 
 ---
 
-## #24 AI generation (spend)
+## #24 AI generation (OpenRouter)
 
-Keep `AI_ENABLED=false` and the worker service stopped until rates and caps are chosen for a **real** model id from the Anthropic account.
+Keep `AI_ENABLED=false` and the worker service stopped until rates and caps are chosen for privacy-allowlisted OpenRouter models (see `src/founderbrain/openrouter-privacy.ts`).
 
-1. Pick `AI_MODEL` from the live account (do not invent ids in source).
-2. Verify that day's `AI_INPUT_USD_PER_MILLION` and `AI_OUTPUT_USD_PER_MILLION` for that exact model.
-3. Approve `AI_WORKSPACE_DAILY_MICROUSD` and `AI_GLOBAL_DAILY_MICROUSD` with headroom for reservation math in `jobs.ts`.
-4. Set the same model/rate/cap vars on **API** (admission) and **worker** (execution). Only the worker gets `ANTHROPIC_API_KEY`. Worker `DATABASE_URL` uses `fb_worker`.
-5. Validate:
+1. Create an OpenRouter **Management API** key (not an inference key). Store it as Railway secret `OPENROUTER_MANAGEMENT_KEY` on the API (and anywhere that must revoke keys). Never put it in git or Slack.
+2. Pick privacy-allowlisted role models (`AI_MODEL_THINKER`, `AI_MODEL_RUNNER` / `AI_MODEL`, `AI_MODEL_VERIFIER`) or accept the code defaults.
+3. Verify that day's `AI_INPUT_USD_PER_MILLION` and `AI_OUTPUT_USD_PER_MILLION` for the runner (primary spend).
+4. Approve `AI_WORKSPACE_DAILY_MICROUSD` and `AI_GLOBAL_DAILY_MICROUSD` with headroom for reservation math in `jobs.ts`.
+5. Set the same model/rate/cap vars on **API** (admission) and **worker** (execution). Per-user inference keys are created automatically on signup as `OneDay-Founderbrain-{email}` with a **$20 lifetime** cap (`limit_reset=null`) and **30-day** expiry; encrypted server-side only.
+6. Validate:
 
 ```sh
 ./scripts/founderbrain-ai-enable-check.sh
 ```
 
-6. Set `AI_ENABLED=true` on both services; start the worker (`deploy/railway/worker.json`). Confirm worker log line and `/api/config` reports `aiEnabled: true`.
+7. Run migrations so `fb_openrouter_key` exists (`npm run fb:migrate`).
+8. Set `AI_ENABLED=true` on both services; start the worker (`deploy/railway/worker.json`). Confirm worker log line and `/api/config` reports `aiEnabled: true`.
 
 ### Acceptance (#24)
 
-`POST /api/jobs` on a fully approved Brain → 202 → job completes → artifact present → `fb_budget.spent` reflects settled cost.
+`POST /api/jobs` on a fully approved Brain → 202 → job completes → artifact present → `fb_budget.spent` reflects settled cost → `fb_openrouter_key.spent_microusd` increases → key revoked on `DELETE /api/workspace`.
 
 ---
 
 ## What this agent environment cannot do alone
 
-No Railway, Cloudflare, Hexclave, or Anthropic credentials are present in the cloud agent VM. Live create/deploy steps must be run by an operator (or a follow-up agent turn after secrets are injected into the environment). Closing #13/#14/#15/#24 requires those live acceptance checks above.
+No Railway, Cloudflare, Hexclave, or OpenRouter credentials are present in the cloud agent VM until an operator injects them. Live create/deploy steps must be run by an operator (or a follow-up agent turn after secrets are injected). Closing #13/#14/#15/#24 requires those live acceptance checks above.
