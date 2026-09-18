@@ -61,7 +61,7 @@ test("settleSaveDecision keeps local edits when draft moved on during save", () 
   });
   assert.equal(decision.changed, true);
   assert.equal(decision.nextDraft.identity.name, "Ada Lovelace");
-  assert.match(decision.notice, /Keep editing to save the rest/);}
+  assert.match(decision.notice, /Keep editing to save the rest/);
 });
 
 test("nextSaveOperation reuses the key for an identical retry", () => {
