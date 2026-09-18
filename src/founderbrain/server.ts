@@ -82,7 +82,7 @@ export async function buildApi(
     options.jobs ?? new BrainJobs(store, config, undefined, (event) => logJobEvent(log, event));
   const authenticate = options.authenticate ?? createAuthenticator(config);
   const app = Fastify({
-    logger: enableLogger ? log : false,
+    loggerInstance: enableLogger ? log : undefined,
     bodyLimit: 128 * 1024,
     trustProxy: false,
     requestTimeout: 20000,
