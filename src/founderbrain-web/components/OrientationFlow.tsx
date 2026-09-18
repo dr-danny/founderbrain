@@ -1,16 +1,18 @@
 /**
- * First-run Typeform: name, ready, optional website import, then Founder Brain intake.
+ * First-run Typeform: name, ready, optional website, then Founder Brain intake.
+ * Cursor-based so Back can reopen earlier answers.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Brain } from "../types";
 import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
-import { GUIDE_STEPS, type GuideStep } from "../guide-intake";
+import { GUIDE_STEPS, readStepValue, type GuideStep } from "../guide-intake";
 
 const NAME_KEY = "founderbrain.what-to-call-you";
 const YES_KEY = "founderbrain.welcome-yes";
 const SITE_KEY = "founderbrain.website-asked";
 const STAGE_KEY = "founderbrain.identity-stage-asked";
+const CURSOR_KEY = "founderbrain.guide-cursor";
 
 function readKey(key: string): string {
   try {
@@ -35,13 +37,11 @@ type Proposal = {
   track?: "b2b" | "b2c";
 };
 
-function nextStep(brain: Brain, track: string | null): GuideStep | null {
-  return (
-    GUIDE_STEPS.find((step) => {
-      if (step.id === "stage" && readKey(STAGE_KEY) === "1") return false;
-      return step.empty(brain, track);
-    }) ?? null
-  );
+function sequence(includeUrl: boolean): string[] {
+  const items = ["name", "ready", "site-ask"];
+  if (includeUrl) items.push("site-url");
+  for (const step of GUIDE_STEPS) items.push(`g:${step.id}`);
+  return items;
 }
 
 export function OrientationFlow({
@@ -78,16 +78,59 @@ export function OrientationFlow({
   const [name, setName] = useState(() => brain.identity.name.trim() || readKey(NAME_KEY));
   const [localError, setLocalError] = useState("");
   const [saidYes, setSaidYes] = useState(() => welcomeDone || readKey(YES_KEY) === "1");
-  const [siteAsked, setSiteAsked] = useState(() => readKey(SITE_KEY) === "1" || readKey(SITE_KEY) === "skip");
   const [wantSite, setWantSite] = useState(readKey(SITE_KEY) === "1");
   const [siteUrl, setSiteUrl] = useState("");
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cursor, setCursor] = useState(() => {
+    const stored = Number(readKey(CURSOR_KEY));
+    if (Number.isFinite(stored) && stored >= 0) return stored;
+    if (welcomeDone || readKey(YES_KEY) === "1") return 2;
+    return screen <= 1 ? 0 : 1;
+  });
 
-  const readyName = name.trim().length >= 1;
-  const step = nextStep(brain, track);
+  const includeUrl = wantSite || readKey(SITE_KEY) === "1";
+  const seq = sequence(includeUrl);
+  const total = seq.length;
+  const safe = Math.min(Math.max(cursor, 0), Math.max(total - 1, 0));
+  const current = seq[safe] ?? "name";
+  const guideId = current.startsWith("g:") ? current.slice(2) : "";
+  const step = GUIDE_STEPS.find((item) => item.id === guideId) ?? null;
   const locked = saving || busy;
+  const showBack = safe > 0;
+
+  useEffect(() => {
+    writeKey(CURSOR_KEY, String(safe));
+  }, [safe]);
+
+  useEffect(() => {
+    if (!step) {
+      setDraft("");
+      return;
+    }
+    setDraft(readStepValue(brain, track, step));
+  }, [step?.id]);
+
+  function moveTo(next: number) {
+    setLocalError("");
+    setProposal(null);
+    const clamped = Math.min(Math.max(next, 0), Math.max(seq.length - 1, 0));
+    writeKey(CURSOR_KEY, String(clamped));
+    setCursor(clamped);
+  }
+
+  function goBack() {
+    moveTo(safe - 1);
+  }
+
+  function goNext() {
+    if (safe >= seq.length - 1) {
+      void onComplete();
+      return;
+    }
+    moveTo(safe + 1);
+  }
 
   async function continueWithName() {
     const next = name.trim();
@@ -95,11 +138,11 @@ export function OrientationFlow({
       setLocalError("Tell us what to call you.");
       return;
     }
-    setLocalError("");
     writeKey(NAME_KEY, next);
     onNamed(next);
     try {
       await onAdvance(2);
+      goNext();
     } catch {
       setLocalError("Could not save. Try again.");
     }
@@ -110,15 +153,10 @@ export function OrientationFlow({
     setSaidYes(true);
     try {
       await onAdvance(2);
+      goNext();
     } catch {
       setLocalError("Could not save. Try again.");
     }
-  }
-
-  async function skipSite() {
-    writeKey(SITE_KEY, "skip");
-    setSiteAsked(true);
-    setWantSite(false);
   }
 
   async function scrapeSite() {
@@ -127,19 +165,23 @@ export function OrientationFlow({
       setLocalError("Use an https address.");
       return;
     }
-    setLocalError("");
+    if (!siteImportEnabled) {
+      writeKey(SITE_KEY, "skip");
+      setWantSite(false);
+      goNext();
+      return;
+    }
     setBusy(true);
+    setLocalError("");
     try {
       const result = await onImport(url);
       setProposal(result.proposal);
       writeKey(SITE_KEY, "1");
-      setSiteAsked(true);
-      setWantSite(true);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Could not read that website. We'll ask instead.");
       writeKey(SITE_KEY, "skip");
-      setSiteAsked(true);
       setWantSite(false);
+      goNext();
     } finally {
       setBusy(false);
     }
@@ -164,6 +206,7 @@ export function OrientationFlow({
       if (proposal.track) await onTrack(proposal.track);
       if (proposal.identity?.stage) writeKey(STAGE_KEY, "1");
       setProposal(null);
+      goNext();
     } catch {
       setLocalError("Could not save. Try again.");
     } finally {
@@ -177,35 +220,36 @@ export function OrientationFlow({
       setLocalError("Give us something to go on.");
       return;
     }
-    setLocalError("");
     try {
       if (stepNow.id === "stage") writeKey(STAGE_KEY, "1");
       if (next) {
         if (stepNow.section === "track") await onTrack(next as "b2b" | "b2c");
         else await onFill(stepNow.section, stepNow.field, next);
-      } else if (stepNow.id === "stage") {
-        writeKey(STAGE_KEY, "1");
       }
-      setDraft("");
+      goNext();
     } catch {
       setLocalError("Could not save. Try again.");
     }
   }
 
-  if (!welcomeDone && !saidYes && (screen <= 1 || !readyName)) {
+  const frame = {
+    screen: safe + 1,
+    total,
+    showBack,
+    onBack: goBack,
+    saving: locked,
+  };
+
+  if (current === "name") {
     return (
       <TypeformShell
         kicker=""
-        screen={1}
-        total={2}
         title="Welcome... what should we call you?"
         continueLabel="Continue"
-        continueDisabled={!readyName}
-        showBack={false}
+        continueDisabled={!name.trim()}
         immersive
-        onBack={() => undefined}
         onContinue={() => void continueWithName()}
-        saving={locked}
+        {...frame}
       >
         <VoiceField
           label="What should we call you?"
@@ -227,19 +271,15 @@ export function OrientationFlow({
     );
   }
 
-  if (!welcomeDone && !saidYes) {
+  if (current === "ready") {
     return (
       <TypeformShell
         kicker=""
-        screen={2}
-        total={2}
         title={`Hi ${name.trim() || "there"}... ready to start?`}
-        showBack={false}
         immersive
         hideContinue
-        onBack={() => undefined}
         onContinue={() => void sayYes()}
-        saving={locked}
+        {...frame}
       >
         <div className="typeform-choices welcome-choices">
           <button className="typeform-choice yes" type="button" onClick={() => void sayYes()} disabled={locked}>
@@ -258,19 +298,15 @@ export function OrientationFlow({
     );
   }
 
-  if (!siteAsked) {
+  if (current === "site-ask") {
     return (
       <TypeformShell
         kicker=""
-        screen={1}
-        total={2}
         title="Do you have a website?"
-        showBack={false}
         immersive
         hideContinue
-        onBack={() => undefined}
         onContinue={() => undefined}
-        saving={locked}
+        {...frame}
       >
         <div className="typeform-choices welcome-choices">
           <button
@@ -280,12 +316,21 @@ export function OrientationFlow({
             onClick={() => {
               writeKey(SITE_KEY, "1");
               setWantSite(true);
-              setSiteAsked(true);
+              moveTo(safe + 1);
             }}
           >
             Yes
           </button>
-          <button className="typeform-choice no" type="button" disabled={locked} onClick={() => void skipSite()}>
+          <button
+            className="typeform-choice no"
+            type="button"
+            disabled={locked}
+            onClick={() => {
+              writeKey(SITE_KEY, "skip");
+              setWantSite(false);
+              moveTo(safe + 1);
+            }}
+          >
             No
           </button>
         </div>
@@ -293,59 +338,18 @@ export function OrientationFlow({
     );
   }
 
-  if (wantSite && !proposal && readKey(SITE_KEY) === "1") {
+  if (current === "site-url" && proposal) {
+    const lines = [proposal.identity?.venture, proposal.offer?.description, proposal.customer?.segment].filter(
+      Boolean,
+    ) as string[];
     return (
       <TypeformShell
         kicker=""
-        screen={1}
-        total={2}
-        title={busy ? "Reading your site..." : "What's the address?"}
-        continueLabel={busy ? "Working" : "Continue"}
-        continueDisabled={busy || !siteUrl.trim()}
-        showBack={false}
-        immersive
-        onBack={() => undefined}
-        onContinue={() => void scrapeSite()}
-        saving={locked}
-      >
-        <VoiceField
-          label="Website"
-          value={siteUrl}
-          maxLength={200}
-          placeholder="https://your-site.com"
-          onChange={setSiteUrl}
-          onEnter={() => void scrapeSite()}
-        />
-        {!siteImportEnabled ? (
-          <p className="entry-lede typeform-lede">If we cannot read it, we will just ask you instead.</p>
-        ) : null}
-        {(error || localError) && (
-          <p className="entry-error" role="alert">
-            {error || localError}
-          </p>
-        )}
-      </TypeformShell>
-    );
-  }
-
-  if (proposal) {
-    const lines = [
-      proposal.identity?.venture,
-      proposal.offer?.description,
-      proposal.customer?.segment,
-    ].filter(Boolean) as string[];
-    return (
-      <TypeformShell
-        kicker=""
-        screen={2}
-        total={2}
         title="Does this look right?"
-        showBack={false}
         immersive
         hideContinue
-        onBack={() => undefined}
         onContinue={() => void applyProposal()}
-        saving={locked}
+        {...frame}
       >
         <ul className="typeform-bullets">
           {lines.map((line) => (
@@ -378,19 +382,46 @@ export function OrientationFlow({
     );
   }
 
+  if (current === "site-url") {
+    return (
+      <TypeformShell
+        kicker=""
+        title={busy ? "Reading your site..." : "What's the address?"}
+        continueLabel={busy ? "Working" : "Continue"}
+        continueDisabled={busy || !siteUrl.trim()}
+        immersive
+        onContinue={() => void scrapeSite()}
+        {...frame}
+      >
+        <VoiceField
+          label="Website"
+          value={siteUrl}
+          maxLength={200}
+          placeholder="https://your-site.com"
+          onChange={setSiteUrl}
+          onEnter={() => void scrapeSite()}
+        />
+        {!siteImportEnabled ? (
+          <p className="entry-lede typeform-lede">If we cannot read it, we will just ask you instead.</p>
+        ) : null}
+        {(error || localError) && (
+          <p className="entry-error" role="alert">
+            {error || localError}
+          </p>
+        )}
+      </TypeformShell>
+    );
+  }
+
   if (!step) {
     return (
       <TypeformShell
         kicker=""
-        screen={1}
-        total={1}
         title="Got it."
         continueLabel="Continue"
-        showBack={false}
         immersive
-        onBack={() => undefined}
         onContinue={() => void onComplete()}
-        saving={locked}
+        {...frame}
       >
         {(error || localError) && (
           <p className="entry-error" role="alert">
@@ -405,15 +436,11 @@ export function OrientationFlow({
     return (
       <TypeformShell
         kicker=""
-        screen={1}
-        total={1}
         title={step.title}
-        showBack={false}
         immersive
         hideContinue
-        onBack={() => undefined}
         onContinue={() => undefined}
-        saving={locked}
+        {...frame}
       >
         <div className="typeform-choices welcome-choices">
           {step.choices?.map((choice) => (
@@ -440,16 +467,12 @@ export function OrientationFlow({
   return (
     <TypeformShell
       kicker=""
-      screen={1}
-      total={1}
       title={step.title}
       continueLabel={step.optional ? "Skip or continue" : "Continue"}
       continueDisabled={!step.optional && !draft.trim()}
-      showBack={false}
       immersive
-      onBack={() => undefined}
       onContinue={() => void commitStep(step, draft)}
-      saving={locked}
+      {...frame}
     >
       <VoiceField
         label={step.title}

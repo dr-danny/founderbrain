@@ -71,6 +71,12 @@ export function TypeformShell({
 
   return (
     <main className={immersive ? "entry-stage typeform-stage immersive" : "entry-stage typeform-stage"}>
+      <div className="typeform-sequence" aria-hidden="true">
+        <div className="typeform-sequence-fill" style={{ width: `${Math.max(4, (screen / total) * 100)}%` }} />
+      </div>
+      <p className="typeform-sequence-label" aria-live="polite">
+        {label}
+      </p>
       <div className="entry-media" aria-hidden="true">
         <img
           className="entry-photo"
@@ -90,45 +96,30 @@ export function TypeformShell({
             <span>Founder</span>Brain
           </p>
         </header>
-        {immersive ? null : (
-          <>
-            <p className="entry-kicker">{kicker}</p>
-            <p className="typeform-progress" aria-live="polite">
-              {label}
-            </p>
-            <div
-              className="typeform-bar"
-              role="progressbar"
-              aria-valuenow={screen}
-              aria-valuemin={1}
-              aria-valuemax={total}
-              aria-label={label}
-            >
-              <div className="typeform-bar-fill" style={{ width: `${(screen / total) * 100}%` }} />
-            </div>
-          </>
-        )}
+        {immersive ? null : kicker ? <p className="entry-kicker">{kicker}</p> : null}
         <h1 id="typeform-title" className="entry-title">
           <TypedText text={title} onDone={() => setTitleDone(true)} />
         </h1>
         <div className={titleDone ? "typeform-body in" : "typeform-body wait"}>
           {children}
-          {hideContinue ? null : (
+          {hideContinue && !showBack ? null : (
             <div className="typeform-actions">
               {showBack ? (
                 <button className="typeform-back" type="button" onClick={onBack} disabled={saving}>
                   Back
                 </button>
               ) : null}
-              <button
-                ref={continueRef}
-                className="entry-cta"
-                type="button"
-                onClick={onContinue}
-                disabled={continueDisabled || saving}
-              >
-                {saving ? "Saving…" : continueLabel}
-              </button>
+              {hideContinue ? null : (
+                <button
+                  ref={continueRef}
+                  className="entry-cta"
+                  type="button"
+                  onClick={onContinue}
+                  disabled={continueDisabled || saving}
+                >
+                  {saving ? "Saving…" : continueLabel}
+                </button>
+              )}
             </div>
           )}
         </div>

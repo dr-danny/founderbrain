@@ -195,6 +195,12 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 
+export function readStepValue(brain: Brain, track: string | null, step: GuideStep): string {
+  if (step.section === "track") return track ?? "";
+  const bucket = brain[step.section] as unknown as Record<string, string>;
+  return (bucket[step.field] ?? "").toString();
+}
+
 export function nextGuideStep(brain: Brain, track: string | null): GuideStep | null {
   return GUIDE_STEPS.find((step) => step.empty(brain, track)) ?? null;
 }

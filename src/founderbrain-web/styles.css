@@ -1177,6 +1177,35 @@ button:not(.link-button) {
 .typeform-stage.immersive {
   grid-template-columns: 1fr;
 }
+.typeform-sequence {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  height: 6px;
+  background: rgba(247, 239, 230, 0.16);
+}
+.typeform-sequence-fill {
+  height: 100%;
+  background: var(--ember);
+  transition: width 0.35s ease;
+}
+.typeform-sequence-label {
+  position: absolute;
+  top: 14px;
+  right: clamp(1rem, 4vw, 2rem);
+  z-index: 4;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+}
+.typeform-stage.immersive .typeform-panel {
+  padding-top: clamp(3.5rem, 12vh, 7rem);
+}
 .typeform-stage .typeform-panel {
   align-self: center;
   width: min(100%, 92vw);
