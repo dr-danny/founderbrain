@@ -204,11 +204,14 @@ export function useFounderBrainApp() {
     const epoch = sessionEpoch.current;
     setError("");
     try {
-      const [nextState, output, nextOrientation] = await Promise.all([
-        api.brain(),
-        api.artifact(),
-        api.orientation(),
-      ]);
+      const [nextState, output] = await Promise.all([api.brain(), api.artifact()]);
+      let nextOrientation;
+      try {
+        nextOrientation = await api.orientation();
+      } catch (err) {
+        if (!(err instanceof ApiError && err.status === 404)) throw err;
+        nextOrientation = emptyOrientationState();
+      }
       if (epoch !== sessionEpoch.current) return;
       setState(nextState);
       setOrientation(nextOrientation);
