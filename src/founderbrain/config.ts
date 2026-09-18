@@ -48,6 +48,8 @@ const envSchema = z.object({
   HIGHLEVEL_CLIENT_ID: z.string().min(8).optional(),
   HIGHLEVEL_CLIENT_SECRET: z.string().min(8).optional(),
   HIGHLEVEL_VERSION_ID: z.string().min(8).optional(),
+  /** Optional Firecrawl key for website import during first-run Typeform. */
+  FIRECRAWL_API_KEY: z.string().min(8).optional(),
 });
 export type Config = z.infer<typeof envSchema>;
 

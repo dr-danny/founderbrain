@@ -127,6 +127,12 @@ export class FounderBrainApi {
   startOauth() {
     return this.request<{ url: string }>("/oauth/start");
   }
+  importSite(url: string) {
+    return this.request<{ proposal: Record<string, unknown>; source: "ai" | "title" }>("/site-import", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  }
   completeOauth(body: { code: string; state: string }) {
     return this.request<{ connected: boolean; locationId: string | null }>("/oauth/complete", {
       method: "POST",

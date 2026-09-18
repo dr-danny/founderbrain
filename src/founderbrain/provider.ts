@@ -96,3 +96,24 @@ export const openRouterProvider: Provider = async (body, key) => {
 
 /** @deprecated Use openRouterProvider. Kept as an alias for older test imports. */
 export const anthropicProvider = openRouterProvider;
+
+export async function firecrawlScrape(url: string, key: string): Promise<string> {
+  const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const json = (await response.json().catch(() => ({}))) as {
+    success?: boolean;
+    data?: { markdown?: string; metadata?: { title?: string } };
+  };
+  const markdown = json.data?.markdown?.trim() ?? "";
+  const title = json.data?.metadata?.title?.trim() ?? "";
+  if (!response.ok || (!markdown && !title))
+    throw new Error("firecrawl_failed");
+  return [title ? `# ${title}` : "", markdown].filter(Boolean).join("\n\n").slice(0, 20_000);
+}

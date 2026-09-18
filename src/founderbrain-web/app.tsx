@@ -79,28 +79,38 @@ export function App() {
     return <AuthPage kind="boot" message={error || "Preparing your private workspace…"} />;
   }
 
-  const identityOpen =
+  const guidedOpen =
     !draft.identity.venture.trim() ||
     !draft.identity.role.trim() ||
-    !draft.identity.goal.trim();
-  if (!firstLoginComplete || identityOpen) {
+    !draft.identity.goal.trim() ||
+    !draft.customer.segment.trim() ||
+    !draft.customer.problem.trim() ||
+    !draft.offer.description.trim() ||
+    !draft.voice.tone.trim();
+  if (!firstLoginComplete || guidedOpen) {
     return (
       <OrientationFlow
         screen={orientation.firstLoginScreen}
         saving={orientationSaving || app.saving}
         error={error}
         welcomeDone={firstLoginComplete}
-        identity={draft.identity}
+        brain={draft}
+        track={orientation.track}
+        siteImportEnabled={Boolean(config.siteImportEnabled)}
         onNamed={(name) => app.patch("identity", "name", name)}
         onAdvance={async (next) => {
           await app.saveOrientation({ firstLoginScreen: next });
         }}
         onComplete={() => app.completeFirstLogin()}
         onDecline={() => void app.signOut()}
-        onIdentity={async (field, value) => {
-          app.patch("identity", field, value);
+        onFill={async (section, field, value) => {
+          app.patch(section, field, value);
           await app.save();
         }}
+        onTrack={async (value) => {
+          await app.saveOrientation({ track: value });
+        }}
+        onImport={(url) => app.importSite(url)}
       />
     );
   }

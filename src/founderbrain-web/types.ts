@@ -36,6 +36,7 @@ export interface Config {
   hexclave: HexclaveClientConfig | null;
   aiEnabled: boolean;
   crmConnectEnabled?: boolean;
+  siteImportEnabled?: boolean;
 }
 export interface Me {
   email: string;

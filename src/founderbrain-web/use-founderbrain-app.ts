@@ -292,6 +292,11 @@ export function useFounderBrainApp() {
     }
   }
 
+  async function importSite(url: string) {
+    if (!api) throw new Error("api_unavailable");
+    return api.importSite(url);
+  }
+
   async function completeFirstLogin() {
     await saveOrientation({
       firstLoginScreen: 4,
@@ -717,6 +722,7 @@ export function useFounderBrainApp() {
     onSignInError,
     saveOrientation,
     completeFirstLogin,
+    importSite,
     connecting,
     startConnect,
   };

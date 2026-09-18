@@ -38,6 +38,7 @@ import {
   saveConnection,
   signOauthState,
 } from "./crm-oauth.ts";
+import { importSite } from "./site-import.ts";
 
 const key = z
   .string()
@@ -264,6 +265,15 @@ export async function buildApi(
     const tokens = await exchangeCode(config, body.code);
     await saveConnection(store, c.workspace, tokens);
     return connectionStatus(store, c.workspace);
+  });
+  app.post("/api/site-import", async (req) => {
+    const body = parse(
+      z.object({ url: z.string().url().max(300) }).strict(),
+      req.body,
+    );
+    if (!body.url.startsWith("https://"))
+      throw new DomainError(422, "invalid_request", "Use an https website address.");
+    return importSite(config, store, context(req).workspace, body.url);
   });
   app.get("/api/me", async (req) => ({ email: context(req).email }));
   app.get("/api/orientation", async (req) => readOrientation(store, context(req).workspace));

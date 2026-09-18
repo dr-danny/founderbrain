@@ -73,6 +73,7 @@ export const MUTATION_PATHS = new Set([
   "POST /api/artifact/:id/accept",
   "DELETE /api/workspace",
   "POST /api/oauth/complete",
+  "POST /api/site-import",
 ]);
 
 export function mutationKey(method: string, path: string): string {
