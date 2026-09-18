@@ -37,7 +37,7 @@ test("settleSaveDecision clears changed when draft matches what was sent", () =>
   };
   const decision = settleSaveDecision(brain, saved, { brain, expectedVersion: 1, key: "k1" });
   assert.equal(decision.changed, false);
-  assert.match(decision.notice, /Saved as version 2/);
+  assert.match(decision.notice, /Saved\./);
 });
 
 test("settleSaveDecision keeps local edits when draft moved on during save", () => {
@@ -61,7 +61,7 @@ test("settleSaveDecision keeps local edits when draft moved on during save", () 
   });
   assert.equal(decision.changed, true);
   assert.equal(decision.nextDraft.identity.name, "Ada Lovelace");
-  assert.match(decision.notice, /New local edits remain unsaved/);
+  assert.match(decision.notice, /Keep editing to save the rest/);
 });
 
 test("nextSaveOperation reuses the key for an identical retry", () => {

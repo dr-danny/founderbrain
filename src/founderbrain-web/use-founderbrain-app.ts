@@ -367,7 +367,7 @@ export function useFounderBrainApp() {
       setDraft(restored.brain);
       setChanged(false);
       setComparison(null);
-      setNotice(`Restored version ${version} as new version ${restored.version}.`);
+      setNotice("Restored.");
       const refreshed = await api.history();
       if (epoch === sessionEpoch.current) setHistory(refreshed.versions);
     } catch (err) {
@@ -395,7 +395,7 @@ export function useFounderBrainApp() {
           setArtifactText(job.artifact.text);
           setArtifactStale(false);
           setJobNeedsReconcile(false);
-          setNotice("A draft output is ready for review.");
+          setNotice("Your draft is ready.");
           return;
         }
         if (outcome.kind === "failed") {
@@ -405,9 +405,7 @@ export function useFounderBrainApp() {
         if (outcome.kind === "uncertain") {
           window.sessionStorage.removeItem(jobStorage);
           setJobNeedsReconcile(true);
-          setNotice(
-            "Generation outcome is uncertain. Reconcile by refreshing the output before starting another job.",
-          );
+          setNotice("This didn't finish cleanly. Refresh before writing another draft.");
           return;
         }
         waitMs = nextPollWaitMs(waitMs);
@@ -449,7 +447,7 @@ export function useFounderBrainApp() {
       if (epoch === sessionEpoch.current) {
         setError(friendlyError(err));
         setGenerationRetry(true);
-        setNotice("Generation start is unresolved. Retry uses the same request key.");
+        setNotice("Couldn't start. Try again.");
         setGenerating(false);
       }
     }
@@ -465,11 +463,7 @@ export function useFounderBrainApp() {
       setArtifactText(output.artifact?.text ?? "");
       setArtifactStale(output.stale);
       setJobNeedsReconcile(false);
-      setNotice(
-        output.artifact
-          ? "Output refreshed from the server."
-          : "No completed output is available yet.",
-      );
+      setNotice(output.artifact ? "Here's the latest draft." : "No draft yet.");
     } catch (err) {
       if (epoch === sessionEpoch.current) setError(friendlyError(err));
     }
@@ -504,16 +498,12 @@ export function useFounderBrainApp() {
       latestDraft.current = fresh.brain;
       setDraft(fresh.brain);
       setArtifactStale(false);
-      setNotice(
-        accepted.verified
-          ? "Output accepted and verified by the server."
-          : "Output accepted; server verification is pending.",
-      );
+      setNotice("Saved.");
     } catch (err) {
       if (epoch === sessionEpoch.current) {
         setError(friendlyError(err));
         setAcceptRetry(true);
-        setNotice("Acceptance outcome is unresolved. Retry uses the same request key.");
+        setNotice("Couldn't save. Try again.");
       }
     } finally {
       if (epoch === sessionEpoch.current) setAccepting(false);

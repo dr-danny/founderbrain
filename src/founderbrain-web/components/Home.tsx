@@ -18,7 +18,7 @@ export function Home({
   const complete = Object.values(state.readiness).filter(Boolean).length;
   return (
     <article className="home-card">
-      <p className="eyebrow">FOUNDERBRAIN / PRIVATE WORKSPACE</p>
+      <p className="eyebrow">PRIVATE WORKSPACE</p>
       <h1>
         {draft.identity.venture
           ? `${draft.identity.venture}, in focus.`

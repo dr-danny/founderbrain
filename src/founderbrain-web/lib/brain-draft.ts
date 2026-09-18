@@ -29,21 +29,19 @@ export function settleSaveDecision(
   latestDraft: Brain,
   saved: BrainState,
   operation: SaveOperation,
-  pendingVerification = false,
+  _pendingVerification = false,
 ): { notice: string; draftMatchesSaved: boolean; nextDraft: Brain; changed: boolean } {
   const draftMatchesSaved = JSON.stringify(latestDraft) === JSON.stringify(operation.brain);
   if (draftMatchesSaved) {
     return {
-      notice: pendingVerification
-        ? `Saved as version ${saved.version}; server verification is pending.`
-        : `Saved as version ${saved.version}.`,
+      notice: "Saved.",
       draftMatchesSaved: true,
       nextDraft: saved.brain,
       changed: false,
     };
   }
   return {
-    notice: `Saved as version ${saved.version}. New local edits remain unsaved.`,
+    notice: "Saved. Keep editing to save the rest.",
     draftMatchesSaved: false,
     nextDraft: latestDraft,
     changed: true,

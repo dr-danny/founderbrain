@@ -30,21 +30,18 @@ export function ConflictDialog({
         >
           Close
         </button>
-        <p className="eyebrow">VERSION CONFLICT</p>
-        <h2 id="conflict-title">Version {conflict.version} was saved elsewhere.</h2>
-        <p>
-          Compare the actual text before choosing. Escape keeps your draft against the current
-          version.
-        </p>
+        <p className="eyebrow">SAVED ELSEWHERE</p>
+        <h2 id="conflict-title">A newer copy was saved somewhere else.</h2>
+        <p>Compare the text before choosing. Escape keeps your draft.</p>
         <BrainDiff
           left={conflict.brain}
           right={draft}
-          leftLabel={`Current saved v${conflict.version}`}
+          leftLabel="Saved copy"
           rightLabel="Your draft"
         />
         <div className="dialog-actions">
           <button className="button secondary" onClick={onLoadServer}>
-            Load server version
+            Use saved copy
           </button>
           <button className="button primary" onClick={onKeepDraft}>
             Keep my draft
