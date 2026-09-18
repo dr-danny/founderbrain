@@ -28,11 +28,12 @@ export function Text({
       </label>
       {hint && <small id={`${id}-hint`}>{hint}</small>}
       {attention && (
-        <small className="field-hint" id={`${id}-req`}>
-          Required — empty and placeholders like “tbd” do not count.
+        <small className="field-hint" id={`${id}-req`} role="status">
+          Required - empty and placeholders like “tbd” do not count.
         </small>
       )}
       <textarea
+        aria-invalid={attention || undefined}
         aria-describedby={
           [hint ? `${id}-hint` : "", attention ? `${id}-req` : ""].filter(Boolean).join(" ") ||
           undefined
@@ -69,11 +70,12 @@ export function Field({
         {required && <b aria-hidden="true"> *</b>}
       </label>
       {attention && (
-        <small className="field-hint" id={`${id}-req`}>
-          Required — empty and placeholders like “tbd” do not count.
+        <small className="field-hint" id={`${id}-req`} role="status">
+          Required - empty and placeholders like “tbd” do not count.
         </small>
       )}
       <input
+        aria-invalid={attention || undefined}
         aria-describedby={attention ? `${id}-req` : undefined}
         id={id}
         value={value}

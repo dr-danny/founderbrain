@@ -4,6 +4,7 @@ The SaaS runs on three vendors: **Cloudflare** (a Worker for the edge, static as
 
 - [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
 - [Staging provision runbook (#13/#14/#15/#24)](docs/founderbrain/PROVISIONING.md)
+- [Operator runbook (uncertain jobs, Hexclave re-bind)](docs/founderbrain/RUNBOOK.md)
 - [API/domain contract](docs/founderbrain/CONTRACT.md)
 - Env checklist (Hexclave, no Supabase): [`.env.founderbrain.example`](.env.founderbrain.example)
 - Node **22** only (see `.nvmrc` / `.node-version`; `engine-strict=true` in `.npmrc`)

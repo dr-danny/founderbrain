@@ -5,7 +5,7 @@
 import type { BrainState } from "../types";
 import { missionCopy, missions, type Mission } from "../mission-copy";
 
-export type View = "home" | "missions" | "brain";
+export type View = "home" | "missions" | "brain" | "privacy";
 
 export function MissionRail({
   view,
@@ -26,13 +26,25 @@ export function MissionRail({
 }) {
   return (
     <aside className="rail" aria-label="Missions">
-      <button className={view === "home" ? "nav active" : "nav"} onClick={onHome}>
+      <button
+        className={view === "home" ? "nav active" : "nav"}
+        onClick={onHome}
+        aria-current={view === "home" ? "page" : undefined}
+      >
         Home
       </button>
-      <button className={view === "missions" ? "nav active" : "nav"} onClick={onMissions}>
+      <button
+        className={view === "missions" ? "nav active" : "nav"}
+        onClick={onMissions}
+        aria-current={view === "missions" ? "page" : undefined}
+      >
         Missions
       </button>
-      <button className={view === "brain" ? "nav active" : "nav"} onClick={onBrain}>
+      <button
+        className={view === "brain" ? "nav active" : "nav"}
+        onClick={onBrain}
+        aria-current={view === "brain" ? "page" : undefined}
+      >
         Brain
       </button>
       <div className="mission-list">
@@ -40,7 +52,8 @@ export function MissionRail({
           <button
             key={key}
             aria-label={`${missionCopy[key].number} ${missionCopy[key].title}${readiness[key] ? " completed" : ""}`}
-            className={mission === key ? "mission active" : "mission"}
+            aria-current={view === "missions" && mission === key ? "page" : undefined}
+            className={mission === key && view === "missions" ? "mission active" : "mission"}
             onClick={() => onSelectMission(key)}
           >
             <span>{missionCopy[key].number}</span>

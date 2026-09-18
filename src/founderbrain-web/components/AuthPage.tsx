@@ -3,8 +3,9 @@
  * Covers local-demo entry, Hexclave sign-in / re-sign-in, and session checking.
  * Presentation is editorial; Hexclave / demo behaviour is unchanged.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Hexclave } from "../hexclave";
+import { PrivacyDisclosure } from "./PrivacyDisclosure";
 
 type AuthPageProps =
   | { kind: "boot"; message: string }
@@ -34,6 +35,7 @@ function EntryShell({
   action,
   notice,
   error,
+  privacyLink = false,
 }: {
   kicker?: string;
   title: string;
@@ -41,7 +43,16 @@ function EntryShell({
   action?: ReactNode;
   notice?: string;
   error?: string;
+  privacyLink?: boolean;
 }) {
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  if (privacyOpen) {
+    return (
+      <main className="app-shell entry-privacy">
+        <PrivacyDisclosure onBack={() => setPrivacyOpen(false)} />
+      </main>
+    );
+  }
   return (
     <main className="entry-stage">
       <div className="entry-media" aria-hidden="true">
@@ -77,6 +88,13 @@ function EntryShell({
             {error}
           </p>
         ) : null}
+        {privacyLink ? (
+          <p className="entry-privacy-link">
+            <button className="quiet linkish" type="button" onClick={() => setPrivacyOpen(true)}>
+              Privacy and data use
+            </button>
+          </p>
+        ) : null}
       </section>
     </main>
   );
@@ -95,6 +113,7 @@ export function AuthPage(props: AuthPageProps) {
         lede="This local demo stays visibly separate from production. On the real hostname, pilot founders sign in with a one-time code from Hexclave."
         notice={props.notice}
         error={props.error}
+        privacyLink
         action={
           <button className="entry-cta" type="button" onClick={props.onEnter}>
             Enter local demo
@@ -120,6 +139,7 @@ export function AuthPage(props: AuthPageProps) {
         lede="Pilot access is invite-only. Sign in with a one-time code sent to the email you were invited under. No password is ever set."
         notice={props.notice}
         error={props.error}
+        privacyLink
         action={
           <button
             className="entry-cta"

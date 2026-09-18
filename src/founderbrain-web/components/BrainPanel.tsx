@@ -18,6 +18,7 @@ export function BrainPanel({
   onCompare,
   onRestore,
   onDownload,
+  onPrivacy,
 }: {
   state: BrainState;
   history: HistoryItem[];
@@ -30,6 +31,7 @@ export function BrainPanel({
   onCompare: (v: number) => void;
   onRestore: (v: number) => void;
   onDownload: (format: "json" | "markdown") => void;
+  onPrivacy: () => void;
 }) {
   return (
     <article className="brain-card">
@@ -100,7 +102,10 @@ export function BrainPanel({
         <h2>Delete this workspace</h2>
         <p>
           This deletes your workspace content, not just this browser session. It cannot be undone.
-          Backup retention and billing reconciliation are handled by the operator.
+          Backup retention and billing reconciliation are handled by the operator.{" "}
+          <button className="quiet linkish" type="button" onClick={onPrivacy}>
+            Privacy and data use
+          </button>
         </p>
         {deleteOpen ? (
           <div>
@@ -110,6 +115,7 @@ export function BrainPanel({
                 id="delete-confirm"
                 value={deleteText}
                 onChange={(event) => onDeleteText(event.target.value)}
+                aria-invalid={deleteText.length > 0 && deleteText !== "DELETE"}
               />
             </label>
             <button className="button danger" disabled={deleteText !== "DELETE"} onClick={onDelete}>

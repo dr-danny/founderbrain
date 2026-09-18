@@ -43,37 +43,39 @@ export function BrainDiff({
       {visible.length === 0 ? (
         <p className="muted">Toggle “Show all fields” to inspect unchanged values.</p>
       ) : (
-        <table className="brain-diff-table">
-          <thead>
-            <tr>
-              <th scope="col">Section</th>
-              <th scope="col">Field</th>
-              <th scope="col">{leftLabel}</th>
-              <th scope="col">{rightLabel}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((row) => (
-              <tr
-                key={`${row.sectionKey}.${row.field}`}
-                className={row.changed ? "changed" : undefined}
-              >
-                <td>{row.section}</td>
-                <td>{row.label}</td>
-                <td>
-                  <span className={row.changed ? "diff-value left" : undefined}>
-                    {row.left || "—"}
-                  </span>
-                </td>
-                <td>
-                  <span className={row.changed ? "diff-value right" : undefined}>
-                    {row.right || "—"}
-                  </span>
-                </td>
+        <div className="brain-diff-scroll">
+          <table className="brain-diff-table">
+            <thead>
+              <tr>
+                <th scope="col">Section</th>
+                <th scope="col">Field</th>
+                <th scope="col">{leftLabel}</th>
+                <th scope="col">{rightLabel}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <tr
+                  key={`${row.sectionKey}.${row.field}`}
+                  className={row.changed ? "changed" : undefined}
+                >
+                  <td>{row.section}</td>
+                  <td>{row.label}</td>
+                  <td>
+                    <span className={row.changed ? "diff-value left" : undefined}>
+                      {row.left || "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={row.changed ? "diff-value right" : undefined}>
+                      {row.right || "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <details
         className="brain-diff-raw"

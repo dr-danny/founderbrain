@@ -106,7 +106,7 @@ What the code does with it:
 - The browser stores no token of ours. The SDK keeps its refresh token in its own cookie and mints access tokens on demand. Only the opaque pending job id is kept in `sessionStorage`. Brain text remains server-side or in memory. Sign out clears private in-memory state first, then asks the SDK to end the session, which navigates to `/`.
 - When the session lapses mid-edit, the API answers 401 and the client turns that into one clear error that keeps the draft on screen and points to signing in again in a new tab, then retrying. The SDK session is read again before every API call, so signing back in as the same founder works without reloading the draft. A different founder's session is refused for that draft. Nothing is lost silently.
 
-Known caveat, on purpose in writing: if an operator **deletes a founder's Hexclave user and creates a new one** for the same email, the new user has a new `sub`, so they sign in to an empty workspace while the real one sits intact under the old subject. That is an operator action, and the recovery is an operator re-binding `fb_user.subject`. Do not "fix" this by keying on email; email is a display value here. The issue tracker holds the recovery-path task (#37). Do not delete and recreate pilot users casually.
+Known caveat, on purpose in writing: if an operator **deletes a founder's Hexclave user and creates a new one** for the same email, the new user has a new `sub`, so they sign in to an empty workspace while the real one sits intact under the old subject. That is an operator action, and the recovery is an operator re-binding `fb_user.subject` (see [RUNBOOK.md](./RUNBOOK.md)). Do not "fix" this by keying on email; email is a display value here. The issue tracker holds the recovery-path task (#37). Do not delete and recreate pilot users casually.
 
 A real one-time-code cycle requires the staging hostname to be a trusted domain. No email is sent by local tests, and the local demo is not a sign-in demonstration.
 
@@ -143,7 +143,7 @@ The API needs the same approved model/rate/cap settings for job admission. The w
 
 The app reserves a conservative maximum before dispatch and settles actual reported token usage. Provider pricing must be kept current; application caps cannot override provider billing. Generation uses one attempt per job. An ambiguous response or expired in-flight lease becomes `uncertain`, retains its budget reservation and blocks new workspace jobs until operator reconciliation. There is deliberately no automatic retry of potentially billed calls.
 
-To release quarantine, an operator must inspect provider usage, then run `node src/founderbrain/reconcile-main.js` with the admin URL in `MIGRATION_DATABASE_URL`, the exact `JOB_ID`, verified `CONFIRMED_COST_MICROUSD`, and `RECONCILIATION_CONFIRMED=yes`. The command settles accounting atomically and never calls the model. It refuses active/completed/already-reconciled jobs. Do not infer zero cost from an elapsed lease.
+To release quarantine, an operator must inspect provider usage, then follow [RUNBOOK.md](./RUNBOOK.md) (reconcile uncertain job). In short: run `npm run fb:reconcile` with the admin URL in `MIGRATION_DATABASE_URL`, the exact `JOB_ID`, verified `CONFIRMED_COST_MICROUSD`, and `RECONCILIATION_CONFIRMED=yes`. The command settles accounting atomically and never calls the model. It refuses active/completed/already-reconciled jobs. Do not infer zero cost from an elapsed lease.
 
 ### Cloudflare Worker
 
@@ -177,7 +177,7 @@ Deletion locks the workspace against writers, removes AI jobs/artifacts before t
 - Fresh one-time-code login on the hosted page, save/readback, sign out then login, restart, restore and A/B isolation pass on staging. An email with no user receives nothing. `GET /api/me` returns the signed-in email and never a subject.
 - Browser check on staging: no request leaves the page except to the app origin and `HEXCLAVE_API_URL`; no analytics or session-replay traffic; no `ssk_` string anywhere in the bundle or responses.
 - A real provider call (after spend approval) passes source-input and budget verification; no mock result represented as real generation.
-- Backup/key recovery, accessible narrow-screen flow, privacy/data-use disclosure and deletion retention are reviewed.
+- Backup/key recovery and accessible narrow-screen flow are reviewed. In-app privacy/data-use disclosure ships in the product; exact backup retention window is recorded when #17 closes.
 - No Oneday logo, proprietary fonts, photographs, endorsement or event-required checklist is shipped without authorization.
 
 Feature scope remains the Astra/Opus plan: four structured missions plus one private generated invitation, history/restore/export, truthful progress. No CRM, publishing, leaderboards, billing or broad agent tools.

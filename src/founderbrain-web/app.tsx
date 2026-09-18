@@ -11,6 +11,7 @@ import { MissionStage } from "./components/MissionStage";
 import { Home } from "./components/Home";
 import { BrainPanel } from "./components/BrainPanel";
 import { ConflictDialog } from "./components/ConflictDialog";
+import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -168,8 +169,10 @@ export function App() {
               onCompare={(v) => void app.compare(v)}
               onRestore={(v) => void app.restore(v)}
               onDownload={app.download}
+              onPrivacy={() => setView("privacy")}
             />
           )}
+          {view === "privacy" && <PrivacyDisclosure onBack={() => setView("brain")} />}
         </section>
       </div>
       {conflict && (

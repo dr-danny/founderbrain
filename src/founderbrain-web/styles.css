@@ -136,7 +136,7 @@ select:focus-visible {
   gap: 4px;
   align-items: center;
   border-radius: 14px;
-  color: #657075;
+  color: #4f585c;
 }
 .mission span {
   font-size: 11px;
@@ -399,7 +399,7 @@ select:focus-visible {
   line-height: 1.55;
 }
 .muted {
-  color: #6e797d;
+  color: #4f585c;
 }
 .artifact textarea {
   width: 100%;
@@ -560,8 +560,62 @@ select:focus-visible {
   margin: 0;
 }
 .delete-zone p {
-  color: #657176;
+  color: #4f585c;
   font-size: 13px;
+}
+.button.quiet.linkish,
+.quiet.linkish {
+  display: inline;
+  padding: 0;
+  min-height: 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: inherit;
+}
+.privacy-card {
+  background: #fff;
+  border-radius: 32px;
+  padding: 40px;
+  max-width: 720px;
+  display: grid;
+  gap: 18px;
+}
+.privacy-card .lede {
+  color: #4f585c;
+  margin: 0;
+  line-height: 1.55;
+}
+.privacy-card section {
+  display: grid;
+  gap: 8px;
+}
+.privacy-card h2 {
+  font-size: 17px;
+  margin: 0;
+}
+.privacy-card p {
+  margin: 0;
+  color: #4f585c;
+  line-height: 1.55;
+  font-size: 14px;
+}
+.entry-privacy {
+  padding: 24px 16px;
+  display: grid;
+  place-items: start center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f4f6f9;
+}
+.entry-privacy-link {
+  margin: 1.25rem 0 0;
+  animation: entry-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+.entry-privacy-link .linkish {
+  color: var(--paper, #fff);
+  opacity: 0.9;
 }
 .danger {
   background: #8f231d;
@@ -1001,12 +1055,18 @@ button:not(.link-button) {
   font-size: 13px;
   background: #fff;
 }
+.brain-diff-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .brain-diff-table th,
 .brain-diff-table td {
   border: 1px solid #e4e8eb;
   padding: 10px 12px;
   vertical-align: top;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .brain-diff-table th {
   background: #f4f6f9;
