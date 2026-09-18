@@ -153,6 +153,8 @@ after(async () => {
   if (!enabled) return;
   for (const [subject, id] of tracked) await store.deleteWorkspace(subject, id).catch(() => {});
   await app?.close();
+  await jobs?.close();
+  await store?.close();
 });
 const headers = (user: string) => ({
   "x-test-user": user,
