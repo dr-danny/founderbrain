@@ -85,13 +85,13 @@ export function App() {
         screen={orientation.firstLoginScreen}
         saving={orientationSaving}
         error={error}
+        knownName={draft.identity.name}
+        onNamed={(name) => app.patch("identity", "name", name)}
         onAdvance={async (next) => {
           await app.saveOrientation({ firstLoginScreen: next });
         }}
-        onBack={async (prev) => {
-          await app.saveOrientation({ firstLoginScreen: prev });
-        }}
         onComplete={() => app.completeFirstLogin()}
+        onDecline={() => void app.signOut()}
       />
     );
   }

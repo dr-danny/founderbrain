@@ -18,11 +18,11 @@ import {
   progressLabel,
 } from "../orientation-copy.ts";
 
-test("first-login has four screens ending at Identity handoff copy", () => {
-  assert.equal(firstLoginScreens.length, 4);
-  assert.equal(firstLoginScreens[0]?.title, "This is the prep.");
-  assert.equal(firstLoginScreens[3]?.continueLabel, "Start Identity");
-  assert.equal(progressLabel(2, 4), "2 of 4");
+test("first-login asks a name then ready to start", () => {
+  assert.equal(firstLoginScreens.length, 2);
+  assert.match(firstLoginScreens[0]?.title ?? "", /Welcome/);
+  assert.match(firstLoginScreens[1]?.title ?? "", /ready to start/);
+  assert.equal(progressLabel(2, 2), "2 of 2");
 });
 
 test("chapter order maps prep homework and skips dropped delivery", () => {

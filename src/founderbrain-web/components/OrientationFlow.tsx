@@ -1,77 +1,148 @@
 /**
- * First-login Typeform: expectations → what → why → Atlanta outcome → Identity.
- * Skip is not offered. Progress persists server-side before advancing.
+ * First-login: ask what to call them, then Yes continues / No signs out.
  */
-import { useState } from "react";
-import { firstLoginScreens, firstLoginTotal } from "../orientation-copy";
+import { useEffect, useRef, useState } from "react";
 import { TypeformShell } from "./TypeformShell";
+
+const NAME_KEY = "founderbrain.what-to-call-you";
+
+function readStoredName(): string {
+  try {
+    return sessionStorage.getItem(NAME_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeName(name: string) {
+  try {
+    sessionStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* private mode */
+  }
+}
 
 export function OrientationFlow({
   screen,
   saving,
   error,
+  knownName = "",
+  onNamed,
   onAdvance,
-  onBack,
   onComplete,
+  onDecline,
 }: {
   screen: number;
   saving: boolean;
   error: string;
+  knownName?: string;
+  onNamed: (name: string) => void;
   onAdvance: (nextScreen: number) => void | Promise<void>;
-  onBack: (prevScreen: number) => void | Promise<void>;
   onComplete: () => void | Promise<void>;
+  onDecline: () => void;
 }) {
-  const index = Math.min(Math.max(screen, 1), firstLoginTotal) - 1;
-  const current = firstLoginScreens[index]!;
+  const step = screen > 2 ? 1 : Math.min(Math.max(screen, 1), 2);
+  const [name, setName] = useState(() => knownName.trim() || readStoredName());
   const [localError, setLocalError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const ready = name.trim().length >= 1;
 
-  async function continueForward() {
+  useEffect(() => {
+    if (step === 1) inputRef.current?.focus();
+  }, [step]);
+
+  async function continueWithName() {
+    const next = name.trim();
+    if (!next) {
+      setLocalError("Tell us what to call you.");
+      inputRef.current?.focus();
+      return;
+    }
     setLocalError("");
+    storeName(next);
+    onNamed(next);
     try {
-      if (screen >= firstLoginTotal) {
-        await onComplete();
-        return;
-      }
-      await onAdvance(screen + 1);
+      await onAdvance(2);
     } catch {
-      setLocalError("Could not save progress. Try again.");
+      setLocalError("Could not save. Try again.");
     }
   }
 
-  async function goBack() {
-    if (screen <= 1) return;
+  async function sayYes() {
     setLocalError("");
     try {
-      await onBack(screen - 1);
+      await onComplete();
     } catch {
-      setLocalError("Could not save progress. Try again.");
+      setLocalError("Could not save. Try again.");
     }
+  }
+
+  if (step === 1) {
+    return (
+      <TypeformShell
+        kicker=""
+        screen={1}
+        total={2}
+        title="Welcome... what should we call you?"
+        continueLabel="Continue"
+        continueDisabled={!ready}
+        showBack={false}
+        immersive
+        onBack={() => undefined}
+        onContinue={() => void continueWithName()}
+        saving={saving}
+      >
+        <label className="typeform-name">
+          <span className="visually-hidden">What should we call you?</span>
+          <input
+            ref={inputRef}
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value.slice(0, 40));
+              setLocalError("");
+            }}
+            maxLength={40}
+            autoComplete="nickname"
+            spellCheck={false}
+            placeholder="Your first name"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void continueWithName();
+              }
+            }}
+          />
+        </label>
+        {(error || localError) && (
+          <p className="entry-error" role="alert">
+            {error || localError}
+          </p>
+        )}
+      </TypeformShell>
+    );
   }
 
   return (
     <TypeformShell
-      kicker="Atlanta prep · First login"
-      screen={screen}
-      total={firstLoginTotal}
-      title={current.title}
-      continueLabel={current.continueLabel ?? "Continue"}
-      showBack={screen > 1}
-      onBack={() => void goBack()}
-      onContinue={() => void continueForward()}
+      kicker=""
+      screen={2}
+      total={2}
+      title={`Hi ${name.trim() || "there"}... ready to start?`}
+      showBack={false}
+      immersive
+      hideContinue
+      onBack={() => undefined}
+      onContinue={() => void sayYes()}
       saving={saving}
     >
-      {current.body.map((line) => (
-        <p key={line} className="entry-lede typeform-lede">
-          {line}
-        </p>
-      ))}
-      {current.bullets ? (
-        <ul className="typeform-bullets">
-          {current.bullets.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      ) : null}
+      <div className="typeform-choices welcome-choices">
+        <button className="typeform-choice yes" type="button" onClick={() => void sayYes()} disabled={saving}>
+          Yes
+        </button>
+        <button className="typeform-choice no" type="button" onClick={onDecline} disabled={saving}>
+          No
+        </button>
+      </div>
       {(error || localError) && (
         <p className="entry-error" role="alert">
           {error || localError}

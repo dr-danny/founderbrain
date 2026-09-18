@@ -38,40 +38,14 @@ export type TypeformScreen = {
 
 export const firstLoginScreens: TypeformScreen[] = [
   {
-    id: "expectations",
-    title: "This is the prep.",
-    body: [
-      "You are not watching another demo. FounderBrain is how you get ready for Atlanta.",
-      "Answer a few questions. Leave with a Brain that is still here when you come back.",
-    ],
+    id: "name",
+    title: "Welcome... what should we call you?",
+    body: [],
   },
   {
-    id: "what",
-    title: "Four missions. One Brain.",
-    body: [
-      "Identity, Customer, Offer, Voice. Then one private first output.",
-      "Save as you go. Nothing is published or sent to customers.",
-    ],
-  },
-  {
-    id: "why",
-    title: "Atlanta only works if the Brain is real.",
-    body: [
-      "Friday is Foundation. Saturday is content and outreach. Sunday is operations and a 90-day plan.",
-      "The weekend is the event. This app is how you arrive ready.",
-    ],
-  },
-  {
-    id: "outcome",
-    title: "What ready means",
-    body: ["By the time you land in Atlanta you will have:"],
-    bullets: [
-      "A saved Founder Brain that survives refresh",
-      "A named customer and offer, or an honest hypothesis",
-      "A voice the engines can actually use",
-      "One private artifact you have approved",
-    ],
-    continueLabel: "Start Identity",
+    id: "ready",
+    title: "Hi X... ready to start?",
+    body: [],
   },
 ];
 
@@ -266,7 +240,7 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
   ];
 }
 
-export const firstLoginTotal = ORIENTATION_FIRST_LOGIN_SCREENS;
+export const firstLoginTotal = 2;
 export const contentTotal = CONTENT_CHAPTER_SCREENS;
 export const outreachTotal = OUTREACH_CHAPTER_SCREENS;
 export const ghlTotal = GHL_CHAPTER_SCREENS;

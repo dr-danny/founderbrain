@@ -2,9 +2,10 @@
  * One-idea-per-screen Typeform shell: progress, Back/Continue, Enter to advance.
  * Reuses the Atlanta entry visual language from AuthPage.
  */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { progressLabel } from "../orientation-copy";
 import { BrandMark } from "./BrandMark";
+import { TypedText } from "./TypedText";
 
 export function TypeformShell({
   kicker,
@@ -18,6 +19,8 @@ export function TypeformShell({
   onBack,
   onContinue,
   saving = false,
+  immersive = false,
+  hideContinue = false,
 }: {
   kicker: string;
   screen: number;
@@ -30,12 +33,25 @@ export function TypeformShell({
   onBack: () => void;
   onContinue: () => void;
   saving?: boolean;
+  immersive?: boolean;
+  hideContinue?: boolean;
 }) {
   const continueRef = useRef<HTMLButtonElement>(null);
+  const [titleDone, setTitleDone] = useState(false);
 
   useEffect(() => {
-    continueRef.current?.focus();
-  }, [screen, title]);
+    setTitleDone(false);
+  }, [title]);
+
+  useEffect(() => {
+    if (!titleDone) return;
+    const field = document.querySelector(".typeform-name input") as HTMLInputElement | null;
+    if (field) {
+      field.focus();
+      return;
+    }
+    if (!hideContinue) continueRef.current?.focus();
+  }, [screen, title, titleDone, hideContinue]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -43,18 +59,18 @@ export function TypeformShell({
       const target = event.target as HTMLElement | null;
       if (target?.tagName === "TEXTAREA") return;
       if (target?.tagName === "INPUT" && (target as HTMLInputElement).type === "text") return;
-      if (continueDisabled || saving) return;
+      if (hideContinue || continueDisabled || saving || !titleDone) return;
       event.preventDefault();
       onContinue();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [continueDisabled, saving, onContinue]);
+  }, [continueDisabled, saving, onContinue, hideContinue, titleDone]);
 
   const label = progressLabel(screen, total);
 
   return (
-    <main className="entry-stage typeform-stage">
+    <main className={immersive ? "entry-stage typeform-stage immersive" : "entry-stage typeform-stage"}>
       <div className="entry-media" aria-hidden="true">
         <img
           className="entry-photo"
@@ -74,39 +90,47 @@ export function TypeformShell({
             <span>Founder</span>Brain
           </p>
         </header>
-        <p className="entry-kicker">{kicker}</p>
-        <p className="typeform-progress" aria-live="polite">
-          {label}
-        </p>
-        <div
-          className="typeform-bar"
-          role="progressbar"
-          aria-valuenow={screen}
-          aria-valuemin={1}
-          aria-valuemax={total}
-          aria-label={label}
-        >
-          <div className="typeform-bar-fill" style={{ width: `${(screen / total) * 100}%` }} />
-        </div>
+        {immersive ? null : (
+          <>
+            <p className="entry-kicker">{kicker}</p>
+            <p className="typeform-progress" aria-live="polite">
+              {label}
+            </p>
+            <div
+              className="typeform-bar"
+              role="progressbar"
+              aria-valuenow={screen}
+              aria-valuemin={1}
+              aria-valuemax={total}
+              aria-label={label}
+            >
+              <div className="typeform-bar-fill" style={{ width: `${(screen / total) * 100}%` }} />
+            </div>
+          </>
+        )}
         <h1 id="typeform-title" className="entry-title">
-          {title}
+          <TypedText text={title} onDone={() => setTitleDone(true)} />
         </h1>
-        <div className="typeform-body">{children}</div>
-        <div className="typeform-actions">
-          {showBack ? (
-            <button className="typeform-back" type="button" onClick={onBack} disabled={saving}>
-              Back
-            </button>
-          ) : null}
-          <button
-            ref={continueRef}
-            className="entry-cta"
-            type="button"
-            onClick={onContinue}
-            disabled={continueDisabled || saving}
-          >
-            {saving ? "Saving…" : continueLabel}
-          </button>
+        <div className={titleDone ? "typeform-body in" : "typeform-body wait"}>
+          {children}
+          {hideContinue ? null : (
+            <div className="typeform-actions">
+              {showBack ? (
+                <button className="typeform-back" type="button" onClick={onBack} disabled={saving}>
+                  Back
+                </button>
+              ) : null}
+              <button
+                ref={continueRef}
+                className="entry-cta"
+                type="button"
+                onClick={onContinue}
+                disabled={continueDisabled || saving}
+              >
+                {saving ? "Saving…" : continueLabel}
+              </button>
+            </div>
+          )}
         </div>
       </section>
     </main>
