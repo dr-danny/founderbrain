@@ -4,6 +4,7 @@
  */
 import type { BrainState, Config } from "../types";
 import { stamp } from "../mission-copy";
+import { BrandMark } from "./BrandMark";
 
 export function TopBar({
   config,
@@ -25,6 +26,7 @@ export function TopBar({
   return (
     <header className="topbar">
       <button className="wordmark link-button" onClick={onHome} aria-label="FounderBrain home">
+        <BrandMark size={28} className="wordmark-mark" />
         <span>Founder</span>Brain
       </button>
       <div className="save-state" aria-live="polite">
