@@ -411,6 +411,7 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
   }, async () => {
     const id = await workspace("partial-spend");
     await store.commit(id, full(), 0, "partial-source");
+    const previous = provider;
     let calls = 0;
     provider = async (body) => {
       calls += 1;
@@ -419,27 +420,31 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       }
       throw new Error("runner ambiguous timeout");
     };
-    const job = await jobs.enqueue(id, 1, "partial-spend-job");
-    await jobs.tick(id);
-    const result = await jobs.read(id, job.id);
-    assert.equal(result.status, "uncertain");
-    assert.ok(calls >= 2);
-    const row = await store.scoped(
-      id,
-      (tx) =>
-        tx`
-          select provider_request_id, openrouter_spend_recorded_microusd, spent_microusd
-          from fb_ai_job j
-          join fb_openrouter_key k on k.founder_id = j.founder_id
-          where j.id = ${job.id}
-        `,
-    );
-    assert.equal(row[0]?.provider_request_id, "partial-t");
-    assert.ok(Number(row[0]?.openrouter_spend_recorded_microusd) > 0);
-    assert.equal(
-      Number(row[0]?.spent_microusd),
-      Number(row[0]?.openrouter_spend_recorded_microusd),
-    );
+    try {
+      const job = await jobs.enqueue(id, 1, "partial-spend-job");
+      await jobs.tick(id);
+      const result = await jobs.read(id, job.id);
+      assert.equal(result.status, "uncertain");
+      assert.ok(calls >= 2);
+      const row = await store.scoped(
+        id,
+        (tx) =>
+          tx`
+            select provider_request_id, openrouter_spend_recorded_microusd, spent_microusd
+            from fb_ai_job j
+            join fb_openrouter_key k on k.founder_id = j.founder_id
+            where j.id = ${job.id}
+          `,
+      );
+      assert.equal(row[0]?.provider_request_id, "partial-t");
+      assert.ok(Number(row[0]?.openrouter_spend_recorded_microusd) > 0);
+      assert.equal(
+        Number(row[0]?.spent_microusd),
+        Number(row[0]?.openrouter_spend_recorded_microusd),
+      );
+    } finally {
+      provider = previous;
+    }
   });
   it("rejects stale proposal acceptance without deleting old artifact", { skip }, async () => {
     const id = await workspace("stale");
