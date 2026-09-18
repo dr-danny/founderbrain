@@ -157,14 +157,9 @@ export function App() {
           view={view}
           mission={mission}
           readiness={state.readiness}
-          firstLoginDone={firstLoginComplete}
           onHome={() => setView("home")}
           onMissions={() => setView("missions")}
           onBrain={() => void app.openHistory()}
-          onAtlanta={() => setView("atlanta")}
-          onContent={() => setView("content")}
-          onOutreach={() => setView("outreach")}
-          onGhl={() => setView("ghl")}
           onSelectMission={(key) => {
             setMission(key);
             setView("missions");

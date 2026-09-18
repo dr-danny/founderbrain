@@ -19,27 +19,17 @@ export function MissionRail({
   view,
   mission,
   readiness,
-  firstLoginDone,
   onHome,
   onMissions,
   onBrain,
-  onAtlanta,
-  onContent,
-  onOutreach,
-  onGhl,
   onSelectMission,
 }: {
   view: View;
   mission: Mission;
   readiness: BrainState["readiness"];
-  firstLoginDone: boolean;
   onHome: () => void;
   onMissions: () => void;
   onBrain: () => void;
-  onAtlanta: () => void;
-  onContent: () => void;
-  onOutreach: () => void;
-  onGhl: () => void;
   onSelectMission: (key: Mission) => void;
 }) {
   return (
@@ -58,38 +48,6 @@ export function MissionRail({
       >
         Missions
       </button>
-      {firstLoginDone ? (
-        <>
-          <button
-            className={view === "atlanta" ? "nav active" : "nav"}
-            onClick={onAtlanta}
-            aria-current={view === "atlanta" ? "page" : undefined}
-          >
-            Atlanta
-          </button>
-          <button
-            className={view === "content" ? "nav active" : "nav"}
-            onClick={onContent}
-            aria-current={view === "content" ? "page" : undefined}
-          >
-            Content
-          </button>
-          <button
-            className={view === "outreach" ? "nav active" : "nav"}
-            onClick={onOutreach}
-            aria-current={view === "outreach" ? "page" : undefined}
-          >
-            Outreach
-          </button>
-          <button
-            className={view === "ghl" ? "nav active" : "nav"}
-            onClick={onGhl}
-            aria-current={view === "ghl" ? "page" : undefined}
-          >
-            HighLevel
-          </button>
-        </>
-      ) : null}
       <button
         className={view === "brain" ? "nav active" : "nav"}
         onClick={onBrain}
