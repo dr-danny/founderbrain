@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, type ReactNode } from "react";
 import { progressLabel } from "../orientation-copy";
+import { BrandMark } from "./BrandMark";
 
 export function TypeformShell({
   kicker,
@@ -108,10 +109,6 @@ export function TypeformShell({
           </button>
         </div>
       </section>
-    </main>
-  );
-}
-  </section>
     </main>
   );
 }
