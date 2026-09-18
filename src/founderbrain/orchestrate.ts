@@ -78,6 +78,13 @@ async function callRole(
       return { result, model, costMicroUsd: cost };
     } catch (error) {
       lastError = error;
+      // Ambiguous failures may already have been billed. Do not try the fallback
+      // model; jobs.ts quarantines the job instead of retrying.
+      const knownNoCharge =
+        typeof error === "object" &&
+        error !== null &&
+        (error as { knownNoCharge?: boolean }).knownNoCharge === true;
+      if (!knownNoCharge) break;
     }
   }
   if (lastError instanceof DomainError) throw lastError;
