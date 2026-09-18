@@ -1,5 +1,5 @@
 /**
- * FounderBrain web shell: auth gates and layout wiring.
+ * FounderBrain web shell: auth gates, first-login orientation, and layout wiring.
  * State machine lives in ./use-founderbrain-app; presentation under ./components.
  */
 import { missions } from "./mission-copy";
@@ -12,6 +12,9 @@ import { Home } from "./components/Home";
 import { BrainPanel } from "./components/BrainPanel";
 import { ConflictDialog } from "./components/ConflictDialog";
 import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
+import { OrientationFlow } from "./components/OrientationFlow";
+import { ContentChapter, OutreachChapter } from "./components/ChapterFlows";
+import { AtlantaReady } from "./components/AtlantaReady";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -24,6 +27,10 @@ export function App() {
     setDemoEntered,
     state,
     draft,
+    orientation,
+    orientationLoaded,
+    orientationSaving,
+    firstLoginComplete,
     view,
     setView,
     mission,
@@ -68,8 +75,53 @@ export function App() {
     );
   }
   if (!email) return <AuthPage kind="checking" error={error} />;
-  if (!state) {
+  if (!state || !orientationLoaded) {
     return <AuthPage kind="boot" message={error || "Preparing your private workspace…"} />;
+  }
+
+  if (!firstLoginComplete) {
+    return (
+      <OrientationFlow
+        screen={orientation.firstLoginScreen}
+        saving={orientationSaving}
+        error={error}
+        onAdvance={async (next) => {
+          await app.saveOrientation({ firstLoginScreen: next });
+        }}
+        onBack={async (prev) => {
+          await app.saveOrientation({ firstLoginScreen: prev });
+        }}
+        onComplete={() => app.completeFirstLogin()}
+      />
+    );
+  }
+
+  if (view === "content") {
+    return (
+      <ContentChapter
+        orientation={orientation}
+        saving={orientationSaving}
+        error={error}
+        onPatch={async (patch) => {
+          await app.saveOrientation(patch);
+        }}
+        onFinished={() => setView("home")}
+      />
+    );
+  }
+
+  if (view === "outreach") {
+    return (
+      <OutreachChapter
+        orientation={orientation}
+        saving={orientationSaving}
+        error={error}
+        onPatch={async (patch) => {
+          await app.saveOrientation(patch);
+        }}
+        onFinished={() => setView("home")}
+      />
+    );
   }
 
   return (
@@ -88,9 +140,13 @@ export function App() {
           view={view}
           mission={mission}
           readiness={state.readiness}
+          firstLoginDone={firstLoginComplete}
           onHome={() => setView("home")}
           onMissions={() => setView("missions")}
           onBrain={() => void app.openHistory()}
+          onAtlanta={() => setView("atlanta")}
+          onContent={() => setView("content")}
+          onOutreach={() => setView("outreach")}
           onSelectMission={(key) => {
             setMission(key);
             setView("missions");
@@ -120,12 +176,29 @@ export function App() {
             <Home
               state={state}
               draft={draft}
+              orientation={orientation}
               onBegin={() => {
                 const first = missions.find((key) => !state.readiness[key]) ?? "output";
                 setMission(first);
                 setView("missions");
               }}
               onHistory={() => void app.openHistory()}
+              onAtlanta={() => setView("atlanta")}
+              onContent={() => setView("content")}
+              onOutreach={() => setView("outreach")}
+            />
+          )}
+          {view === "atlanta" && (
+            <AtlantaReady
+              state={state}
+              orientation={orientation}
+              onContent={() => setView("content")}
+              onOutreach={() => setView("outreach")}
+              onMissions={() => {
+                const first = missions.find((key) => !state.readiness[key]) ?? "output";
+                setMission(first);
+                setView("missions");
+              }}
             />
           )}
           {view === "missions" && (

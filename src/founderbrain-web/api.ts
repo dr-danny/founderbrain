@@ -6,6 +6,7 @@
  * cookies (`credentials: 'omit'`).
  */
 import type { Artifact, Brain, BrainState, Config, HistoryItem, Job, Me } from "./types";
+import type { OrientationPatch, OrientationState } from "../founderbrain-shared/orientation";
 
 export class ApiError extends Error {
   constructor(
@@ -110,6 +111,15 @@ export class FounderBrainApi {
   }
   me() {
     return this.request<Me>("/me", {}, 8_000);
+  }
+  orientation() {
+    return this.request<OrientationState>("/orientation");
+  }
+  saveOrientation(patch: OrientationPatch) {
+    return this.request<OrientationState>("/orientation", {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
   }
   brain(version?: number) {
     return this.request<BrainState>(

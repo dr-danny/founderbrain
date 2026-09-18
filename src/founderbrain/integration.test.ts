@@ -9,6 +9,7 @@ import { emptyBrain, canonicalize, DomainError, type Brain } from "./domain.ts";
 import type { Config } from "./config.ts";
 import { migrateJobs } from "./jobs.ts";
 import { migrateOpenRouterKeys, ensureOpenRouterKey } from "./openrouter-keys.ts";
+import { migrateOrientation } from "./orientation.ts";
 import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { OPENROUTER_LIFETIME_USD, openRouterKeyName } from "./openrouter-management.ts";
 
@@ -113,6 +114,7 @@ before(async () => {
   process.env.GE_MASTER_KEY ??= randomBytes(32).toString("base64");
   await migrateJobs(url);
   await migrateOpenRouterKeys(url);
+  await migrateOrientation(url);
   config = {
     NODE_ENV: "production",
     DATABASE_URL: url,
@@ -217,26 +219,30 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       );
     },
   );
-  it("provisions OneDay-Founderbrain-{email} keys on first authenticated request", { skip }, async () => {
-    const before = createdHashes.length;
-    const r = await app.inject({ url: "/api/me", headers: headers("provision") });
-    assert.equal(r.statusCode, 200);
-    assert.ok(createdHashes.length > before);
-    const subject = prefix + "|provision";
-    const id = await store.ensureWorkspace(subject);
-    tracked.set(subject, id);
-    const meta = await store.scoped(
-      id,
-      (tx) =>
-        tx`select key_name, lifetime_limit_usd, expires_at, spent_microusd from fb_openrouter_key`,
-    );
-    assert.equal(meta[0]?.key_name, "OneDay-Founderbrain-provision@example.test");
-    assert.equal(Number(meta[0]?.lifetime_limit_usd), 20);
-    assert.equal(Number(meta[0]?.spent_microusd), 0);
-    const expires = new Date(meta[0]!.expires_at);
-    assert.ok(expires.getTime() > Date.now() + 29 * 864e5);
-    assert.ok(expires.getTime() < Date.now() + 31 * 864e5);
-  });
+  it(
+    "provisions OneDay-Founderbrain-{email} keys on first authenticated request",
+    { skip },
+    async () => {
+      const before = createdHashes.length;
+      const r = await app.inject({ url: "/api/me", headers: headers("provision") });
+      assert.equal(r.statusCode, 200);
+      assert.ok(createdHashes.length > before);
+      const subject = prefix + "|provision";
+      const id = await store.ensureWorkspace(subject);
+      tracked.set(subject, id);
+      const meta = await store.scoped(
+        id,
+        (tx) =>
+          tx`select key_name, lifetime_limit_usd, expires_at, spent_microusd from fb_openrouter_key`,
+      );
+      assert.equal(meta[0]?.key_name, "OneDay-Founderbrain-provision@example.test");
+      assert.equal(Number(meta[0]?.lifetime_limit_usd), 20);
+      assert.equal(Number(meta[0]?.spent_microusd), 0);
+      const expires = new Date(meta[0]!.expires_at);
+      assert.ok(expires.getTime() > Date.now() + 29 * 864e5);
+      assert.ok(expires.getTime() < Date.now() + 31 * 864e5);
+    },
+  );
 
   it("authenticates membership and rejects revoked membership", { skip }, async () => {
     const id = await workspace("revoked");
@@ -306,7 +312,12 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       const beforeDeletes = deletedHashes.length;
       provider = async (body) => {
         if (body.system.includes("plan one short") || body.system.includes("You plan")) {
-          return { text: "- angle: appointments", inputTokens: 10, outputTokens: 5, requestId: "t" };
+          return {
+            text: "- angle: appointments",
+            inputTokens: 10,
+            outputTokens: 5,
+            requestId: "t",
+          };
         }
         if (body.system.includes("Verify")) {
           return { text: "PASS", inputTokens: 5, outputTokens: 1, requestId: "v" };
@@ -422,6 +433,80 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       } finally {
         await db.end();
       }
+    },
+  );
+  it(
+    "persists first-login orientation with readback, resume, and skip on return",
+    { skip },
+    async () => {
+      await workspace("orient");
+      const missing = await app.inject({
+        url: "/api/orientation",
+        headers: headers("orient"),
+      });
+      assert.equal(missing.statusCode, 200);
+      const initial = missing.json() as {
+        firstLoginScreen: number;
+        firstLoginCompletedAt: string | null;
+      };
+      assert.equal(initial.firstLoginScreen, 1);
+      assert.equal(initial.firstLoginCompletedAt, null);
+
+      const mid = await app.inject({
+        method: "PUT",
+        url: "/api/orientation",
+        headers: headers("orient"),
+        payload: { firstLoginScreen: 3 },
+      });
+      assert.equal(mid.statusCode, 200);
+      assert.equal(mid.json().firstLoginScreen, 3);
+      assert.equal(mid.json().firstLoginCompletedAt, null);
+
+      const resume = await app.inject({
+        url: "/api/orientation",
+        headers: headers("orient"),
+      });
+      assert.equal(resume.json().firstLoginScreen, 3);
+
+      const done = await app.inject({
+        method: "PUT",
+        url: "/api/orientation",
+        headers: headers("orient"),
+        payload: { firstLoginScreen: 4, firstLoginComplete: true },
+      });
+      assert.equal(done.statusCode, 200);
+      assert.equal(done.json().firstLoginScreen, 4);
+      assert.ok(done.json().firstLoginCompletedAt);
+
+      const again = await app.inject({
+        url: "/api/orientation",
+        headers: headers("orient"),
+      });
+      assert.ok(again.json().firstLoginCompletedAt);
+      assert.equal(again.json().firstLoginCompletedAt, done.json().firstLoginCompletedAt);
+
+      const chapter = await app.inject({
+        method: "PUT",
+        url: "/api/orientation",
+        headers: headers("orient"),
+        payload: {
+          track: "b2b",
+          contentScreen: 4,
+          contentAnswers: { domainReady: true, thirtyPieces: true, bottleneck: "Editing time" },
+        },
+      });
+      assert.equal(chapter.statusCode, 200);
+      assert.equal(chapter.json().track, "b2b");
+      assert.equal(chapter.json().contentAnswers.domainReady, true);
+      assert.equal(chapter.json().contentAnswers.bottleneck, "Editing time");
+
+      const bad = await app.inject({
+        method: "PUT",
+        url: "/api/orientation",
+        headers: headers("orient"),
+        payload: { firstLoginScreen: 99 },
+      });
+      assert.equal(bad.statusCode, 422);
     },
   );
   it(

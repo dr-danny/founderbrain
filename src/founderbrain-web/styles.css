@@ -1098,3 +1098,171 @@ button:not(.link-button) {
   max-height: 45vh;
   overflow: auto;
 }
+
+/* Typeform orientation / chapters — Atlanta entry language */
+.typeform-stage .typeform-panel {
+  max-width: 28rem;
+}
+.typeform-progress {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ember);
+}
+.typeform-bar {
+  height: 3px;
+  width: min(100%, 14rem);
+  background: rgba(247, 239, 230, 0.22);
+  border-radius: 2px;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.typeform-bar-fill {
+  height: 100%;
+  background: var(--ember);
+  border-radius: 2px;
+  transition: width 0.35s ease;
+}
+.typeform-body {
+  margin-top: 0.35rem;
+}
+.typeform-lede {
+  margin-top: 0.85rem !important;
+}
+.typeform-bullets {
+  margin: 1.1rem 0 0;
+  padding: 0 0 0 1.15rem;
+  max-width: 34ch;
+  color: var(--paper-muted);
+  line-height: 1.5;
+}
+.typeform-bullets li {
+  margin-bottom: 0.45rem;
+}
+.typeform-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1.6rem;
+}
+.typeform-back {
+  appearance: none;
+  border: 1px solid rgba(247, 239, 230, 0.35);
+  background: transparent;
+  color: var(--paper-muted);
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.85rem 1.15rem;
+  min-height: 3.15rem;
+  border-radius: 2px;
+}
+.typeform-back:hover {
+  color: var(--paper);
+  border-color: rgba(247, 239, 230, 0.65);
+}
+.typeform-choices {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  max-width: 28rem;
+}
+.typeform-choice {
+  appearance: none;
+  text-align: left;
+  border: 1px solid rgba(247, 239, 230, 0.35);
+  background: rgba(18, 12, 20, 0.35);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.98rem;
+  padding: 0.95rem 1.1rem;
+  border-radius: 2px;
+}
+.typeform-choice:hover {
+  border-color: var(--ember);
+  background: rgba(224, 137, 74, 0.16);
+}
+.typeform-confirm,
+.typeform-field {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.2rem;
+  max-width: 28rem;
+  color: var(--paper-muted);
+  font-size: 0.98rem;
+}
+.typeform-confirm {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.75rem;
+}
+.typeform-confirm input {
+  margin-top: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.typeform-field input {
+  appearance: none;
+  border: 1px solid rgba(247, 239, 230, 0.35);
+  background: rgba(18, 12, 20, 0.45);
+  color: var(--paper);
+  border-radius: 2px;
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+}
+.typeform-field input:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.atlanta-home-progress {
+  margin-top: 1.25rem;
+}
+.atlanta-card .atlanta-day {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e4e8eb;
+}
+.atlanta-card .atlanta-day h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.atlanta-card .atlanta-day > p {
+  margin: 0;
+  color: #667176;
+  max-width: 40rem;
+  line-height: 1.5;
+}
+.atlanta-artifacts {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.atlanta-artifacts li {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: 0.45rem;
+  align-items: start;
+  color: #4f585c;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.atlanta-artifacts li.ready {
+  color: #0b5f3a;
+  font-weight: 600;
+}
+.atlanta-artifacts li.partial span {
+  color: #8a4b08;
+}
+@media (prefers-reduced-motion: reduce) {
+  .typeform-bar-fill {
+    transition: none;
+  }
+}
