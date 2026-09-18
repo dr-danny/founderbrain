@@ -143,7 +143,6 @@ export function App() {
               accepting={app.accepting}
               acceptRetry={app.acceptRetry}
               jobNeedsReconcile={app.jobNeedsReconcile}
-              verified={state.verified}
               canRetrySave={Boolean(saveOperation.current)}
               onPatch={app.patch}
               onSave={() => void app.save()}
