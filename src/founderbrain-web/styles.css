@@ -1333,26 +1333,33 @@ button:not(.link-button) {
   border-color: rgba(247, 239, 230, 0.65);
 }
 .typeform-choices {
-  display: grid;
-  gap: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.9rem;
   margin-top: 1.25rem;
-  max-width: 28rem;
+  max-width: none;
+  width: min(100%, 92vw);
 }
 .typeform-choice {
   appearance: none;
-  text-align: left;
-  border: 1px solid rgba(247, 239, 230, 0.35);
-  background: rgba(18, 12, 20, 0.35);
+  flex: 1 1 11rem;
+  text-align: center;
+  border: 1px solid rgba(247, 239, 230, 0.4);
+  background: rgba(18, 12, 20, 0.42);
   color: var(--paper);
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 0.98rem;
-  padding: 0.95rem 1.1rem;
-  border-radius: 2px;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+  letter-spacing: -0.03em;
+  padding: 1.2rem 1.5rem;
+  min-height: 4.4rem;
+  border-radius: 4px;
 }
 .typeform-choice:hover {
-  border-color: var(--ember);
-  background: rgba(224, 137, 74, 0.16);
+  border-color: var(--paper);
+  background: var(--paper);
+  color: var(--ink);
 }
 .typeform-external {
   display: inline-flex;
