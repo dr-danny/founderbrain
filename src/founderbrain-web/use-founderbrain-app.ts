@@ -298,7 +298,7 @@ export function useFounderBrainApp() {
       firstLoginComplete: true,
     });
     setMission("identity");
-    setView("missions");
+    setView("home");
   }
 
   function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) {

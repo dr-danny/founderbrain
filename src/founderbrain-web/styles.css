@@ -1174,19 +1174,21 @@ button:not(.link-button) {
   overflow: auto;
 }
 
+.typeform-stage.immersive {
+  grid-template-columns: 1fr;
+}
 .typeform-stage .typeform-panel {
   align-self: center;
-  width: min(100%, 46rem);
-  max-width: 46rem;
-  padding-top: clamp(2rem, 8vh, 5rem);
-  padding-bottom: clamp(2rem, 8vh, 5rem);
+  width: min(100%, 92vw);
+  max-width: 92vw;
+  padding: clamp(2rem, 10vh, 6rem) clamp(1.25rem, 6vw, 5rem);
 }
 .typeform-stage .entry-title {
-  max-width: 12ch;
-  font-size: clamp(3.4rem, 8vw, 6.1rem);
-  line-height: 0.92;
+  max-width: 92vw;
+  font-size: clamp(4.4rem, 11vw, 8.6rem);
+  line-height: 0.88;
   font-weight: 700;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.05em;
 }
 .typeform-stage .typeform-lede,
 .typeform-stage .typeform-body .entry-lede {
@@ -1223,22 +1225,25 @@ button:not(.link-button) {
 }
 .typeform-name {
   display: block;
-  margin-top: 1.6rem;
-  width: min(100%, 22rem);
+  margin-top: 1.8rem;
+  width: min(100%, 72vw);
 }
-.typeform-name input {
+.typeform-name input,
+.typeform-name textarea {
   width: 100%;
   background: transparent;
   border: 0;
   border-bottom: 2px solid rgba(247, 239, 230, 0.45);
   color: var(--paper);
   font-family: var(--font-display);
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-size: clamp(2rem, 5vw, 3.5rem);
   letter-spacing: -0.03em;
   padding: 0.35rem 0 0.5rem;
   border-radius: 0;
+  resize: none;
 }
-.typeform-name input:focus {
+.typeform-name input:focus,
+.typeform-name textarea:focus {
   outline: none;
   border-bottom-color: var(--ember);
 }

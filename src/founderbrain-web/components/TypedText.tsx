@@ -35,14 +35,14 @@ export function TypedText({
       }
       const next = text[i] ?? "";
       const prev = text[i - 1] ?? "";
-      let delay = 32;
-      if (prev === "." && next === ".") delay = 160;
-      else if (prev === "." && next === " ") delay = 420;
-      else if (prev === "?" || prev === "!") delay = 280;
-      else if (prev === ",") delay = 140;
+      let delay = 78;
+      if (prev === "." && next === ".") delay = 320;
+      else if (prev === "." && next === " ") delay = 820;
+      else if (prev === "?" || prev === "!") delay = 560;
+      else if (prev === ",") delay = 280;
       timer = window.setTimeout(step, delay);
     };
-    timer = window.setTimeout(step, 240);
+    timer = window.setTimeout(step, 520);
     return () => window.clearTimeout(timer);
   }, [text]);
 

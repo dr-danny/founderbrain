@@ -79,19 +79,28 @@ export function App() {
     return <AuthPage kind="boot" message={error || "Preparing your private workspace…"} />;
   }
 
-  if (!firstLoginComplete) {
+  const identityOpen =
+    !draft.identity.venture.trim() ||
+    !draft.identity.role.trim() ||
+    !draft.identity.goal.trim();
+  if (!firstLoginComplete || identityOpen) {
     return (
       <OrientationFlow
         screen={orientation.firstLoginScreen}
-        saving={orientationSaving}
+        saving={orientationSaving || app.saving}
         error={error}
-        knownName={draft.identity.name}
+        welcomeDone={firstLoginComplete}
+        identity={draft.identity}
         onNamed={(name) => app.patch("identity", "name", name)}
         onAdvance={async (next) => {
           await app.saveOrientation({ firstLoginScreen: next });
         }}
         onComplete={() => app.completeFirstLogin()}
         onDecline={() => void app.signOut()}
+        onIdentity={async (field, value) => {
+          app.patch("identity", field, value);
+          await app.save();
+        }}
       />
     );
   }
