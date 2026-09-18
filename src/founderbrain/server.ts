@@ -28,6 +28,7 @@ import {
 } from "./rate-limit.ts";
 import { ensureOpenRouterKey, revokeOpenRouterKey } from "./openrouter-keys.ts";
 import type { OpenRouterManagement } from "./openrouter-management.ts";
+import { readOrientation, writeOrientation } from "./orientation.ts";
 
 const key = z
   .string()
@@ -226,6 +227,10 @@ export async function buildApi(
     };
   });
   app.get("/api/me", async (req) => ({ email: context(req).email }));
+  app.get("/api/orientation", async (req) => readOrientation(store, context(req).workspace));
+  app.put("/api/orientation", async (req) =>
+    writeOrientation(store, context(req).workspace, req.body),
+  );
   app.get("/api/brain", async (req) => {
     const query = parse(
       z.object({ version: z.coerce.number().int().positive().optional() }).strict(),

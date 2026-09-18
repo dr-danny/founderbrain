@@ -33,6 +33,12 @@ import {
 } from "./lib/job-poll";
 import { type Mission } from "./mission-copy";
 import { type View } from "./components/MissionRail";
+import {
+  emptyOrientationState,
+  isFirstLoginComplete,
+  type OrientationPatch,
+  type OrientationState,
+} from "../founderbrain-shared/orientation";
 
 export function useFounderBrainApp() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -46,6 +52,8 @@ export function useFounderBrainApp() {
   const [demoEntered, setDemoEntered] = useState(false);
   const [state, setState] = useState<BrainState | null>(null);
   const [draft, setDraft] = useState<Brain>(emptyBrain());
+  const [orientation, setOrientation] = useState<OrientationState | null>(null);
+  const [orientationSaving, setOrientationSaving] = useState(false);
   const [view, setView] = useState<View>("home");
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
@@ -99,6 +107,8 @@ export function useFounderBrainApp() {
     acceptOperation.current = null;
     window.sessionStorage.removeItem(jobStorage);
     setState(null);
+    setOrientation(null);
+    setOrientationSaving(false);
     latestDraft.current = emptyBrain();
     setDraft(latestDraft.current);
     setChanged(false);
@@ -192,11 +202,14 @@ export function useFounderBrainApp() {
     const epoch = sessionEpoch.current;
     setError("");
     try {
-      const nextState = await api.brain();
-      if (epoch !== sessionEpoch.current) return;
-      const output = await api.artifact();
+      const [nextState, output, nextOrientation] = await Promise.all([
+        api.brain(),
+        api.artifact(),
+        api.orientation(),
+      ]);
       if (epoch !== sessionEpoch.current) return;
       setState(nextState);
+      setOrientation(nextOrientation);
       latestDraft.current = nextState.brain;
       setDraft(nextState.brain);
       setChanged(false);
@@ -208,6 +221,33 @@ export function useFounderBrainApp() {
     } catch (err) {
       if (epoch === sessionEpoch.current) setError(friendlyError(err));
     }
+  }
+
+  async function saveOrientation(patch: OrientationPatch): Promise<OrientationState> {
+    if (!api) throw new Error("api_unavailable");
+    const epoch = sessionEpoch.current;
+    setOrientationSaving(true);
+    setError("");
+    try {
+      const saved = await api.saveOrientation(patch);
+      if (epoch !== sessionEpoch.current) return saved;
+      setOrientation(saved);
+      return saved;
+    } catch (err) {
+      if (epoch === sessionEpoch.current) setError(friendlyError(err));
+      throw err;
+    } finally {
+      if (epoch === sessionEpoch.current) setOrientationSaving(false);
+    }
+  }
+
+  async function completeFirstLogin() {
+    await saveOrientation({
+      firstLoginScreen: 4,
+      firstLoginComplete: true,
+    });
+    setMission("identity");
+    setView("missions");
   }
 
   function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) {
@@ -577,6 +617,10 @@ export function useFounderBrainApp() {
     setDemoEntered,
     state,
     draft,
+    orientation: orientation ?? emptyOrientationState(),
+    orientationLoaded: orientation !== null,
+    orientationSaving,
+    firstLoginComplete: orientation ? isFirstLoginComplete(orientation) : false,
     view,
     setView,
     mission,
@@ -620,5 +664,7 @@ export function useFounderBrainApp() {
     deleteWorkspace,
     download,
     onSignInError,
+    saveOrientation,
+    completeFirstLogin,
   };
 }

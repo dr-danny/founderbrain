@@ -67,6 +67,7 @@ export const EDGE_IP_LIMIT: RateLimitConfig = { limit: 180, windowMs: 60_000 };
 
 export const MUTATION_PATHS = new Set([
   "PUT /api/brain",
+  "PUT /api/orientation",
   "POST /api/restore",
   "POST /api/jobs",
   "POST /api/artifact/:id/accept",
