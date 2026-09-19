@@ -1,9 +1,11 @@
 name: FounderBrain build and database proof
 on:
   push:
-    branches: [main, feat/typeform-onboarding-52]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 concurrency:
   group: founderbrain-${{ github.workflow }}-${{ github.ref }}
