@@ -72,13 +72,13 @@ describe("metered usage pricing", () => {
   });
 
   it("prices voice transcription per second with the buffer", () => {
-    // 60s x ($0.02/60) x 1.3 = $0.0004333... -> ceil = 434 microUSD
+    // 60s x ($0.04/60) x 1.3 = $0.0008666... -> ceil = 867 microUSD
     const priced = pricedUsageEvent(config({}), {
       kind: "voice_transcribe",
-      costMicroUsd: 334,
+      costMicroUsd: 667,
       meta: { seconds: 60 },
     });
-    assert.equal(priced.priceMicroUsd, 434);
+    assert.equal(priced.priceMicroUsd, 867);
   });
 
   it("responds with founder-facing totals only, buffer hidden", () => {

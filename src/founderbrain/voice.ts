@@ -40,7 +40,7 @@ export async function transcribeVoice(
     new Blob([new Uint8Array(input.audio)], { type: input.mime }),
     `voice.${input.mime === "audio/webm" ? "webm" : "ogg"}`,
   );
-  form.append("model", "whisper-large-v3");
+  form.append("model", "whisper-large-v3-turbo");
   form.append("temperature", "0");
   form.append("response_format", "json");
 
@@ -65,7 +65,7 @@ export async function transcribeVoice(
   await recordUsageEvent(store, workspace, config, {
     kind: "voice_transcribe",
     costMicroUsd: ceilMicro((seconds / 60) * voiceCostRateUsdPerMinute(config) * 1_000_000),
-    meta: { seconds, provider: "groq", model: "whisper-large-v3" },
+    meta: { seconds, provider: "groq", model: "whisper-large-v3-turbo" },
   });
   return { text };
 }

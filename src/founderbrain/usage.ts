@@ -36,9 +36,9 @@ export type UsageEvent = {
  * credit. FIRECRAWL_USD_PER_CREDIT overrides this if our plan is cheaper.
  */
 const DEFAULT_FIRECRAWL_USD_PER_CREDIT = 0.0025;
-/** Groq whisper-large-v3 bills $0.02 per hour of audio (docs: console.groq.com/docs/speech-to-text).
+/** Groq whisper-large-v3-turbo bills $0.04 per hour of audio (console.groq.com/docs/model/whisper-large-v3-turbo).
  *  VOICE_USD_PER_MINUTE overrides. */
-const DEFAULT_VOICE_USD_PER_MINUTE = 0.02 / 60;
+const DEFAULT_VOICE_USD_PER_MINUTE = 0.04 / 60;
 /** 30% hidden buffer on top of actual cost, baked into the displayed price (Danny, 2026-09-18).
  *  PRICE_MARKUP env overrides. Never shown to the founder; cost fields stay server-side. */
 const DEFAULT_PRICE_MARKUP = 1.3;
