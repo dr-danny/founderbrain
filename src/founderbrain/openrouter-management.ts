@@ -10,6 +10,10 @@
  *
  * AUTH. Bearer management key (OPENROUTER_MANAGEMENT_KEY). Regular sk-or
  * inference keys are rejected by these routes.
+ *
+ * WORKSPACE. `workspace_id` is only accepted on create; OpenRouter has no way to
+ * move a key afterwards. Without it every founder key lands in the account's
+ * Default workspace and misses the OneDay Atlanta guardrail.
  */
 import { DomainError } from "./domain.ts";
 
@@ -76,7 +80,10 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-export function createOpenRouterManagement(managementKey: string): OpenRouterManagement {
+export function createOpenRouterManagement(
+  managementKey: string,
+  workspaceId?: string,
+): OpenRouterManagement {
   if (!managementKey || managementKey.length < 16) {
     throw new Error("OPENROUTER_MANAGEMENT_KEY is required for key administration.");
   }
@@ -94,6 +101,7 @@ export function createOpenRouterManagement(managementKey: string): OpenRouterMan
           limit_reset: null,
           expires_at: expiresAt,
           include_byok_in_limit: false,
+          ...(workspaceId ? { workspace_id: workspaceId } : {}),
         }),
         signal: AbortSignal.timeout(30000),
       });

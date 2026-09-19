@@ -148,6 +148,7 @@ Browser → Worker → API for `GET /api/config` works; assets carry CSP/securit
 Keep `AI_ENABLED=false` and the worker service stopped until rates and caps are chosen for privacy-allowlisted OpenRouter models (see `src/founderbrain/openrouter-privacy.ts`).
 
 1. Create an OpenRouter **Management API** key (not an inference key). Store it as Railway secret `OPENROUTER_MANAGEMENT_KEY` on the API (and anywhere that must revoke keys). Never put it in git or Slack.
+1b. Set `OPENROUTER_WORKSPACE_ID` to the **OneDay Atlanta** workspace UUID on the same services. OpenRouter accepts `workspace_id` only at key creation and has no move-key operation, so leaving it unset parks every founder key in the account Default workspace, outside the OneDay guardrail (default-deny model list, ZDR, redaction, workspace budget). Read the UUID with `GET /api/v1/workspaces` using a management key.
 2. Pick privacy-allowlisted role models (`AI_MODEL_THINKER`, `AI_MODEL_RUNNER` / `AI_MODEL`, `AI_MODEL_VERIFIER`) or accept the code defaults.
 3. Verify that day's `AI_INPUT_USD_PER_MILLION` and `AI_OUTPUT_USD_PER_MILLION` for the runner (primary spend).
 4. Approve `AI_WORKSPACE_DAILY_MICROUSD` and `AI_GLOBAL_DAILY_MICROUSD` with headroom for reservation math in `jobs.ts`.

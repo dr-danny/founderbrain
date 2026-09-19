@@ -135,6 +135,7 @@ Use the same compiled image with `node src/founderbrain/worker.js`. Its `DATABAS
 
 - `AI_ENABLED=true`
 - `OPENROUTER_MANAGEMENT_KEY` on the API (creates/revokes per-user keys named `OneDay-Founderbrain-{email}`, $20 lifetime / no reset, 30-day expiry)
+- `OPENROUTER_WORKSPACE_ID`: the OneDay Atlanta workspace UUID. Applied only at key creation; without it keys are created in the account Default workspace and skip the OneDay guardrail
 - Privacy-allowlisted `AI_MODEL_THINKER` / `AI_MODEL_RUNNER` (or `AI_MODEL`) / `AI_MODEL_VERIFIER`, or accept code defaults
 - `AI_INPUT_USD_PER_MILLION`, `AI_OUTPUT_USD_PER_MILLION`: verified current rates for the runner model
 - `AI_WORKSPACE_DAILY_MICROUSD`, `AI_GLOBAL_DAILY_MICROUSD`: approved daily limits, in millionths of a dollar
