@@ -1,9 +1,9 @@
 name: FounderBrain build and database proof
 on:
   push:
-    branches: [main, feat/founderbrain-railway-workers]
+    branches: [main, feat/typeform-onboarding-52]
   pull_request:
-    branches: [main, feat/founderbrain-railway-workers]
+    branches: [main]
   workflow_dispatch:
 concurrency:
   group: founderbrain-${{ github.workflow }}-${{ github.ref }}
@@ -97,6 +97,13 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8080/health/ready
           docker exec founderbrain-smoke node --input-type=module -e "
+            import {PgBrainStore} from './src/founderbrain/store.js';
+            const s=new PgBrainStore(process.env.DATABASE_URL);
+            const id=await s.ensureWorkspace('ci-container-fixture');
+            const current=await s.read(id);
+            if(current.version!==1||current.brain.identity.name!=='Container restart fixture')throw new Error('Restart persistence failed');
+            await s.close();console.log('Encrypted revision survived container restart');"
+moke node --input-type=module -e "
             import {PgBrainStore} from './src/founderbrain/store.js';
             const s=new PgBrainStore(process.env.DATABASE_URL);
             const id=await s.ensureWorkspace('ci-container-fixture');

@@ -190,6 +190,40 @@ class BrowserAuthTests(unittest.TestCase):
         self.assertTrue(parse_qs(hosted.query).get("hexclave_cross_domain_state"))
         self.assertEqual(self.errors, [])
 
+    def test_signed_in_empty_workspace_opens_welcome_typeform(self):
+        brain = {
+            "workspaceId": "ws_fixture", "version": 0, "sha": "0" * 64, "updatedAt": None,
+            "brain": {
+                "schemaVersion": 1,
+                "identity": {"name": "", "venture": "", "role": "", "stage": "exploring", "goal": "", "approved": False},
+                "customer": {"segment": "", "problem": "", "outcome": "", "workaround": "",
+                             "evidenceStatus": "hypothesis", "evidence": "", "approved": False},
+                "offer": {"description": "", "delivery": "", "outcome": "", "cta": "", "price": "", "approved": False},
+                "voice": {"tone": "", "boundaries": "", "sample": "", "approved": False},
+            },
+            "readiness": {"identity": False, "customer": False, "offer": False, "voice": False, "output": False},
+            "verified": False, "artifact": None,
+        }
+        orientation = {
+            "firstLoginScreen": 1, "firstLoginCompletedAt": None, "track": None,
+            "contentScreen": 1, "contentCompletedAt": None, "contentAnswers": {},
+            "outreachScreen": 1, "outreachCompletedAt": None, "outreachAnswers": {},
+            "ghlScreen": 1, "ghlCompletedAt": None, "ghlAnswers": {},
+            "updatedAt": "2026-09-18T00:00:00.000Z",
+        }
+        self.context.route(self.origin + "/api/me", lambda r: r.fulfill(json={"email": "ada@example.test"}))
+        self.context.route(self.origin + "/api/brain", lambda r: r.fulfill(json=brain))
+        self.context.route(self.origin + "/api/artifact", lambda r: r.fulfill(json={"artifact": None, "stale": False}))
+        self.context.route(self.origin + "/api/orientation", lambda r: r.fulfill(json=orientation))
+        self.page.goto(self.origin)
+        self.page.get_by_role("button", name="Sign in", exact=True).click()
+        expect(self.page.get_by_role("heading", name="Hosted sign-in fixture")).to_be_visible()
+        state = parse_qs(urlparse(self.page.url).query)["hexclave_cross_domain_state"][0]
+        self.page.goto(self.origin + "/?" + urlencode({"code": "fixture-code", "state": state}))
+        expect(self.page.get_by_text("Welcome", exact=False)).to_be_visible(timeout=20000)
+        expect(self.page.locator(".typeform-sequence")).to_be_visible()
+        self.assertEqual(self.errors, [])
+
     def test_hosted_callback_establishes_session_and_api_uses_access_token(self):
         received_tokens = []
         def me(route):
