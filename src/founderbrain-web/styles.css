@@ -1206,6 +1206,86 @@ button:not(.link-button) {
 .typeform-stage.immersive .typeform-panel {
   padding-top: clamp(3.5rem, 12vh, 7rem);
 }
+.site-reading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.8rem;
+  min-height: 4.2rem;
+}
+.site-reading-ring {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 3px solid rgba(247, 239, 230, 0.2);
+  border-top-color: var(--ember);
+  border-radius: 50%;
+  animation: site-spin 0.8s linear infinite;
+}
+.site-reading-line {
+  margin: 0;
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  color: var(--paper);
+}
+@keyframes site-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.site-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.25rem 1.5rem;
+  margin-top: 1.6rem;
+  padding: 1.35rem 1.5rem;
+  max-width: min(100%, 44rem);
+  background: rgba(18, 12, 20, 0.55);
+  border: 1px solid rgba(247, 239, 230, 0.18);
+  border-radius: 18px;
+}
+.site-card-logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 12px;
+}
+.site-card-logo.fallback {
+  display: grid;
+  place-items: center;
+  background: var(--ember);
+  color: var(--ink);
+  font-family: var(--font-brand);
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+.site-card-body h2 {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-brand);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  letter-spacing: -0.04em;
+}
+.site-card-body dl {
+  margin: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.site-card-row {
+  display: grid;
+  gap: 0.15rem;
+}
+.site-card-row dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+}
+.site-card-row dd {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.4;
+  color: var(--paper);
+}
 .typeform-stage .typeform-panel {
   align-self: center;
   width: min(100%, 92vw);

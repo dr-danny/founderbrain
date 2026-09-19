@@ -34,15 +34,16 @@ export async function importSite(
   store: PgBrainStore,
   workspace: string,
   url: string,
-): Promise<{ proposal: SiteProposal; source: "ai" | "title" }> {
+): Promise<{ proposal: SiteProposal; source: "ai" | "title"; logoUrl: string }> {
   if (!config.FIRECRAWL_API_KEY)
     throw new DomainError(503, "site_import_not_configured", "Website import is not configured yet.");
-  let markdown = "";
+  let scraped: { markdown: string; title: string; logoUrl: string };
   try {
-    markdown = await firecrawlScrape(url, config.FIRECRAWL_API_KEY);
+    scraped = await firecrawlScrape(url, config.FIRECRAWL_API_KEY);
   } catch {
     throw new DomainError(502, "site_import_failed", "Could not read that website. We'll ask instead.");
   }
+  const markdown = scraped.markdown;
   if (config.AI_ENABLED === "true") {
     try {
       const loaded = await loadOpenRouterApiKey(store, workspace);
@@ -58,12 +59,13 @@ export async function importSite(
         loaded.apiKey,
       );
       const proposal = parseProposal(result.text);
-      if (proposal.identity || proposal.customer || proposal.offer) return { proposal, source: "ai" };
+      if (proposal.identity || proposal.customer || proposal.offer)
+        return { proposal, source: "ai", logoUrl: scraped.logoUrl };
     } catch {
       /* fall through to title */
     }
   }
-  const name = heading(markdown);
+  const name = heading(markdown) || scraped.title;
   if (!name) throw new DomainError(502, "site_import_failed", "Could not read that website. We'll ask instead.");
-  return { proposal: { identity: { venture: name } }, source: "title" };
+  return { proposal: { identity: { venture: name } }, source: "title", logoUrl: scraped.logoUrl };
 }

@@ -128,7 +128,11 @@ export class FounderBrainApi {
     return this.request<{ url: string }>("/oauth/start");
   }
   importSite(url: string) {
-    return this.request<{ proposal: Record<string, unknown>; source: "ai" | "title" }>("/site-import", {
+    return this.request<{
+      proposal: Record<string, unknown>;
+      source: "ai" | "title";
+      logoUrl?: string;
+    }>("/site-import", {
       method: "POST",
       body: JSON.stringify({ url }),
     });

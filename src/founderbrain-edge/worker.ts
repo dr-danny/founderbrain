@@ -89,7 +89,7 @@ function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
       "form-action 'self'",
       "script-src 'self'",
       "style-src 'self'",
-      "img-src 'self' data:",
+      "img-src 'self' data: https:",
       `connect-src ${connectSources(env)}`,
     ].join("; "),
   );

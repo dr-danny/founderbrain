@@ -35,7 +35,35 @@ type Proposal = {
   offer?: Record<string, string>;
   voice?: Record<string, string>;
   track?: "b2b" | "b2c";
+  logoUrl?: string;
 };
+
+function normalizeSiteUrl(raw: string): string {
+  let value = raw.trim();
+  if (!value || value === "https://" || value === "http://") return "";
+  value = value.replace(/^https?:\/\//i, "");
+  return `https://${value}`;
+}
+
+function ReadingSite() {
+  const lines = [
+    "Reading your site...",
+    "Finding what you sell...",
+    "Looking for who you serve...",
+    "Pulling the story together...",
+  ];
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setIndex((n) => (n + 1) % lines.length), 1600);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="site-reading" role="status">
+      <div className="site-reading-ring" aria-hidden="true" />
+      <p className="site-reading-line">{lines[index]}</p>
+    </div>
+  );
+}
 
 function sequence(includeUrl: boolean): string[] {
   const items = ["name", "ready", "site-ask"];
@@ -73,13 +101,13 @@ export function OrientationFlow({
   onDecline: () => void;
   onFill: (section: "identity" | "customer" | "offer" | "voice", field: string, value: string) => Promise<void>;
   onTrack: (value: "b2b" | "b2c") => Promise<void>;
-  onImport: (url: string) => Promise<{ proposal: Proposal }>;
+  onImport: (url: string) => Promise<{ proposal: Proposal; logoUrl?: string }>;
 }) {
   const [name, setName] = useState(() => brain.identity.name.trim() || readKey(NAME_KEY));
   const [localError, setLocalError] = useState("");
   const [saidYes, setSaidYes] = useState(() => welcomeDone || readKey(YES_KEY) === "1");
   const [wantSite, setWantSite] = useState(readKey(SITE_KEY) === "1");
-  const [siteUrl, setSiteUrl] = useState("");
+  const [siteUrl, setSiteUrl] = useState("https://");
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -160,9 +188,9 @@ export function OrientationFlow({
   }
 
   async function scrapeSite() {
-    const url = siteUrl.trim();
-    if (!url.startsWith("https://")) {
-      setLocalError("Use an https address.");
+    const url = normalizeSiteUrl(siteUrl);
+    if (!url) {
+      setLocalError("Add the rest of the address.");
       return;
     }
     if (!siteImportEnabled) {
@@ -175,7 +203,7 @@ export function OrientationFlow({
     setLocalError("");
     try {
       const result = await onImport(url);
-      setProposal(result.proposal);
+      setProposal({ ...result.proposal, logoUrl: result.logoUrl });
       writeKey(SITE_KEY, "1");
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Could not read that website. We'll ask instead.");
@@ -339,9 +367,13 @@ export function OrientationFlow({
   }
 
   if (current === "site-url" && proposal) {
-    const lines = [proposal.identity?.venture, proposal.offer?.description, proposal.customer?.segment].filter(
-      Boolean,
-    ) as string[];
+    const rows = [
+      ["Business", proposal.identity?.venture],
+      ["Sells", proposal.offer?.description],
+      ["Buyer", proposal.customer?.segment],
+      ["Problem", proposal.customer?.problem],
+      ["Price", proposal.offer?.price],
+    ].filter((row): row is [string, string] => Boolean(row[1]));
     return (
       <TypeformShell
         kicker=""
@@ -351,11 +383,26 @@ export function OrientationFlow({
         onContinue={() => void applyProposal()}
         {...frame}
       >
-        <ul className="typeform-bullets">
-          {lines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+        <article className="site-card">
+          {proposal.logoUrl ? (
+            <img className="site-card-logo" src={proposal.logoUrl} alt="" />
+          ) : (
+            <div className="site-card-logo fallback" aria-hidden="true">
+              {(proposal.identity?.venture || "B").slice(0, 1)}
+            </div>
+          )}
+          <div className="site-card-body">
+            <h2>{proposal.identity?.venture || "Your business"}</h2>
+            <dl>
+              {rows.map(([label, value]) => (
+                <div key={label} className="site-card-row">
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </article>
         <div className="typeform-choices welcome-choices">
           <button className="typeform-choice yes" type="button" disabled={locked} onClick={() => void applyProposal()}>
             Yes
@@ -386,22 +433,29 @@ export function OrientationFlow({
     return (
       <TypeformShell
         kicker=""
-        title={busy ? "Reading your site..." : "What's the address?"}
-        continueLabel={busy ? "Working" : "Continue"}
-        continueDisabled={busy || !siteUrl.trim()}
+        title="What's the address?"
+        continueLabel="Continue"
+        continueDisabled={busy || !normalizeSiteUrl(siteUrl)}
         immersive
         onContinue={() => void scrapeSite()}
         {...frame}
       >
-        <VoiceField
-          label="Website"
-          value={siteUrl}
-          maxLength={200}
-          placeholder="https://your-site.com"
-          onChange={setSiteUrl}
-          onEnter={() => void scrapeSite()}
-        />
-        {!siteImportEnabled ? (
+        {busy ? (
+          <ReadingSite />
+        ) : (
+          <VoiceField
+            label="Website"
+            value={siteUrl}
+            maxLength={200}
+            placeholder="your-site.com"
+            onChange={(value) => {
+              if (value.startsWith("https://") || value.startsWith("http://")) setSiteUrl(value);
+              else setSiteUrl(`https://${value.replace(/^\/+/, "")}`);
+            }}
+            onEnter={() => void scrapeSite()}
+          />
+        )}
+        {!siteImportEnabled && !busy ? (
           <p className="entry-lede typeform-lede">If we cannot read it, we will just ask you instead.</p>
         ) : null}
         {(error || localError) && (

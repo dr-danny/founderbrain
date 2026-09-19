@@ -97,7 +97,10 @@ export const openRouterProvider: Provider = async (body, key) => {
 /** @deprecated Use openRouterProvider. Kept as an alias for older test imports. */
 export const anthropicProvider = openRouterProvider;
 
-export async function firecrawlScrape(url: string, key: string): Promise<string> {
+export async function firecrawlScrape(
+  url: string,
+  key: string,
+): Promise<{ markdown: string; title: string; logoUrl: string }> {
   const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
     method: "POST",
     headers: {
@@ -109,11 +112,29 @@ export async function firecrawlScrape(url: string, key: string): Promise<string>
   });
   const json = (await response.json().catch(() => ({}))) as {
     success?: boolean;
-    data?: { markdown?: string; metadata?: { title?: string } };
+    data?: {
+      markdown?: string;
+      metadata?: {
+        title?: string;
+        ogImage?: string;
+        favicon?: string;
+        image?: string;
+        logo?: string;
+        "og:image"?: string;
+      };
+    };
   };
   const markdown = json.data?.markdown?.trim() ?? "";
-  const title = json.data?.metadata?.title?.trim() ?? "";
+  const meta = json.data?.metadata ?? {};
+  const title = meta.title?.trim() ?? "";
+  const logoUrl = [meta.ogImage, meta["og:image"], meta.logo, meta.image, meta.favicon]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .find((value) => value.startsWith("https://")) ?? "";
   if (!response.ok || (!markdown && !title))
     throw new Error("firecrawl_failed");
-  return [title ? `# ${title}` : "", markdown].filter(Boolean).join("\n\n").slice(0, 20_000);
+  return {
+    markdown: [title ? `# ${title}` : "", markdown].filter(Boolean).join("\n\n").slice(0, 20_000),
+    title,
+    logoUrl,
+  };
 }
