@@ -3,7 +3,6 @@
  */
 import { useEffect, useRef, useState } from "react";
 
-<<<<<<< HEAD
 const MIC_SETTINGS_URL =
   "chrome://settings/content/siteDetails?site=" +
   encodeURIComponent(window.location.origin);
@@ -81,24 +80,17 @@ function MicBlockedModal({
   );
 }
 
-=======
->>>>>>> origin/main
 type SpeechRec = {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
   onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
-<<<<<<< HEAD
   onerror: ((event: { error?: string }) => void) | null;
-=======
-  onerror: (() => void) | null;
->>>>>>> origin/main
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
 };
 
-<<<<<<< HEAD
 /**
  * Real errors must reach the founder. Before 2026-09-18 every recognition
  * failure (blocked mic, no speech, network) reset state silently, so the mic
@@ -122,8 +114,6 @@ function micHint(code: string | undefined): string {
   }
 }
 
-=======
->>>>>>> origin/main
 function speechEngine(): SpeechRec | null {
   const Speech =
     (window as Window & { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec })
@@ -145,10 +135,7 @@ export function VoiceField({
   placeholder,
   multiline = false,
   onEnter,
-<<<<<<< HEAD
   serverTranscribe,
-=======
->>>>>>> origin/main
 }: {
   label: string;
   value: string;
@@ -157,7 +144,6 @@ export function VoiceField({
   placeholder: string;
   multiline?: boolean;
   onEnter?: () => void;
-<<<<<<< HEAD
   /** Server fallback when Web Speech cannot (blob, seconds) -> transcript. */
   serverTranscribe?: (blob: Blob, seconds: number) => Promise<string>;
 }) {
@@ -170,12 +156,6 @@ export function VoiceField({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-=======
-}) {
-  const [listening, setListening] = useState(false);
-  const [supported, setSupported] = useState(false);
-  const recRef = useRef<SpeechRec | null>(null);
->>>>>>> origin/main
   const baseRef = useRef(value);
   baseRef.current = value;
 
@@ -184,7 +164,6 @@ export function VoiceField({
     return () => recRef.current?.stop();
   }, []);
 
-<<<<<<< HEAD
   // Long pre-filled answers must be visible without scrolling (Danny, 2026-09-19):
   // textareas grow to fit their content, single-line inputs shrink their font.
   useEffect(() => {
@@ -272,17 +251,10 @@ export function VoiceField({
       setListening(false);
       setBlocked("blocked");
     }
-=======
-  function stop() {
-    recRef.current?.stop();
-    recRef.current = null;
-    setListening(false);
->>>>>>> origin/main
   }
 
   function start() {
     const rec = speechEngine();
-<<<<<<< HEAD
 
     if (!rec) {
       void beginServerRecording();
@@ -291,11 +263,6 @@ export function VoiceField({
     recRef.current?.stop();
     recRef.current = rec;
     setHint("");
-=======
-    if (!rec) return;
-    recRef.current?.stop();
-    recRef.current = rec;
->>>>>>> origin/main
     const frozen = baseRef.current.trim();
     rec.onresult = (event) => {
       let spoken = "";
@@ -305,7 +272,6 @@ export function VoiceField({
       const next = `${frozen ? `${frozen} ` : ""}${spoken.trim()}`.slice(0, maxLength);
       onChange(next);
     };
-<<<<<<< HEAD
     rec.onerror = (event) => {
       stop();
       const code = event?.error;
@@ -322,19 +288,13 @@ export function VoiceField({
         setHint(micHint(code));
       }
     };
-=======
-    rec.onerror = () => stop();
->>>>>>> origin/main
     rec.onend = () => setListening(false);
     try {
       rec.start();
       setListening(true);
     } catch {
       setListening(false);
-<<<<<<< HEAD
       setHint(micHint("not-allowed"));
-=======
->>>>>>> origin/main
     }
   }
 
@@ -343,10 +303,7 @@ export function VoiceField({
       <span className="visually-hidden">{label}</span>
       {multiline ? (
         <textarea
-<<<<<<< HEAD
           ref={areaRef}
-=======
->>>>>>> origin/main
           value={value}
           rows={3}
           maxLength={maxLength}
@@ -355,10 +312,7 @@ export function VoiceField({
         />
       ) : (
         <input
-<<<<<<< HEAD
           ref={inputRef}
-=======
->>>>>>> origin/main
           value={value}
           maxLength={maxLength}
           placeholder={placeholder}
@@ -370,7 +324,6 @@ export function VoiceField({
               onEnter();
             }
           }}
-<<<<<<< HEAD
           onFocus={(event) => {
             // Focus drops the caret at the end and scrolls long pre-filled text to its tail.
             // Keep the caret where it is (typing still appends) but show the start.
@@ -379,8 +332,6 @@ export function VoiceField({
               if (el.scrollWidth > el.clientWidth) el.scrollLeft = 0;
             });
           }}
-=======
->>>>>>> origin/main
         />
       )}
       {supported ? (
@@ -388,10 +339,7 @@ export function VoiceField({
           className={listening ? "voice-mic on" : "voice-mic"}
           type="button"
           aria-pressed={listening}
-<<<<<<< HEAD
           disabled={serverBusy}
-=======
->>>>>>> origin/main
           aria-label={listening ? "Stop listening" : "Speak"}
           onClick={() => (listening ? stop() : start())}
         >
@@ -403,7 +351,6 @@ export function VoiceField({
           </svg>
         </button>
       ) : null}
-<<<<<<< HEAD
       {hint || serverBusy ? (
         <span className="voice-hint" role="status" aria-live="polite">
           {serverBusy ? "Transcribing…" : hint}
@@ -423,8 +370,6 @@ export function VoiceField({
           onClose={() => setBlocked("")}
         />
       ) : null}
-=======
->>>>>>> origin/main
     </label>
   );
 }

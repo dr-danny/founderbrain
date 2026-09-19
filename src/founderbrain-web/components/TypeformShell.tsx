@@ -47,12 +47,8 @@ export function TypeformShell({
     if (!titleDone) return;
     const field = document.querySelector(".typeform-name input") as HTMLInputElement | null;
     if (field) {
-<<<<<<< HEAD
       // preventScroll: otherwise the caret-at-end drags long pre-filled answers to their tail.
       field.focus({ preventScroll: true });
-=======
-      field.focus();
->>>>>>> origin/main
       return;
     }
     if (!hideContinue) continueRef.current?.focus();
