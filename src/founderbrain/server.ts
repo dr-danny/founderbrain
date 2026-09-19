@@ -235,6 +235,7 @@ export async function buildApi(
           },
       aiEnabled: config.AI_ENABLED === "true",
       crmConnectEnabled: crmOAuthConfigured(config),
+      siteImportEnabled: Boolean(config.FIRECRAWL_API_KEY),
     };
   });
   app.get("/api/oauth/status", async (req) => connectionStatus(store, context(req).workspace));
