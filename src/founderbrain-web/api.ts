@@ -5,7 +5,7 @@
  * fresh Hexclave access token (or the local-demo header) and never relies on
  * cookies (`credentials: 'omit'`).
  */
-import type { Artifact, Brain, BrainState, Config, HistoryItem, Job, Me } from "./types";
+import type { Artifact, Brain, BrainState, Config, HistoryItem, Job, Me, UsageResponse } from "./types";
 import type { OrientationPatch, OrientationState } from "../founderbrain-shared/orientation";
 
 export class ApiError extends Error {
@@ -124,6 +124,9 @@ export class FounderBrainApi {
   oauthStatus() {
     return this.request<{ connected: boolean; locationId: string | null }>("/oauth/status");
   }
+  usage() {
+    return this.request<UsageResponse>("/usage");
+  }
   startOauth() {
     return this.request<{ url: string }>("/oauth/start");
   }
@@ -136,6 +139,13 @@ export class FounderBrainApi {
       method: "POST",
       body: JSON.stringify({ url }),
     });
+  }
+  transcribeVoice(audio: { audioBase64: string; mime: string; seconds: number }) {
+    return this.request<{ text: string }>(
+      "/voice",
+      { method: "POST", body: JSON.stringify(audio) },
+      45_000,
+    );
   }
   completeOauth(body: { code: string; state: string }) {
     return this.request<{ connected: boolean; locationId: string | null }>("/oauth/complete", {

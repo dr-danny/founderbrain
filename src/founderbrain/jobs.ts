@@ -28,6 +28,7 @@ import { buildOrchestrationFromConfig, orchestrateInvitation } from "./orchestra
 import { keyIsUsable, loadOpenRouterApiKey, recordOpenRouterSpend } from "./openrouter-keys.ts";
 import type { OrchestrationRole, RoleModels } from "./openrouter-privacy.ts";
 import { OPENROUTER_LIFETIME_USD } from "./openrouter-management.ts";
+import { ceilMicro, insertUsageEvent, pricedUsageEvent, recordUsageEvent, type UsageEvent } from "./usage.ts";
 
 export type { Provider, ProviderResult } from "./provider.ts";
 
@@ -502,7 +503,7 @@ export class BrainJobs {
           },
         },
       );
-      const cost = Math.ceil(
+      const cost = ceilMicro(
         result.inputTokens * pinned.inputRate + result.outputTokens * pinned.outputRate,
       );
       billedMicroUsd = cost;
@@ -555,6 +556,16 @@ export class BrainJobs {
           );
         }
         const sha = await putPrivate(tx, workspace, result.text);
+        // Meter actual usage alongside the settle so the pre-connect price
+        // screen and any later reconciliation share one ledger.
+        const usageEvent: UsageEvent = {
+          kind: "ai_tokens",
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          costMicroUsd: cost,
+          jobId: job.id,
+        };
+        await insertUsageEvent(tx, workspace, usageEvent, pricedUsageEvent(this.config, usageEvent));
         await tx`
           insert into fb_artifact (
             id, founder_id, job_id, source_version, source_hash, input_hash, draft_sha
@@ -609,6 +620,17 @@ export class BrainJobs {
           await recordOpenRouterSpend(this.store, workspace, billedMicroUsd, {
             allowOverLifetime: true,
           });
+          const quarantined: UsageEvent = {
+            kind: "ai_tokens",
+            costMicroUsd: billedMicroUsd,
+            jobId: job.id,
+            meta: { reason: "quarantine_partial_spend" },
+          };
+          try {
+            await recordUsageEvent(this.store, workspace, this.config, quarantined);
+          } catch {
+            // Quarantine still proceeds; operator reconcile can apply confirmed spend.
+          }
           await this.store.scoped(workspace, async (tx: Tx) => {
             await tx`
               update fb_ai_job

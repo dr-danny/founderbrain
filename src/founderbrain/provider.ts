@@ -120,7 +120,7 @@ function pickFavicon(
 export async function firecrawlScrape(
   url: string,
   key: string,
-): Promise<{ markdown: string; title: string; logoUrl: string }> {
+): Promise<{ markdown: string; title: string; logoUrl: string; creditsUsed: number }> {
   const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
     method: "POST",
     headers: {
@@ -132,7 +132,9 @@ export async function firecrawlScrape(
   });
   const json = (await response.json().catch(() => ({}))) as {
     success?: boolean;
+    creditsUsed?: number;
     data?: {
+      creditsUsed?: number;
       markdown?: string;
       metadata?: {
         title?: string;
@@ -148,11 +150,16 @@ export async function firecrawlScrape(
   const meta = json.data?.metadata ?? {};
   const title = meta.title?.trim() ?? "";
   const logoUrl = pickFavicon(meta, url);
-  if (!response.ok || (!markdown && !title))
-    throw new Error("firecrawl_failed");
+  if (!response.ok || (!markdown && !title)) throw new Error("firecrawl_failed");
+  // Metered usage: Firecrawl bills 1 credit per basic scraped page. Trust the
+  // response when it reports credits, otherwise bill the known base rate.
+  const reported = json.creditsUsed ?? json.data?.creditsUsed;
+  const creditsUsed =
+    typeof reported === "number" && Number.isSafeInteger(reported) && reported >= 1 ? reported : 1;
   return {
     markdown: [title ? `# ${title}` : "", markdown].filter(Boolean).join("\n\n").slice(0, 20_000),
     title,
     logoUrl,
+    creditsUsed,
   };
 }

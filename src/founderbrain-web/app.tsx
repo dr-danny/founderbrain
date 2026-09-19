@@ -5,16 +5,15 @@
 import { missions } from "./mission-copy";
 import { useFounderBrainApp } from "./use-founderbrain-app";
 import { AuthPage } from "./components/AuthPage";
-import { TopBar } from "./components/TopBar";
+import { TopBar, AccountChip } from "./components/TopBar";
 import { MissionRail } from "./components/MissionRail";
-import { MissionStage } from "./components/MissionStage";
-import { Home } from "./components/Home";
+import { MissionTypeform } from "./components/MissionTypeform";
+import { AtlantaReady } from "./components/AtlantaReady";
 import { BrainPanel } from "./components/BrainPanel";
 import { ConflictDialog } from "./components/ConflictDialog";
 import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
-import { AtlantaReady } from "./components/AtlantaReady";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -79,6 +78,8 @@ export function App() {
     return <AuthPage kind="boot" message={error || "Preparing your private workspace…"} />;
   }
 
+  // Signed-in views without the full TopBar still get the account chip top right.
+  const accountChip = email ? <AccountChip email={email} onSignOut={() => void app.signOut()} /> : null;
   const guidedOpen =
     !draft.identity.venture.trim() ||
     !draft.identity.role.trim() ||
@@ -90,6 +91,7 @@ export function App() {
   if (!firstLoginComplete || guidedOpen) {
     return (
       <>
+      {accountChip}
       <OrientationFlow
         screen={orientation.firstLoginScreen}
         saving={orientationSaving || app.saving}
@@ -114,6 +116,9 @@ export function App() {
           await app.saveOrientation({ track: value });
         }}
         onImport={(url) => app.importSite(url)}
+        onTranscribe={(blob, seconds) =>
+          app.transcribeVoice(blob, seconds).then((result) => result.text)
+        }
       />
       {conflict ? (
         <ConflictDialog
@@ -130,46 +135,93 @@ export function App() {
 
   if (view === "content") {
     return (
-      <ContentChapter
-        orientation={orientation}
-        saving={orientationSaving}
-        error={error}
-        onPatch={async (patch) => {
-          await app.saveOrientation(patch);
-        }}
-        onFinished={() => setView("home")}
-      />
+      <>
+        {accountChip}
+        <ContentChapter
+          orientation={orientation}
+          saving={orientationSaving}
+          error={error}
+          onPatch={async (patch) => {
+            await app.saveOrientation(patch);
+          }}
+          onFinished={() => setView("atlanta")}
+        />
+      </>
     );
   }
 
   if (view === "outreach") {
     return (
-      <OutreachChapter
-        orientation={orientation}
-        saving={orientationSaving}
-        error={error}
-        onPatch={async (patch) => {
-          await app.saveOrientation(patch);
-        }}
-        onFinished={() => setView("home")}
-      />
+      <>
+        {accountChip}
+        <OutreachChapter
+          orientation={orientation}
+          saving={orientationSaving}
+          error={error}
+          onPatch={async (patch) => {
+            await app.saveOrientation(patch);
+          }}
+          onFinished={() => setView("atlanta")}
+        />
+      </>
     );
   }
 
   if (view === "ghl") {
     return (
-      <GhlChapter
+      <>
+        {accountChip}
+        <GhlChapter
         orientation={orientation}
         saving={orientationSaving}
         error={error}
         connectEnabled={Boolean(config.crmConnectEnabled)}
         connecting={app.connecting}
         onConnect={() => app.startConnect()}
+        loadUsage={() => app.getUsage()}
         onPatch={async (patch) => {
           await app.saveOrientation(patch);
         }}
-        onFinished={() => setView("home")}
-      />
+        onFinished={() => setView("atlanta")}
+        />
+      </>
+    );
+  }
+
+  if (view === "missions") {
+    return (
+      <>
+        {accountChip}
+        <MissionTypeform
+          mission={mission}
+          draft={draft}
+          saving={app.saving}
+          changed={app.changed}
+          config={config}
+          artifact={app.artifact}
+          artifactText={app.artifactText}
+          artifactStale={app.artifactStale}
+          generating={app.generating}
+          generationRetry={app.generationRetry}
+          accepting={app.accepting}
+          acceptRetry={app.acceptRetry}
+          jobNeedsReconcile={app.jobNeedsReconcile}
+          verified={state.verified}
+          canRetrySave={Boolean(saveOperation.current)}
+          onPatch={app.patch}
+          onSave={() => void app.save()}
+          onRetrySave={() => void app.retrySave()}
+          onApprove={(section) => void app.approve(section)}
+          onFinished={() => setView("atlanta")}
+          onTranscribe={(blob, seconds) =>
+            app.transcribeVoice(blob, seconds).then((result) => result.text)
+          }
+          onText={app.setArtifactText}
+          onGenerate={() => void app.generate()}
+          onReconcile={() => void app.reconcileOutput()}
+          onAccept={() => void app.acceptOutput()}
+        />
+      </>
     );
   }
 
@@ -181,7 +233,7 @@ export function App() {
         state={state}
         changed={app.changed}
         saving={app.saving}
-        onHome={() => setView("home")}
+        onHome={() => setView("atlanta")}
         onSignOut={() => void app.signOut()}
       />
       <div className="layout">
@@ -189,7 +241,7 @@ export function App() {
           view={view}
           mission={mission}
           readiness={state.readiness}
-          onHome={() => setView("home")}
+          onHome={() => setView("atlanta")}
           onMissions={() => setView("missions")}
           onBrain={() => void app.openHistory()}
           onSelectMission={(key) => {
@@ -217,23 +269,6 @@ export function App() {
               )}
             </p>
           )}
-          {view === "home" && (
-            <Home
-              state={state}
-              draft={draft}
-              orientation={orientation}
-              onBegin={() => {
-                const first = missions.find((key) => !state.readiness[key]) ?? "output";
-                setMission(first);
-                setView("missions");
-              }}
-              onHistory={() => void app.openHistory()}
-              onAtlanta={() => setView("atlanta")}
-              onContent={() => setView("content")}
-              onOutreach={() => setView("outreach")}
-              onGhl={() => setView("ghl")}
-            />
-          )}
           {view === "atlanta" && (
             <AtlantaReady
               state={state}
@@ -246,34 +281,6 @@ export function App() {
                 setMission(first);
                 setView("missions");
               }}
-            />
-          )}
-          {view === "missions" && (
-            <MissionStage
-              mission={mission}
-              draft={draft}
-              saving={app.saving}
-              changed={app.changed}
-              config={config}
-              artifact={app.artifact}
-              artifactText={app.artifactText}
-              artifactStale={app.artifactStale}
-              generating={app.generating}
-              generationRetry={app.generationRetry}
-              accepting={app.accepting}
-              acceptRetry={app.acceptRetry}
-              jobNeedsReconcile={app.jobNeedsReconcile}
-              verified={state.verified}
-              canRetrySave={Boolean(saveOperation.current)}
-              onPatch={app.patch}
-              onSave={() => void app.save()}
-              onRetrySave={() => void app.retrySave()}
-              onApprove={(section) => void app.approve(section)}
-              onNext={setMission}
-              onText={app.setArtifactText}
-              onGenerate={() => void app.generate()}
-              onReconcile={() => void app.reconcileOutput()}
-              onAccept={() => void app.acceptOutput()}
             />
           )}
           {view === "brain" && (

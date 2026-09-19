@@ -11,6 +11,7 @@ import type {
   OrientationState,
   OutreachAnswers,
 } from "../../founderbrain-shared/orientation";
+import type { UsageResponse } from "../types";
 import {
   contentScreens,
   contentTotal,
@@ -305,6 +306,76 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
   );
 }
 
+const money = (microUsd: number): string => {
+  const usd = microUsd / 1_000_000;
+  return usd >= 1 ? `$${usd.toFixed(2)}` : `$${usd.toFixed(4)}`;
+};
+
+/** Metered price lines for the pre-connect summary. Text only: matches the Typeform body. */
+function UsagePriceLines({ usage }: { usage: UsageResponse }) {
+  const ai = usage.ai;
+  const fc = usage.firecrawl;
+  if (ai.events === 0 && fc.scrapes === 0) {
+    return (
+      <p className="entry-lede typeform-lede">
+        Nothing metered yet. Your price stays $0.00 until you use AI or import a website.
+      </p>
+    );
+  }
+  return (
+    <div>
+      {ai.events > 0 ? (
+        <p className="entry-lede typeform-lede">
+          AI: {ai.inputTokens.toLocaleString()} tokens in, {ai.outputTokens.toLocaleString()} out
+          across {ai.events} run{ai.events === 1 ? "" : "s"} → {money(ai.priceMicroUsd)}
+        </p>
+      ) : null}
+      {fc.scrapes > 0 ? (
+        <p className="entry-lede typeform-lede">
+          Pages read from your website: {fc.credits.toLocaleString()} credit
+          {fc.credits === 1 ? "" : "s"} across {fc.scrapes} import{fc.scrapes === 1 ? "" : "s"} →{" "}
+          {money(fc.priceMicroUsd)}
+        </p>
+      ) : null}
+      <p className="entry-lede typeform-lede">
+        <strong>Final price: {money(usage.totalMicroUsd)}</strong>
+      </p>
+    </div>
+  );
+}
+
+function UsagePrice({ loadUsage }: { loadUsage?: () => Promise<UsageResponse> }) {
+  const [usage, setUsage] = useState<UsageResponse | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!loadUsage) {
+      setFailed(true);
+      return;
+    }
+    void loadUsage().then(
+      (value) => {
+        if (alive) setUsage(value);
+      },
+      () => {
+        if (alive) setFailed(true);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [loadUsage]);
+  if (failed) {
+    return (
+      <p className="entry-lede typeform-lede">
+        Price unavailable right now. It still carries with your account when you sync.
+      </p>
+    );
+  }
+  if (!usage) return <p className="entry-lede typeform-lede">Tallying your usage…</p>;
+  return <UsagePriceLines usage={usage} />;
+}
+
 export function GhlChapter({
   orientation,
   saving,
@@ -314,10 +385,12 @@ export function GhlChapter({
   connectEnabled = false,
   connecting = false,
   onConnect,
+  loadUsage,
 }: ChapterProps & {
   connectEnabled?: boolean;
   connecting?: boolean;
   onConnect?: () => void | Promise<void>;
+  loadUsage?: () => Promise<UsageResponse>;
 }) {
   const screens = useMemo(
     () => ghlScreens(orientation.ghlAnswers.hasAccount),
@@ -413,6 +486,7 @@ export function GhlChapter({
         confirmValue={false}
         onConfirm={() => undefined}
       />
+      {current.usage ? <UsagePrice loadUsage={loadUsage} /> : null}
       {isConnect && connected ? (
         <p className="entry-lede typeform-lede">Connected. You can leave this chapter.</p>
       ) : null}

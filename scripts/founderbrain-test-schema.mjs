@@ -12,6 +12,7 @@ try{
  await sql.unsafe(await readFile(new URL('../src/server/db/rls.sql',import.meta.url),'utf8'));
  await sql.unsafe(await readFile(new URL('../src/founderbrain/0001_founderbrain.sql',import.meta.url),'utf8'));
  await sql.unsafe(await readFile(new URL('../src/founderbrain/jobs.sql',import.meta.url),'utf8'));
+ await sql.unsafe(await readFile(new URL('../src/founderbrain/usage.sql',import.meta.url),'utf8'));
  for(const role of ['fb_runtime','fb_worker']){
   const exists=await sql`select 1 from pg_roles where rolname=${role}`;
   if(!exists.length)await sql.unsafe(`CREATE ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS`);

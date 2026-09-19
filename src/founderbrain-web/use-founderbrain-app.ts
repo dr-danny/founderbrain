@@ -36,6 +36,7 @@ import { type View } from "./components/MissionRail";
 import {
   emptyOrientationState,
   isFirstLoginComplete,
+  GHL_CHAPTER_SCREENS,
   type OrientationPatch,
   type OrientationState,
 } from "../founderbrain-shared/orientation";
@@ -55,7 +56,7 @@ export function useFounderBrainApp() {
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>("atlanta");
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -265,7 +266,7 @@ export function useFounderBrainApp() {
       try {
         await api.completeOauth({ code, state: oauthState });
         const saved = await api.saveOrientation({
-          ghlScreen: 4,
+          ghlScreen: GHL_CHAPTER_SCREENS,
           ghlComplete: true,
           ghlAnswers: { connected: true },
         });
@@ -297,13 +298,29 @@ export function useFounderBrainApp() {
     return api.importSite(url);
   }
 
+  async function transcribeVoice(blob: Blob, seconds: number) {
+    if (!api) throw new Error("api_unavailable");
+    const audioBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+      reader.onerror = () => reject(new Error("read_failed"));
+      reader.readAsDataURL(blob);
+    });
+    return api.transcribeVoice({ audioBase64, mime: blob.type || "audio/webm", seconds });
+  }
+
+  async function getUsage() {
+    if (!api) throw new Error("api_unavailable");
+    return api.usage();
+  }
+
   async function completeFirstLogin() {
     await saveOrientation({
       firstLoginScreen: 4,
       firstLoginComplete: true,
     });
     setMission("identity");
-    setView("home");
+    setView("atlanta");
   }
 
   async function commitField(
@@ -759,6 +776,8 @@ export function useFounderBrainApp() {
     saveOrientation,
     completeFirstLogin,
     importSite,
+    getUsage,
+    transcribeVoice,
     connecting,
     startConnect,
   };

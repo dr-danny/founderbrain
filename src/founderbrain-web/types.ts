@@ -52,3 +52,23 @@ export interface Job {
   error?: string;
   artifact?: import("../founderbrain-shared/domain").Artifact;
 }
+
+/** Actual metered usage and the founder-facing price (GET /api/usage).
+ *  Cost and markup stay server-side; the price already includes the buffer. */
+export interface UsageResponse {
+  ai: {
+    events: number;
+    inputTokens: number;
+    outputTokens: number;
+    priceMicroUsd: number;
+    priceInputUsdPerMillion: number | null;
+    priceOutputUsdPerMillion: number | null;
+  };
+  firecrawl: {
+    scrapes: number;
+    credits: number;
+    priceMicroUsd: number;
+    priceUsdPerCredit: number;
+  };
+  totalMicroUsd: number;
+}

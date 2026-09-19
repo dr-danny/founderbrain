@@ -30,12 +30,14 @@ test("chapter order maps prep homework and skips dropped delivery", () => {
   assert.equal(contentScreens("b2c").length, 6);
   assert.equal(outreachScreens("b2b").length, 3);
   assert.equal(outreachScreens("b2c").length, 3);
-  assert.equal(ghlScreens(false).length, 4);
-  assert.equal(ghlScreens(true).length, 4);
+  assert.equal(ghlScreens(false).length, 5);
+  assert.equal(ghlScreens(true).length, 5);
   assert.equal(ghlScreens(false)[2]?.id, "ghl-buy");
   assert.equal(ghlScreens(true)[2]?.id, "ghl-ready");
   assert.equal(ghlScreens(false)[2]?.externalLink?.href, GHL_STARTER_URL);
-  assert.equal(ghlScreens(false)[3]?.id, "ghl-connect");
+  assert.equal(ghlScreens(false)[3]?.id, "ghl-price");
+  assert.equal(ghlScreens(false)[3]?.usage, true);
+  assert.equal(ghlScreens(false)[4]?.id, "ghl-connect");
   assert.match(contentScreens("b2b")[2]!.title, /Email domain/i);
   assert.match(contentScreens("b2c")[2]!.title, /Instagram/i);
   assert.match(outreachScreens("b2b")[1]!.title, /Prospect/i);

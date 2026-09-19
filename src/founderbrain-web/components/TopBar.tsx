@@ -1,11 +1,25 @@
 /**
- * Top application bar: brand home link, save status, and account/sign-out.
- * Keeps chrome out of the App state machine so layout stays readable.
+ * Minimal signed-in account chip for views without the full TopBar (Typeform
+ * wizard and chapters). Same sign-out action, fixed top right.
  */
+export function AccountChip({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+  return (
+    <div className="account-chip">
+      <span className="account-chip-email">{email}</span>
+      <button className="quiet" onClick={onSignOut}>
+        Sign out
+      </button>
+    </div>
+  );
+}
 import type { BrainState, Config } from "../types";
 import { stamp } from "../mission-copy";
 import { BrandMark } from "./BrandMark";
 
+/**
+ * Top application bar: brand home link, save status, and account/sign-out.
+ * Keeps chrome out of the App state machine so layout stays readable.
+ */
 export function TopBar({
   config,
   email,

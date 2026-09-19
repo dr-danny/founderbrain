@@ -28,6 +28,7 @@ import {
 } from "./rate-limit.ts";
 import { ensureOpenRouterKey, revokeOpenRouterKey } from "./openrouter-keys.ts";
 import type { OpenRouterManagement } from "./openrouter-management.ts";
+import { usageResponse, usageTotals } from "./usage.ts";
 import { readOrientation, writeOrientation } from "./orientation.ts";
 import {
   authorizeUrl,
@@ -39,6 +40,7 @@ import {
   signOauthState,
 } from "./crm-oauth.ts";
 import { importSite } from "./site-import.ts";
+import { transcribeVoice } from "./voice.ts";
 
 const key = z
   .string()
@@ -267,6 +269,23 @@ export async function buildApi(
     await saveConnection(store, c.workspace, tokens);
     return connectionStatus(store, c.workspace);
   });
+  app.post("/api/voice", { bodyLimit: 16 * 1024 * 1024 }, async (req) => {
+    const body = parse(
+      z
+        .object({
+          audioBase64: z.string().min(64).max(32_000_000),
+          mime: z.string().regex(/^audio\/(webm|ogg|wav|mpeg)$/),
+          seconds: z.coerce.number().positive().max(600),
+        })
+        .strict(),
+      req.body,
+    );
+    return transcribeVoice(config, store, context(req).workspace, {
+      audio: Buffer.from(body.audioBase64, "base64"),
+      mime: body.mime,
+      seconds: body.seconds,
+    });
+  });
   app.post("/api/site-import", async (req) => {
     const body = parse(
       z.object({ url: z.string().url().max(300) }).strict(),
@@ -277,6 +296,9 @@ export async function buildApi(
     return importSite(config, store, context(req).workspace, body.url);
   });
   app.get("/api/me", async (req) => ({ email: context(req).email }));
+  app.get("/api/usage", async (req) =>
+    usageResponse(config, await usageTotals(store, context(req).workspace)),
+  );
   app.get("/api/orientation", async (req) => readOrientation(store, context(req).workspace));
   app.put("/api/orientation", async (req) =>
     writeOrientation(store, context(req).workspace, req.body),

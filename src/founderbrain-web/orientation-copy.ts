@@ -33,6 +33,8 @@ export type TypeformScreen = {
   confirm?: { key: string; label: string };
   /** Opens in a new tab. Used for HighLevel Starter. */
   externalLink?: { href: string; label: string };
+  /** This screen fetches GET /api/usage and renders the metered price table. */
+  usage?: boolean;
   continueLabel?: string;
 };
 
@@ -228,6 +230,15 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
       ],
     },
     buyOrSkip,
+    {
+      id: "ghl-price",
+      title: "Your metered price.",
+      body: [
+        "Nothing was charged up front. Usage is metered as it happens: AI tokens and pages read from your website.",
+        "This is the final price for what this Brain actually used. It carries to HighLevel with the rest of your account.",
+      ],
+      usage: true,
+    },
     {
       id: "ghl-connect",
       title: "Connect HighLevel",

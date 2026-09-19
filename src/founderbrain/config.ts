@@ -58,6 +58,22 @@ const envSchema = z.object({
   HIGHLEVEL_VERSION_ID: z.string().min(8).optional(),
   /** Optional Firecrawl key for website import during first-run Typeform. */
   FIRECRAWL_API_KEY: z.string().min(8).optional(),
+  /** Groq key for server-side voice transcription, the fallback when a browser's
+   *  Web Speech service is unavailable. ASR only: the audio goes nowhere else. */
+  GROQ_API_KEY: z.string().min(16).optional(),
+  /** What the transcription provider charges per minute. Defaults to Groq
+   *  whisper-large-v3 at $0.02/hour. */
+  VOICE_USD_PER_MINUTE: z.coerce.number().positive().optional(),
+  PRICE_VOICE_USD_PER_MINUTE: z.coerce.number().positive().optional(),
+  /** What Firecrawl charges us per credit (1 credit = 1 scraped page). Defaults to their
+   *  pay-as-you-go rate of $0.0025 per credit (docs.firecrawl.dev/billing: 2,000 credits per $5). */
+  FIRECRAWL_USD_PER_CREDIT: z.coerce.number().positive().optional(),
+  /** What the founder pays for metered usage. Overrides default to cost x PRICE_MARKUP
+   *  (PRICE_MARKUP defaults to 1: break-even, no invented margin). */
+  PRICE_AI_INPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
+  PRICE_AI_OUTPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
+  PRICE_FIRECRAWL_USD_PER_CREDIT: z.coerce.number().positive().optional(),
+  PRICE_MARKUP: z.coerce.number().positive().optional(),
 });
 export type Config = z.infer<typeof envSchema>;
 

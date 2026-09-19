@@ -6,7 +6,6 @@ import type { BrainState } from "../types";
 import { missionCopy, missions, type Mission } from "../mission-copy";
 
 export type View =
-  | "home"
   | "missions"
   | "brain"
   | "privacy"
@@ -35,11 +34,11 @@ export function MissionRail({
   return (
     <aside className="rail" aria-label="Missions">
       <button
-        className={view === "home" ? "nav active" : "nav"}
+        className={view === "atlanta" ? "nav active" : "nav"}
         onClick={onHome}
-        aria-current={view === "home" ? "page" : undefined}
+        aria-current={view === "atlanta" ? "page" : undefined}
       >
-        Home
+        Atlanta
       </button>
       <button
         className={view === "missions" ? "nav active" : "nav"}
