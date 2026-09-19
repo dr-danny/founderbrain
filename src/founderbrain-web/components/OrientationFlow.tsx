@@ -107,7 +107,6 @@ export function OrientationFlow({
 }) {
   const [name, setName] = useState(() => brain.identity.name.trim() || readKey(NAME_KEY));
   const [localError, setLocalError] = useState("");
-  const [saidYes, setSaidYes] = useState(() => welcomeDone || readKey(YES_KEY) === "1");
   const [wantSite, setWantSite] = useState(readKey(SITE_KEY) === "1");
   const [siteUrl, setSiteUrl] = useState("https://");
   const [proposal, setProposal] = useState<Proposal | null>(null);
@@ -180,7 +179,6 @@ export function OrientationFlow({
 
   async function sayYes() {
     writeKey(YES_KEY, "1");
-    setSaidYes(true);
     try {
       await onAdvance(2);
       goNext();

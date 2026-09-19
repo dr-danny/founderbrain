@@ -147,9 +147,7 @@ export async function firecrawlScrape(
   const markdown = json.data?.markdown?.trim() ?? "";
   const meta = json.data?.metadata ?? {};
   const title = meta.title?.trim() ?? "";
-  const logoUrl = [meta.ogImage, meta["og:image"], meta.logo, meta.image, meta.favicon]
-    .map((value) => (typeof value === "string" ? value.trim() : ""))
-    .find((value) => value.startsWith("https://")) ?? "";
+  const logoUrl = pickFavicon(meta, url);
   if (!response.ok || (!markdown && !title))
     throw new Error("firecrawl_failed");
   return {
