@@ -3,7 +3,7 @@
  *
  * WHAT THIS IS. Actual-usage metering for AI tokens and Firecrawl credits,
  * plus the pricing math that turns recorded usage into the final price shown
- * in the HighLevel chapter before Connect.
+ * in the GoHighLevel chapter before Connect.
  *
  * WHY IT EXISTS. AI spend was already settled into fb_openrouter_key.spent_microusd,
  * but nothing recorded token counts or Firecrawl scrapes, and nothing surfaced a

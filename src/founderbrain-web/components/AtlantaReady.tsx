@@ -86,7 +86,7 @@ export function AtlantaReady({
           {orientation.outreachCompletedAt ? "Review outreach chapter" : "Outreach chapter"}
         </button>
         <button className="button secondary" type="button" onClick={onGhl}>
-          {orientation.ghlCompletedAt ? "Review HighLevel chapter" : "HighLevel chapter"}
+          {orientation.ghlCompletedAt ? "Review GoHighLevel chapter" : "GoHighLevel chapter"}
         </button>
       </div>
       <small>Nothing is published or sent to customers.</small>

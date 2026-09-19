@@ -454,7 +454,7 @@ export function GhlChapter({
 
   return (
     <TypeformShell
-      kicker="Atlanta prep · HighLevel"
+      kicker="Atlanta prep · GoHighLevel"
       screen={screen}
       total={ghlTotal}
       title={current.title}
@@ -463,7 +463,7 @@ export function GhlChapter({
           ? connected
             ? "Back to Home"
             : connectEnabled
-              ? "Connect HighLevel"
+              ? "Connect GoHighLevel"
               : "Connect is not configured"
           : (current.continueLabel ?? (isChoice ? "Choose below" : "Continue"))
       }

@@ -258,7 +258,7 @@ export function useFounderBrainApp() {
     window.history.replaceState({}, "", "/");
     setView("ghl");
     if (denied || !code || !oauthState) {
-      setError("HighLevel Connect did not finish. Try Connect again.");
+      setError("GoHighLevel Connect did not finish. Try Connect again.");
       return;
     }
     setConnecting(true);
@@ -271,7 +271,7 @@ export function useFounderBrainApp() {
           ghlAnswers: { connected: true },
         });
         setOrientation(saved);
-        setNotice("HighLevel connected.");
+        setNotice("GoHighLevel connected.");
       } catch (err) {
         setError(friendlyError(err));
       } finally {

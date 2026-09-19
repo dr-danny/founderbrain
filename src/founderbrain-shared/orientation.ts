@@ -231,7 +231,7 @@ export function atlantaReadyMap(
     },
     {
       key: "ghlAccount",
-      label: "HighLevel connected",
+      label: "GoHighLevel connected",
       day: "sunday",
       ready: orientation.ghlAnswers.connected === true,
     },

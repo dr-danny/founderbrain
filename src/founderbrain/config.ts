@@ -52,7 +52,7 @@ const envSchema = z.object({
   AI_OUTPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
   AI_WORKSPACE_DAILY_MICROUSD: positive.optional(),
   AI_GLOBAL_DAILY_MICROUSD: positive.optional(),
-  /** HighLevel Marketplace OAuth. Optional until Connect is configured. */
+  /** GoHighLevel Marketplace OAuth. Optional until Connect is configured. */
   HIGHLEVEL_CLIENT_ID: z.string().min(8).optional(),
   HIGHLEVEL_CLIENT_SECRET: z.string().min(8).optional(),
   HIGHLEVEL_VERSION_ID: z.string().min(8).optional(),

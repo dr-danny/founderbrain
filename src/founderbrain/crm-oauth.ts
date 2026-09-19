@@ -1,5 +1,5 @@
 /**
- * HighLevel OAuth for FounderBrain Connect. Tokens are sealed in ge_blob.
+ * GoHighLevel OAuth for FounderBrain Connect. Tokens are sealed in ge_blob.
  * Redirect path is /oauth/callback (must not contain "ghl").
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -129,7 +129,7 @@ export async function exchangeCode(
     expires_in?: number;
   };
   if (!response.ok || !json.access_token || !json.locationId)
-    throw new DomainError(502, "crm_oauth_failed", "HighLevel did not complete Connect. Try again.");
+    throw new DomainError(502, "crm_oauth_failed", "GoHighLevel did not complete Connect. Try again.");
   return {
     accessToken: json.access_token,
     refreshToken: json.refresh_token ?? "",

@@ -15,7 +15,7 @@ import {
   OUTREACH_CHAPTER_SCREENS,
 } from "../founderbrain-shared/orientation";
 
-/** Official HighLevel pricing. Founders buy Starter; do not start the 14-day trial. */
+/** Official GoHighLevel pricing. Founders buy Starter; do not start the 14-day trial. */
 export const GHL_STARTER_URL = "https://www.gohighlevel.com/pricing";
 
 export type TypeformChoice = { value: string; label: string };
@@ -31,7 +31,7 @@ export type TypeformScreen = {
   textField?: { key: string; label: string; placeholder: string };
   /** Confirm checkbox key into chapter answers. */
   confirm?: { key: string; label: string };
-  /** Opens in a new tab. Used for HighLevel Starter. */
+  /** Opens in a new tab. Used for GoHighLevel Starter. */
   externalLink?: { href: string; label: string };
   /** This screen fetches GET /api/usage and renders the metered price table. */
   usage?: boolean;
@@ -167,7 +167,7 @@ export function outreachScreens(track: FounderTrack | null): TypeformScreen[] {
       title: "Outreach copy",
       body: [
         "Saturday is content and outreach. Finalise the copy the engines will reuse.",
-        "Apollo stays weekend work for B2B. HighLevel has its own chapter.",
+        "Apollo stays weekend work for B2B. GoHighLevel has its own chapter.",
       ],
       confirm: {
         key: "copyFinalised",
@@ -192,7 +192,7 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
     hasAccount === true
       ? {
           id: "ghl-ready",
-          title: "You already have HighLevel.",
+          title: "You already have GoHighLevel.",
           body: [
             "Good. You do not need another account.",
             "Next step is Connect. One click, on your sub-account.",
@@ -202,30 +202,30 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
           id: "ghl-buy",
           title: "Buy Starter.",
           body: [
-            "Open HighLevel pricing in a new tab. Buy the Starter plan at $97 a month.",
+            "Open GoHighLevel pricing in a new tab. Buy the Starter plan at $97 a month.",
             "Do not start the 14-day trial. A trial started now expires during Atlanta.",
           ],
           externalLink: {
             href: GHL_STARTER_URL,
-            label: "Buy HighLevel Starter",
+            label: "Buy GoHighLevel Starter",
           },
         };
 
   return [
     {
       id: "ghl-need",
-      title: "You need HighLevel.",
+      title: "You need GoHighLevel.",
       body: [
-        "FounderBrain writes your Brain here. HighLevel is where it runs: CRM, posts, automations.",
-        "Claude is not part of this. You bring your own HighLevel account.",
+        "FounderBrain writes your Brain here. GoHighLevel is where it runs: CRM, posts, automations.",
+        "Claude is not part of this. You bring your own GoHighLevel account.",
       ],
     },
     {
       id: "ghl-have",
-      title: "Do you already have HighLevel?",
+      title: "Do you already have GoHighLevel?",
       body: ["If you do, skip the purchase. If you do not, buy Starter next."],
       choices: [
-        { value: "yes", label: "I already have HighLevel" },
+        { value: "yes", label: "I already have GoHighLevel" },
         { value: "no", label: "I need to buy Starter" },
       ],
     },
@@ -235,15 +235,15 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
       title: "Your metered price.",
       body: [
         "Nothing was charged up front. Usage is metered as it happens: AI tokens and pages read from your website.",
-        "This is the final price for what this Brain actually used. It carries to HighLevel with the rest of your account.",
+        "This is the final price for what this Brain actually used. It carries to GoHighLevel with the rest of your account.",
       ],
       usage: true,
     },
     {
       id: "ghl-connect",
-      title: "Connect HighLevel",
+      title: "Connect GoHighLevel",
       body: [
-        "One click opens HighLevel. Pick your sub-account. You come back connected.",
+        "One click opens GoHighLevel. Pick your sub-account. You come back connected.",
         "Nothing is published or sent in that click. It only authorizes FounderBrain to push later.",
       ],
       continueLabel: "Back to Home",

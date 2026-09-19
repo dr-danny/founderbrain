@@ -1846,3 +1846,88 @@ button:not(.link-button) {
   font-size: 1.15rem;
   padding: 1.1rem 1.75rem;
 }
+
+/* Typeform editorial layout (Danny, 2026-09-19): stop hugging the left edge.
+   On wide screens the headline owns the left column and the live content
+   (lede, fields, choices, actions) fills the right column. */
+@media (min-width: 60rem) {
+  .typeform-stage .typeform-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto 1fr;
+    align-content: center;
+    align-items: start;
+  }
+  .typeform-stage .entry-brand-block {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .typeform-stage .entry-kicker {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .typeform-stage .entry-title {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    max-width: 100%;
+    font-size: clamp(3.4rem, 8vw, 7.2rem);
+    line-height: 0.92;
+  }
+  .typeform-stage .typeform-body {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    align-self: start;
+    width: 100%;
+    margin-top: clamp(1.5rem, 4vh, 3rem);
+  }
+  .typeform-stage .typeform-lede,
+  .typeform-stage .typeform-body .entry-lede {
+    max-width: none;
+  }
+  .typeform-stage .typeform-name {
+    width: 100%;
+    max-width: none;
+  }
+  .typeform-stage .typeform-actions {
+    max-width: none;
+  }
+  .typeform-stage .typeform-choices {
+    width: 100%;
+  }
+}
+
+/* Glassmorphism card (Danny, 2026-09-19): the whole typeform surface becomes a
+   translucent frosted panel floating over the Atlanta photo. */
+.typeform-stage .typeform-panel {
+  background: linear-gradient(135deg, rgba(28, 19, 27, 0.58), rgba(10, 7, 12, 0.5));
+  backdrop-filter: blur(22px) saturate(1.25);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  border: 1px solid rgba(247, 239, 230, 0.16);
+  border-radius: clamp(16px, 2vw, 26px);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(247, 239, 230, 0.1);
+  width: min(100%, 88rem);
+  max-width: 94vw;
+  min-height: min(86vh, 46rem);
+  align-content: center;
+}
+.typeform-stage .entry-title {
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+}
+.typeform-stage .typeform-back,
+.typeform-stage .mission-save {
+  background: rgba(247, 239, 230, 0.06);
+  border-color: rgba(247, 239, 230, 0.22);
+}
+.typeform-stage .typeform-name input,
+.typeform-stage .typeform-name textarea {
+  border-bottom-color: rgba(247, 239, 230, 0.34);
+}
+.typeform-stage .typeform-choice {
+  background: rgba(247, 239, 230, 0.05);
+}
+.typeform-stage .typeform-choice.picked,
+.typeform-stage .welcome-choices .typeform-choice.yes {
+  background: var(--paper);
+}

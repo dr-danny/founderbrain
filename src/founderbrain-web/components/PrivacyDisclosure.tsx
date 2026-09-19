@@ -40,7 +40,7 @@ export function PrivacyDisclosure({ onBack }: { onBack: () => void }) {
           <li>Browsing, editing, saving, approving, exporting, and restoring send nothing to any AI provider.</li>
           <li>A provider (OpenRouter) is called only when you click Generate, using the pinned Brain input for that job. Models are limited to a short allowlist reviewed for zero data retention.</li>
           <li>Optional website import sends the address you submit to Firecrawl to read that page. Nothing is read unless you submit a URL.</li>
-          <li>Provider calls are metered: token counts and page credits are recorded to compute the price shown before HighLevel connect. Metering records are billing records, not Brain content, and are kept while billing requires.</li>
+          <li>Provider calls are metered: token counts and page credits are recorded to compute the price shown before GoHighLevel connect. Metering records are billing records, not Brain content, and are kept while billing requires.</li>
         </ul>
       </section>
 
