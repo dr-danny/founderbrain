@@ -6,6 +6,10 @@ import type { BrainState } from "../types";
 import { missionCopy, missions, type Mission } from "../mission-copy";
 
 export type View =
+<<<<<<< HEAD
+=======
+  | "home"
+>>>>>>> origin/main
   | "missions"
   | "brain"
   | "privacy"

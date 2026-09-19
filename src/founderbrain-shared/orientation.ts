@@ -7,7 +7,11 @@ import { z } from "zod";
 export const ORIENTATION_FIRST_LOGIN_SCREENS = 4 as const;
 export const CONTENT_CHAPTER_SCREENS = 6 as const;
 export const OUTREACH_CHAPTER_SCREENS = 3 as const;
+<<<<<<< HEAD
 export const GHL_CHAPTER_SCREENS = 5 as const;
+=======
+export const GHL_CHAPTER_SCREENS = 4 as const;
+>>>>>>> origin/main
 
 export const trackSchema = z.enum(["b2b", "b2c"]);
 export type FounderTrack = z.infer<typeof trackSchema>;

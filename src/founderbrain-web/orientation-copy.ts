@@ -33,8 +33,11 @@ export type TypeformScreen = {
   confirm?: { key: string; label: string };
   /** Opens in a new tab. Used for HighLevel Starter. */
   externalLink?: { href: string; label: string };
+<<<<<<< HEAD
   /** This screen fetches GET /api/usage and renders the metered price table. */
   usage?: boolean;
+=======
+>>>>>>> origin/main
   continueLabel?: string;
 };
 
@@ -231,6 +234,7 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
     },
     buyOrSkip,
     {
+<<<<<<< HEAD
       id: "ghl-price",
       title: "Your metered price.",
       body: [
@@ -240,6 +244,8 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
       usage: true,
     },
     {
+=======
+>>>>>>> origin/main
       id: "ghl-connect",
       title: "Connect HighLevel",
       body: [

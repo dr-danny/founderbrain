@@ -306,6 +306,7 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
   );
 }
 
+<<<<<<< HEAD
 const money = (microUsd: number): string => {
   const usd = microUsd / 1_000_000;
   return usd >= 1 ? `$${usd.toFixed(2)}` : `$${usd.toFixed(4)}`;
@@ -376,6 +377,8 @@ function UsagePrice({ loadUsage }: { loadUsage?: () => Promise<UsageResponse> })
   return <UsagePriceLines usage={usage} />;
 }
 
+=======
+>>>>>>> origin/main
 export function GhlChapter({
   orientation,
   saving,
@@ -385,12 +388,18 @@ export function GhlChapter({
   connectEnabled = false,
   connecting = false,
   onConnect,
+<<<<<<< HEAD
   loadUsage,
+=======
+>>>>>>> origin/main
 }: ChapterProps & {
   connectEnabled?: boolean;
   connecting?: boolean;
   onConnect?: () => void | Promise<void>;
+<<<<<<< HEAD
   loadUsage?: () => Promise<UsageResponse>;
+=======
+>>>>>>> origin/main
 }) {
   const screens = useMemo(
     () => ghlScreens(orientation.ghlAnswers.hasAccount),
@@ -486,7 +495,10 @@ export function GhlChapter({
         confirmValue={false}
         onConfirm={() => undefined}
       />
+<<<<<<< HEAD
       {current.usage ? <UsagePrice loadUsage={loadUsage} /> : null}
+=======
+>>>>>>> origin/main
       {isConnect && connected ? (
         <p className="entry-lede typeform-lede">Connected. You can leave this chapter.</p>
       ) : null}

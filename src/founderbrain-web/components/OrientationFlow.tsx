@@ -88,7 +88,10 @@ export function OrientationFlow({
   onApplyIntake,
   onTrack,
   onImport,
+<<<<<<< HEAD
   onTranscribe,
+=======
+>>>>>>> origin/main
 }: {
   screen: number;
   saving: boolean;
@@ -105,7 +108,10 @@ export function OrientationFlow({
   onApplyIntake: (proposal: Proposal) => Promise<void>;
   onTrack: (value: "b2b" | "b2c") => Promise<void>;
   onImport: (url: string) => Promise<{ proposal: Proposal; logoUrl?: string }>;
+<<<<<<< HEAD
   onTranscribe?: (blob: Blob, seconds: number) => Promise<string>;
+=======
+>>>>>>> origin/main
 }) {
   const [name, setName] = useState(() => brain.identity.name.trim() || readKey(NAME_KEY));
   const [localError, setLocalError] = useState("");
@@ -275,7 +281,10 @@ export function OrientationFlow({
           value={name}
           maxLength={40}
           placeholder="Your first name"
+<<<<<<< HEAD
           serverTranscribe={onTranscribe}
+=======
+>>>>>>> origin/main
           onChange={(value) => {
             setName(value);
             setLocalError("");
@@ -440,7 +449,10 @@ export function OrientationFlow({
             value={siteUrl}
             maxLength={200}
             placeholder="your-site.com"
+<<<<<<< HEAD
             serverTranscribe={onTranscribe}
+=======
+>>>>>>> origin/main
             onChange={(value) => {
               if (value.startsWith("https://") || value.startsWith("http://")) setSiteUrl(value);
               else setSiteUrl(`https://${value.replace(/^\/+/, "")}`);
@@ -527,7 +539,10 @@ export function OrientationFlow({
         maxLength={step.kind === "long" ? 400 : 160}
         placeholder={step.placeholder ?? ""}
         multiline={step.kind === "long"}
+<<<<<<< HEAD
         serverTranscribe={onTranscribe}
+=======
+>>>>>>> origin/main
         onChange={setDraft}
         onEnter={step.kind === "long" ? undefined : () => void commitStep(step, draft)}
       />

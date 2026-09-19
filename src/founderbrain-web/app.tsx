@@ -14,6 +14,10 @@ import { ConflictDialog } from "./components/ConflictDialog";
 import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
+<<<<<<< HEAD
+=======
+import { AtlantaReady } from "./components/AtlantaReady";
+>>>>>>> origin/main
 
 export function App() {
   const app = useFounderBrainApp();
@@ -78,8 +82,11 @@ export function App() {
     return <AuthPage kind="boot" message={error || "Preparing your private workspace…"} />;
   }
 
+<<<<<<< HEAD
   // Signed-in views without the full TopBar still get the account chip top right.
   const accountChip = email ? <AccountChip email={email} onSignOut={() => void app.signOut()} /> : null;
+=======
+>>>>>>> origin/main
   const guidedOpen =
     !draft.identity.venture.trim() ||
     !draft.identity.role.trim() ||
@@ -91,7 +98,10 @@ export function App() {
   if (!firstLoginComplete || guidedOpen) {
     return (
       <>
+<<<<<<< HEAD
       {accountChip}
+=======
+>>>>>>> origin/main
       <OrientationFlow
         screen={orientation.firstLoginScreen}
         saving={orientationSaving || app.saving}
@@ -116,9 +126,12 @@ export function App() {
           await app.saveOrientation({ track: value });
         }}
         onImport={(url) => app.importSite(url)}
+<<<<<<< HEAD
         onTranscribe={(blob, seconds) =>
           app.transcribeVoice(blob, seconds).then((result) => result.text)
         }
+=======
+>>>>>>> origin/main
       />
       {conflict ? (
         <ConflictDialog
@@ -225,6 +238,23 @@ export function App() {
     );
   }
 
+  if (view === "ghl") {
+    return (
+      <GhlChapter
+        orientation={orientation}
+        saving={orientationSaving}
+        error={error}
+        connectEnabled={Boolean(config.crmConnectEnabled)}
+        connecting={app.connecting}
+        onConnect={() => app.startConnect()}
+        onPatch={async (patch) => {
+          await app.saveOrientation(patch);
+        }}
+        onFinished={() => setView("home")}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <TopBar
@@ -241,7 +271,11 @@ export function App() {
           view={view}
           mission={mission}
           readiness={state.readiness}
+<<<<<<< HEAD
           onHome={() => setView("atlanta")}
+=======
+          onHome={() => setView("home")}
+>>>>>>> origin/main
           onMissions={() => setView("missions")}
           onBrain={() => void app.openHistory()}
           onSelectMission={(key) => {
@@ -269,6 +303,26 @@ export function App() {
               )}
             </p>
           )}
+<<<<<<< HEAD
+=======
+          {view === "home" && (
+            <Home
+              state={state}
+              draft={draft}
+              orientation={orientation}
+              onBegin={() => {
+                const first = missions.find((key) => !state.readiness[key]) ?? "output";
+                setMission(first);
+                setView("missions");
+              }}
+              onHistory={() => void app.openHistory()}
+              onAtlanta={() => setView("atlanta")}
+              onContent={() => setView("content")}
+              onOutreach={() => setView("outreach")}
+              onGhl={() => setView("ghl")}
+            />
+          )}
+>>>>>>> origin/main
           {view === "atlanta" && (
             <AtlantaReady
               state={state}

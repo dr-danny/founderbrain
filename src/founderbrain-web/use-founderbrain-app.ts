@@ -56,7 +56,11 @@ export function useFounderBrainApp() {
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
+<<<<<<< HEAD
   const [view, setView] = useState<View>("atlanta");
+=======
+  const [view, setView] = useState<View>("home");
+>>>>>>> origin/main
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -266,7 +270,11 @@ export function useFounderBrainApp() {
       try {
         await api.completeOauth({ code, state: oauthState });
         const saved = await api.saveOrientation({
+<<<<<<< HEAD
           ghlScreen: GHL_CHAPTER_SCREENS,
+=======
+          ghlScreen: 4,
+>>>>>>> origin/main
           ghlComplete: true,
           ghlAnswers: { connected: true },
         });
@@ -298,6 +306,7 @@ export function useFounderBrainApp() {
     return api.importSite(url);
   }
 
+<<<<<<< HEAD
   async function transcribeVoice(blob: Blob, seconds: number) {
     if (!api) throw new Error("api_unavailable");
     const audioBase64 = await new Promise<string>((resolve, reject) => {
@@ -314,13 +323,19 @@ export function useFounderBrainApp() {
     return api.usage();
   }
 
+=======
+>>>>>>> origin/main
   async function completeFirstLogin() {
     await saveOrientation({
       firstLoginScreen: 4,
       firstLoginComplete: true,
     });
     setMission("identity");
+<<<<<<< HEAD
     setView("atlanta");
+=======
+    setView("home");
+>>>>>>> origin/main
   }
 
   async function commitField(
@@ -776,8 +791,11 @@ export function useFounderBrainApp() {
     saveOrientation,
     completeFirstLogin,
     importSite,
+<<<<<<< HEAD
     getUsage,
     transcribeVoice,
+=======
+>>>>>>> origin/main
     connecting,
     startConnect,
   };

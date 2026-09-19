@@ -4,10 +4,16 @@
 import { DomainError } from "./domain.ts";
 import type { Config } from "./config.ts";
 import { firecrawlScrape, openRouterProvider } from "./provider.ts";
+<<<<<<< HEAD
 import { loadOpenRouterApiKey, recordOpenRouterSpend } from "./openrouter-keys.ts";
 import type { PgBrainStore } from "./store.ts";
 import { DEFAULT_ORCHESTRATION } from "./openrouter-privacy.ts";
 import { recordUsageEvent, ceilMicro } from "./usage.ts";
+=======
+import { loadOpenRouterApiKey } from "./openrouter-keys.ts";
+import type { PgBrainStore } from "./store.ts";
+import { DEFAULT_ORCHESTRATION } from "./openrouter-privacy.ts";
+>>>>>>> origin/main
 
 export type SiteProposal = {
   identity?: { venture?: string; role?: string; stage?: string; goal?: string };
@@ -38,12 +44,17 @@ export async function importSite(
 ): Promise<{ proposal: SiteProposal; source: "ai" | "title"; logoUrl: string }> {
   if (!config.FIRECRAWL_API_KEY)
     throw new DomainError(503, "site_import_not_configured", "Website import is not configured yet.");
+<<<<<<< HEAD
   let scraped: { markdown: string; title: string; logoUrl: string; creditsUsed: number };
+=======
+  let scraped: { markdown: string; title: string; logoUrl: string };
+>>>>>>> origin/main
   try {
     scraped = await firecrawlScrape(url, config.FIRECRAWL_API_KEY);
   } catch {
     throw new DomainError(502, "site_import_failed", "Could not read that website. We'll ask instead.");
   }
+<<<<<<< HEAD
   // Meter the scrape before anything else can fail: the credit was spent.
   await recordUsageEvent(store, workspace, config, {
     kind: "firecrawl_scrape",
@@ -53,6 +64,8 @@ export async function importSite(
     ),
     meta: { host: new URL(url).hostname },
   });
+=======
+>>>>>>> origin/main
   const markdown = scraped.markdown;
   if (config.AI_ENABLED === "true") {
     try {
@@ -68,6 +81,7 @@ export async function importSite(
         },
         loaded.apiKey,
       );
+<<<<<<< HEAD
       // Meter the extract against the same rates the job path bills at.
       const costMicroUsd = ceilMicro(
         result.inputTokens * (config.AI_INPUT_USD_PER_MILLION ?? 0) +
@@ -100,6 +114,12 @@ export async function importSite(
           "The lifetime AI budget for this account is spent. Website import still read the page, but the AI extract needs budget.",
         );
       }
+=======
+      const proposal = parseProposal(result.text);
+      if (proposal.identity || proposal.customer || proposal.offer)
+        return { proposal, source: "ai", logoUrl: scraped.logoUrl };
+    } catch {
+>>>>>>> origin/main
       /* fall through to title */
     }
   }

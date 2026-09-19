@@ -124,9 +124,12 @@ export class FounderBrainApi {
   oauthStatus() {
     return this.request<{ connected: boolean; locationId: string | null }>("/oauth/status");
   }
+<<<<<<< HEAD
   usage() {
     return this.request<UsageResponse>("/usage");
   }
+=======
+>>>>>>> origin/main
   startOauth() {
     return this.request<{ url: string }>("/oauth/start");
   }
@@ -140,6 +143,7 @@ export class FounderBrainApi {
       body: JSON.stringify({ url }),
     });
   }
+<<<<<<< HEAD
   transcribeVoice(audio: { audioBase64: string; mime: string; seconds: number }) {
     return this.request<{ text: string }>(
       "/voice",
@@ -147,6 +151,8 @@ export class FounderBrainApi {
       45_000,
     );
   }
+=======
+>>>>>>> origin/main
   completeOauth(body: { code: string; state: string }) {
     return this.request<{ connected: boolean; locationId: string | null }>("/oauth/complete", {
       method: "POST",

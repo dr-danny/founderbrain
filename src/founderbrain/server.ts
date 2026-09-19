@@ -40,7 +40,10 @@ import {
   signOauthState,
 } from "./crm-oauth.ts";
 import { importSite } from "./site-import.ts";
+<<<<<<< HEAD
 import { transcribeVoice } from "./voice.ts";
+=======
+>>>>>>> origin/main
 
 const key = z
   .string()
@@ -269,6 +272,7 @@ export async function buildApi(
     await saveConnection(store, c.workspace, tokens);
     return connectionStatus(store, c.workspace);
   });
+<<<<<<< HEAD
   app.post("/api/voice", { bodyLimit: 16 * 1024 * 1024 }, async (req) => {
     const body = parse(
       z
@@ -286,6 +290,8 @@ export async function buildApi(
       seconds: body.seconds,
     });
   });
+=======
+>>>>>>> origin/main
   app.post("/api/site-import", async (req) => {
     const body = parse(
       z.object({ url: z.string().url().max(300) }).strict(),

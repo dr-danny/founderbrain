@@ -20,6 +20,13 @@ import { BrandMark } from "./BrandMark";
  * Top application bar: brand home link, save status, and account/sign-out.
  * Keeps chrome out of the App state machine so layout stays readable.
  */
+<<<<<<< HEAD
+=======
+import type { BrainState, Config } from "../types";
+import { stamp } from "../mission-copy";
+import { BrandMark } from "./BrandMark";
+
+>>>>>>> origin/main
 export function TopBar({
   config,
   email,

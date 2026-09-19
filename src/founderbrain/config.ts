@@ -58,6 +58,7 @@ const envSchema = z.object({
   HIGHLEVEL_VERSION_ID: z.string().min(8).optional(),
   /** Optional Firecrawl key for website import during first-run Typeform. */
   FIRECRAWL_API_KEY: z.string().min(8).optional(),
+<<<<<<< HEAD
   /** Groq key for server-side voice transcription, the fallback when a browser's
    *  Web Speech service is unavailable. ASR only: the audio goes nowhere else. */
   GROQ_API_KEY: z.string().min(16).optional(),
@@ -74,6 +75,8 @@ const envSchema = z.object({
   PRICE_AI_OUTPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
   PRICE_FIRECRAWL_USD_PER_CREDIT: z.coerce.number().positive().optional(),
   PRICE_MARKUP: z.coerce.number().positive().optional(),
+=======
+>>>>>>> origin/main
 });
 export type Config = z.infer<typeof envSchema>;
 
