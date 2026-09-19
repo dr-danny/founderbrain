@@ -22,11 +22,16 @@ export interface RoleModels {
 /**
  * Models suitable for short founder-writing work and eligible under OpenRouter
  * ZDR routing (`provider.zdr: true`). Keep this list short and reviewed.
+ *
+ * Verified against https://openrouter.ai/api/v1/models on 2026-09-18. The old
+ * `claude-3.5-sonnet` / `claude-3.5-haiku` ids were retired from the catalog,
+ * which left thinker and verifier pointing at models that no longer resolve.
+ * Mirror any change here in the OneDay Atlanta workspace guardrail allowlist.
  */
 export const PRIVACY_ELIGIBLE_MODELS = [
   "anthropic/claude-sonnet-4",
-  "anthropic/claude-3.5-sonnet",
-  "anthropic/claude-3.5-haiku",
+  "anthropic/claude-sonnet-4.5",
+  "anthropic/claude-haiku-4.5",
   "google/gemini-2.5-flash",
   "openai/gpt-4o-mini",
 ] as const;
@@ -38,19 +43,19 @@ const ALLOWED = new Set<string>(PRIVACY_ELIGIBLE_MODELS);
 /** Default roles for invitation / founder-writing orchestration. */
 export const DEFAULT_ORCHESTRATION: Record<OrchestrationRole, RoleModels> = {
   thinker: {
-    primary: "anthropic/claude-3.5-haiku",
+    primary: "anthropic/claude-haiku-4.5",
     fallback: "google/gemini-2.5-flash",
     maxTokens: 400,
     budgetShare: 0.2,
   },
   runner: {
     primary: "anthropic/claude-sonnet-4",
-    fallback: "anthropic/claude-3.5-sonnet",
+    fallback: "anthropic/claude-sonnet-4.5",
     maxTokens: 700,
     budgetShare: 0.55,
   },
   verifier: {
-    primary: "anthropic/claude-3.5-haiku",
+    primary: "anthropic/claude-haiku-4.5",
     fallback: "google/gemini-2.5-flash",
     maxTokens: 300,
     budgetShare: 0.25,

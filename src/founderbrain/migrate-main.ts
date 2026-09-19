@@ -10,6 +10,7 @@ import { runFounderBrainMigrations } from "./migrations.ts";
 import { migrateJobs } from "./jobs.ts";
 import { migrateOpenRouterKeys } from "./openrouter-keys.ts";
 import { migrateOrientation } from "./orientation.ts";
+import { migrateCrmOauth } from "./crm-oauth.ts";
 import { applyMigrationDatabaseUrl, loadMigrationEnv } from "./config.ts";
 import postgres from "postgres";
 
@@ -21,6 +22,7 @@ try {
   await migrateJobs(admin);
   await migrateOpenRouterKeys(admin);
   await migrateOrientation(admin);
+  await migrateCrmOauth(admin);
   if (role) {
     if (!/^fb_[a-z0-9_]{1,50}$/.test(role))
       throw new Error("RUNTIME_DB_ROLE must be a restricted fb_ role name.");

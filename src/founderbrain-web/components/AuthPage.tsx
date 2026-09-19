@@ -6,6 +6,7 @@
 import { useState, type ReactNode } from "react";
 import type { Hexclave } from "../hexclave";
 import { PrivacyDisclosure } from "./PrivacyDisclosure";
+import { BrandMark } from "./BrandMark";
 
 type AuthPageProps =
   | { kind: "boot"; message: string }
@@ -69,9 +70,9 @@ function EntryShell({
       <div className="entry-veil" aria-hidden="true" />
       <section className="entry-panel">
         <header className="entry-brand-block">
-          <p className="entry-brand">OneDay</p>
+          <BrandMark size={56} className="entry-mark" />
           <p className="entry-product">
-            Founder<span>Brain</span>
+            <span>Founder</span>Brain
           </p>
         </header>
         {kicker ? <p className="entry-kicker">{kicker}</p> : null}

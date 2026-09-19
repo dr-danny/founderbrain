@@ -28,6 +28,15 @@ need AI_OUTPUT_USD_PER_MILLION
 need AI_WORKSPACE_DAILY_MICROUSD
 need AI_GLOBAL_DAILY_MICROUSD
 need OPENROUTER_MANAGEMENT_KEY
+need OPENROUTER_WORKSPACE_ID
+
+# Workspace placement is set once, at key creation. A wrong or missing value cannot be
+# corrected later: OpenRouter has no move-key operation.
+if [[ -n "${OPENROUTER_WORKSPACE_ID:-}" ]] &&
+  ! [[ "${OPENROUTER_WORKSPACE_ID}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+  echo "INVALID OPENROUTER_WORKSPACE_ID must be the workspace UUID, not the slug"
+  fail=1
+fi
 
 # Numeric sanity without printing values
 for name in AI_INPUT_USD_PER_MILLION AI_OUTPUT_USD_PER_MILLION; do
@@ -66,4 +75,5 @@ fi
 echo "AI enablement check PASSED. Set identical model/rate/cap vars on API + worker,"
 echo "OPENROUTER_MANAGEMENT_KEY on API (provision/revoke) and worker can read per-user keys from DB,"
 echo "AI_ENABLED=true on both, then start the worker service."
-echo "Per-user keys: OneDay-Founderbrain-{email}, \$20 lifetime (no reset), 30-day expiry."
+echo "Per-user keys: OneDay-Founderbrain-{email}, \$20 lifetime (no reset), 30-day expiry,"
+echo "created in the OPENROUTER_WORKSPACE_ID workspace (OneDay Atlanta). Placement cannot be changed after creation."

@@ -54,6 +54,7 @@ export function useFounderBrainApp() {
   const [draft, setDraft] = useState<Brain>(emptyBrain());
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [view, setView] = useState<View>("home");
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
@@ -75,6 +76,7 @@ export function useFounderBrainApp() {
   const [deleteText, setDeleteText] = useState("");
   const latestDraft = useRef(draft);
   const sessionEpoch = useRef(0);
+  const oauthHandled = useRef(false);
   const saveOperation = useRef<{ brain: Brain; expectedVersion: number; key: string } | null>(null);
   const jobOperation = useRef<{ expectedVersion: number; key: string } | null>(null);
   const acceptOperation = useRef<{
@@ -202,11 +204,14 @@ export function useFounderBrainApp() {
     const epoch = sessionEpoch.current;
     setError("");
     try {
-      const [nextState, output, nextOrientation] = await Promise.all([
-        api.brain(),
-        api.artifact(),
-        api.orientation(),
-      ]);
+      const [nextState, output] = await Promise.all([api.brain(), api.artifact()]);
+      let nextOrientation;
+      try {
+        nextOrientation = await api.orientation();
+      } catch (err) {
+        if (!(err instanceof ApiError && (err.status === 404 || err.status === 503))) throw err;
+        nextOrientation = emptyOrientationState();
+      }
       if (epoch !== sessionEpoch.current) return;
       setState(nextState);
       setOrientation(nextOrientation);
@@ -241,13 +246,98 @@ export function useFounderBrainApp() {
     }
   }
 
+  useEffect(() => {
+    if (!api || !email || oauthHandled.current) return;
+    if (window.location.pathname !== "/oauth/callback") return;
+    oauthHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const oauthState = params.get("state");
+    const denied = params.get("error");
+    window.history.replaceState({}, "", "/");
+    setView("ghl");
+    if (denied || !code || !oauthState) {
+      setError("HighLevel Connect did not finish. Try Connect again.");
+      return;
+    }
+    setConnecting(true);
+    void (async () => {
+      try {
+        await api.completeOauth({ code, state: oauthState });
+        const saved = await api.saveOrientation({
+          ghlScreen: 4,
+          ghlComplete: true,
+          ghlAnswers: { connected: true },
+        });
+        setOrientation(saved);
+        setNotice("HighLevel connected.");
+      } catch (err) {
+        setError(friendlyError(err));
+      } finally {
+        setConnecting(false);
+      }
+    })();
+  }, [api, email]);
+
+  async function startConnect() {
+    if (!api) throw new Error("api_unavailable");
+    setConnecting(true);
+    setError("");
+    try {
+      const started = await api.startOauth();
+      window.location.assign(started.url);
+    } catch (err) {
+      setConnecting(false);
+      setError(friendlyError(err));
+    }
+  }
+
+  async function importSite(url: string) {
+    if (!api) throw new Error("api_unavailable");
+    return api.importSite(url);
+  }
+
   async function completeFirstLogin() {
     await saveOrientation({
       firstLoginScreen: 4,
       firstLoginComplete: true,
     });
     setMission("identity");
-    setView("missions");
+    setView("home");
+  }
+
+  async function commitField(
+    section: Exclude<Mission, "output">,
+    field: string,
+    value: string | boolean,
+  ) {
+    const next = patchBrain(latestDraft.current, section, field, value);
+    latestDraft.current = next;
+    setDraft(next);
+    setChanged(true);
+    await save(next);
+  }
+
+  async function applyIntake(proposal: {
+    identity?: Record<string, string>;
+    customer?: Record<string, string>;
+    offer?: Record<string, string>;
+    voice?: Record<string, string>;
+  }) {
+    let next = latestDraft.current;
+    for (const section of ["identity", "customer", "offer", "voice"] as const) {
+      const fields = proposal[section];
+      if (!fields) continue;
+      for (const [field, value] of Object.entries(fields)) {
+        if (typeof value === "string" && value.trim()) {
+          next = patchBrain(next, section, field, value);
+        }
+      }
+    }
+    latestDraft.current = next;
+    setDraft(next);
+    setChanged(true);
+    await save(next);
   }
 
   function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) {
@@ -649,6 +739,8 @@ export function useFounderBrainApp() {
     closeConflict,
     hexclave,
     patch,
+    commitField,
+    applyIntake,
     save,
     retrySave,
     approve,
@@ -666,5 +758,8 @@ export function useFounderBrainApp() {
     onSignInError,
     saveOrientation,
     completeFirstLogin,
+    importSite,
+    connecting,
+    startConnect,
   };
 }

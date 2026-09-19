@@ -29,6 +29,16 @@ import {
 import { ensureOpenRouterKey, revokeOpenRouterKey } from "./openrouter-keys.ts";
 import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { readOrientation, writeOrientation } from "./orientation.ts";
+import {
+  authorizeUrl,
+  connectionStatus,
+  crmOAuthConfigured,
+  exchangeCode,
+  readOauthState,
+  saveConnection,
+  signOauthState,
+} from "./crm-oauth.ts";
+import { importSite } from "./site-import.ts";
 
 const key = z
   .string()
@@ -224,7 +234,47 @@ export async function buildApi(
             publishableClientKey: config.HEXCLAVE_PUBLISHABLE_CLIENT_KEY ?? null,
           },
       aiEnabled: config.AI_ENABLED === "true",
+      crmConnectEnabled: crmOAuthConfigured(config),
+      siteImportEnabled: Boolean(config.FIRECRAWL_API_KEY),
     };
+  });
+  app.get("/api/oauth/status", async (req) => connectionStatus(store, context(req).workspace));
+  app.get("/api/oauth/start", async (req) => {
+    if (!crmOAuthConfigured(config))
+      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
+    const secret = config.ORIGIN_SECRET ?? config.HIGHLEVEL_CLIENT_SECRET;
+    if (!secret)
+      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
+    const c = context(req);
+    const state = signOauthState(secret, c.subject);
+    return { url: authorizeUrl(config, state) };
+  });
+  app.post("/api/oauth/complete", async (req) => {
+    if (!crmOAuthConfigured(config))
+      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
+    const secret = config.ORIGIN_SECRET ?? config.HIGHLEVEL_CLIENT_SECRET;
+    if (!secret)
+      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
+    const body = parse(
+      z.object({ code: z.string().min(8).max(512), state: z.string().min(8).max(2000) }).strict(),
+      req.body,
+    );
+    const c = context(req);
+    const claimed = readOauthState(secret, body.state);
+    if (claimed.sub !== c.subject)
+      throw new DomainError(403, "oauth_state_mismatch", "Connect belonged to a different session.");
+    const tokens = await exchangeCode(config, body.code);
+    await saveConnection(store, c.workspace, tokens);
+    return connectionStatus(store, c.workspace);
+  });
+  app.post("/api/site-import", async (req) => {
+    const body = parse(
+      z.object({ url: z.string().url().max(300) }).strict(),
+      req.body,
+    );
+    if (!body.url.startsWith("https://"))
+      throw new DomainError(422, "invalid_request", "Use an https website address.");
+    return importSite(config, store, context(req).workspace, body.url);
   });
   app.get("/api/me", async (req) => ({ email: context(req).email }));
   app.get("/api/orientation", async (req) => readOrientation(store, context(req).workspace));

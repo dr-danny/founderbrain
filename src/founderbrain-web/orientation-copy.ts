@@ -10,9 +10,13 @@ import type {
 } from "../founderbrain-shared/orientation";
 import {
   CONTENT_CHAPTER_SCREENS,
+  GHL_CHAPTER_SCREENS,
   ORIENTATION_FIRST_LOGIN_SCREENS,
   OUTREACH_CHAPTER_SCREENS,
 } from "../founderbrain-shared/orientation";
+
+/** Official HighLevel pricing. Founders buy Starter; do not start the 14-day trial. */
+export const GHL_STARTER_URL = "https://www.gohighlevel.com/pricing";
 
 export type TypeformChoice = { value: string; label: string };
 
@@ -27,45 +31,21 @@ export type TypeformScreen = {
   textField?: { key: string; label: string; placeholder: string };
   /** Confirm checkbox key into chapter answers. */
   confirm?: { key: string; label: string };
+  /** Opens in a new tab. Used for HighLevel Starter. */
+  externalLink?: { href: string; label: string };
   continueLabel?: string;
 };
 
 export const firstLoginScreens: TypeformScreen[] = [
   {
-    id: "expectations",
-    title: "This is the prep.",
-    body: [
-      "You are not watching another demo. FounderBrain is how you get ready for Atlanta.",
-      "Answer a few questions. Leave with a Brain that is still here when you come back.",
-    ],
+    id: "name",
+    title: "Welcome... what should we call you?",
+    body: [],
   },
   {
-    id: "what",
-    title: "Four missions. One Brain.",
-    body: [
-      "Identity, Customer, Offer, Voice. Then one private first output.",
-      "Save as you go. Nothing is published or sent to customers.",
-    ],
-  },
-  {
-    id: "why",
-    title: "Atlanta only works if the Brain is real.",
-    body: [
-      "Friday is Foundation. Saturday is content and outreach. Sunday is operations and a 90-day plan.",
-      "The weekend is the event. This app is how you arrive ready.",
-    ],
-  },
-  {
-    id: "outcome",
-    title: "What ready means",
-    body: ["By the time you land in Atlanta you will have:"],
-    bullets: [
-      "A saved Founder Brain that survives refresh",
-      "A named customer and offer, or an honest hypothesis",
-      "A voice the engines can actually use",
-      "One private artifact you have approved",
-    ],
-    continueLabel: "Start Identity",
+    id: "ready",
+    title: "Hi X... ready to start?",
+    body: [],
   },
 ];
 
@@ -185,7 +165,7 @@ export function outreachScreens(track: FounderTrack | null): TypeformScreen[] {
       title: "Outreach copy",
       body: [
         "Saturday is content and outreach. Finalise the copy the engines will reuse.",
-        "Apollo and GoHighLevel stay weekend work — not a first-login setup here.",
+        "Apollo stays weekend work for B2B. HighLevel has its own chapter.",
       ],
       confirm: {
         key: "copyFinalised",
@@ -205,9 +185,65 @@ export function outreachScreens(track: FounderTrack | null): TypeformScreen[] {
   ];
 }
 
-export const firstLoginTotal = ORIENTATION_FIRST_LOGIN_SCREENS;
+export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
+  const buyOrSkip: TypeformScreen =
+    hasAccount === true
+      ? {
+          id: "ghl-ready",
+          title: "You already have HighLevel.",
+          body: [
+            "Good. You do not need another account.",
+            "Next step is Connect. One click, on your sub-account.",
+          ],
+        }
+      : {
+          id: "ghl-buy",
+          title: "Buy Starter.",
+          body: [
+            "Open HighLevel pricing in a new tab. Buy the Starter plan at $97 a month.",
+            "Do not start the 14-day trial. A trial started now expires during Atlanta.",
+          ],
+          externalLink: {
+            href: GHL_STARTER_URL,
+            label: "Buy HighLevel Starter",
+          },
+        };
+
+  return [
+    {
+      id: "ghl-need",
+      title: "You need HighLevel.",
+      body: [
+        "FounderBrain writes your Brain here. HighLevel is where it runs: CRM, posts, automations.",
+        "Claude is not part of this. You bring your own HighLevel account.",
+      ],
+    },
+    {
+      id: "ghl-have",
+      title: "Do you already have HighLevel?",
+      body: ["If you do, skip the purchase. If you do not, buy Starter next."],
+      choices: [
+        { value: "yes", label: "I already have HighLevel" },
+        { value: "no", label: "I need to buy Starter" },
+      ],
+    },
+    buyOrSkip,
+    {
+      id: "ghl-connect",
+      title: "Connect HighLevel",
+      body: [
+        "One click opens HighLevel. Pick your sub-account. You come back connected.",
+        "Nothing is published or sent in that click. It only authorizes FounderBrain to push later.",
+      ],
+      continueLabel: "Back to Home",
+    },
+  ];
+}
+
+export const firstLoginTotal = 2;
 export const contentTotal = CONTENT_CHAPTER_SCREENS;
 export const outreachTotal = OUTREACH_CHAPTER_SCREENS;
+export const ghlTotal = GHL_CHAPTER_SCREENS;
 
 export function progressLabel(screen: number, total: number): string {
   return `${screen} of ${total}`;
@@ -234,6 +270,8 @@ export function chapterCopyCorpus(): string {
     ...contentScreens("b2c"),
     ...outreachScreens("b2b"),
     ...outreachScreens("b2c"),
+    ...ghlScreens(true),
+    ...ghlScreens(false),
   ];
   return screens
     .flatMap((s) => [s.title, ...s.body, ...(s.bullets ?? []), s.continueLabel ?? ""])
@@ -241,7 +279,7 @@ export function chapterCopyCorpus(): string {
     .toLowerCase();
 }
 
-export type ChapterKind = "first-login" | "content" | "outreach";
+export type ChapterKind = "first-login" | "content" | "outreach" | "ghl";
 
 export function mergeContentAnswers(
   current: ContentAnswers,

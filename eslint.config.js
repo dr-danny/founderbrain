@@ -143,7 +143,11 @@ export default tseslint.config(
     // FounderBrain Rule 3. OpenRouter inference is called only from provider.ts;
     // Management API only from openrouter-management.ts.
     files: ["src/founderbrain/**/*.ts"],
-    ignores: ["src/founderbrain/provider.ts", "src/founderbrain/openrouter-management.ts"],
+    ignores: [
+      "src/founderbrain/provider.ts",
+      "src/founderbrain/openrouter-management.ts",
+      "src/founderbrain/crm-oauth.ts",
+    ],
     rules: {
       "no-restricted-globals": [
         "error",

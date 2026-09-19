@@ -8,6 +8,7 @@ import {
   OPENROUTER_KEY_NAME_PREFIX,
   OPENROUTER_KEY_TTL_DAYS,
   OPENROUTER_LIFETIME_USD,
+  createOpenRouterManagement,
   openRouterKeyExpiresAt,
   openRouterKeyName,
 } from "./openrouter-management.ts";
@@ -34,9 +35,9 @@ describe("openrouter privacy allowlist", () => {
 
   it("resolves role defaults and rejects non-allowlisted overrides", () => {
     const roles = resolveOrchestration({});
-    assert.equal(roles.thinker.primary, "anthropic/claude-3.5-haiku");
+    assert.equal(roles.thinker.primary, "anthropic/claude-haiku-4.5");
     assert.equal(roles.runner.primary, "anthropic/claude-sonnet-4");
-    assert.equal(roles.verifier.primary, "anthropic/claude-3.5-haiku");
+    assert.equal(roles.verifier.primary, "anthropic/claude-haiku-4.5");
     assert.throws(() => resolveOrchestration({ runner: "not-allowed/model" }));
   });
 });
@@ -56,6 +57,54 @@ describe("openrouter key naming and expiry", () => {
     const expires = openRouterKeyExpiresAt(now);
     assert.equal(expires, "2026-10-18T12:00:00Z");
     assert.match(expires, /T\d{2}:\d{2}:\d{2}Z$/);
+  });
+});
+
+describe("openrouter key workspace placement", () => {
+  const WORKSPACE_ID = "f0c76c1c-eae8-4e6c-8e71-b9df533302db";
+
+  async function captureCreateBody(workspaceId?: string): Promise<Record<string, unknown>> {
+    const realFetch = globalThis.fetch;
+    let sent: Record<string, unknown> = {};
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      if (init?.method === "POST") {
+        sent = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return new Response(
+          JSON.stringify({
+            key: "sk-or-v1-fixture",
+            data: {
+              hash: "hash",
+              name: sent.name,
+              limit: OPENROUTER_LIFETIME_USD,
+              limit_reset: null,
+              expires_at: sent.expires_at,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected request: ${href}`);
+    }) as typeof globalThis.fetch;
+    try {
+      const client = createOpenRouterManagement("fixture-management-key-not-live", workspaceId);
+      await client.createUserKey("ada@example.test");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    return sent;
+  }
+
+  it("sends workspace_id so keys land outside the Default workspace", async () => {
+    const body = await captureCreateBody(WORKSPACE_ID);
+    assert.equal(body.workspace_id, WORKSPACE_ID);
+    assert.equal(body.limit, OPENROUTER_LIFETIME_USD);
+    assert.equal(body.limit_reset, null);
+  });
+
+  it("omits workspace_id entirely when none is configured", async () => {
+    const body = await captureCreateBody(undefined);
+    assert.equal("workspace_id" in body, false);
   });
 });
 

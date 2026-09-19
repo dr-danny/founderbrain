@@ -25,6 +25,9 @@ type OrientationRow = {
   outreach_screen: number;
   outreach_completed_at: Date | string | null;
   outreach_answers: unknown;
+  ghl_screen?: number;
+  ghl_completed_at?: Date | string | null;
+  ghl_answers?: unknown;
   updated_at: Date | string;
 };
 
@@ -44,6 +47,9 @@ function rowToState(row: OrientationRow): OrientationState {
     outreachScreen: row.outreach_screen,
     outreachCompletedAt: iso(row.outreach_completed_at),
     outreachAnswers: row.outreach_answers ?? {},
+    ghlScreen: row.ghl_screen ?? 1,
+    ghlCompletedAt: iso(row.ghl_completed_at ?? null),
+    ghlAnswers: row.ghl_answers ?? {},
     updatedAt: iso(row.updated_at) ?? new Date().toISOString(),
   });
 }
@@ -75,6 +81,9 @@ export async function readOrientation(
         outreach_screen,
         outreach_completed_at,
         outreach_answers,
+        ghl_screen,
+        ghl_completed_at,
+        ghl_answers,
         updated_at
       from fb_orientation
       where founder_id = ${workspaceId}
@@ -111,6 +120,9 @@ export async function writeOrientation(
         outreach_screen,
         outreach_completed_at,
         outreach_answers,
+        ghl_screen,
+        ghl_completed_at,
+        ghl_answers,
         updated_at
       from fb_orientation
       where founder_id = ${workspaceId}
@@ -131,6 +143,9 @@ export async function writeOrientation(
         outreach_screen,
         outreach_completed_at,
         outreach_answers,
+        ghl_screen,
+        ghl_completed_at,
+        ghl_answers,
         updated_at
       ) values (
         ${workspaceId},
@@ -143,6 +158,9 @@ export async function writeOrientation(
         ${next.outreachScreen},
         ${next.outreachCompletedAt},
         ${tx.json(next.outreachAnswers as never)},
+        ${next.ghlScreen},
+        ${next.ghlCompletedAt},
+        ${tx.json(next.ghlAnswers as never)},
         ${next.updatedAt}
       )
       on conflict (founder_id) do update set
@@ -155,6 +173,9 @@ export async function writeOrientation(
         outreach_screen = excluded.outreach_screen,
         outreach_completed_at = excluded.outreach_completed_at,
         outreach_answers = excluded.outreach_answers,
+        ghl_screen = excluded.ghl_screen,
+        ghl_completed_at = excluded.ghl_completed_at,
+        ghl_answers = excluded.ghl_answers,
         updated_at = excluded.updated_at
     `;
 
@@ -169,6 +190,9 @@ export async function writeOrientation(
         outreach_screen,
         outreach_completed_at,
         outreach_answers,
+        ghl_screen,
+        ghl_completed_at,
+        ghl_answers,
         updated_at
       from fb_orientation
       where founder_id = ${workspaceId}

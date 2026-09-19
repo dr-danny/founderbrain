@@ -34,6 +34,14 @@ const envSchema = z.object({
   AI_ENABLED: z.enum(["true", "false"]).default("false"),
   /** Management key for per-user OpenRouter key create/revoke. Never an inference key. */
   OPENROUTER_MANAGEMENT_KEY: z.string().min(16).optional(),
+  /**
+   * Workspace that per-founder keys are created in. Omit and OpenRouter drops the
+   * key in the account's Default workspace, outside the OneDay guardrail.
+   */
+  OPENROUTER_WORKSPACE_ID: z
+    .string()
+    .uuid("OPENROUTER_WORKSPACE_ID must be the workspace UUID")
+    .optional(),
   /** Optional role model overrides; must be privacy-allowlisted. Defaults in openrouter-privacy.ts. */
   AI_MODEL_THINKER: z.string().optional(),
   AI_MODEL_RUNNER: z.string().optional(),
@@ -44,6 +52,12 @@ const envSchema = z.object({
   AI_OUTPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
   AI_WORKSPACE_DAILY_MICROUSD: positive.optional(),
   AI_GLOBAL_DAILY_MICROUSD: positive.optional(),
+  /** HighLevel Marketplace OAuth. Optional until Connect is configured. */
+  HIGHLEVEL_CLIENT_ID: z.string().min(8).optional(),
+  HIGHLEVEL_CLIENT_SECRET: z.string().min(8).optional(),
+  HIGHLEVEL_VERSION_ID: z.string().min(8).optional(),
+  /** Optional Firecrawl key for website import during first-run Typeform. */
+  FIRECRAWL_API_KEY: z.string().min(8).optional(),
 });
 export type Config = z.infer<typeof envSchema>;
 

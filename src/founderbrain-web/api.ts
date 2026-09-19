@@ -121,6 +121,28 @@ export class FounderBrainApi {
       body: JSON.stringify(patch),
     });
   }
+  oauthStatus() {
+    return this.request<{ connected: boolean; locationId: string | null }>("/oauth/status");
+  }
+  startOauth() {
+    return this.request<{ url: string }>("/oauth/start");
+  }
+  importSite(url: string) {
+    return this.request<{
+      proposal: Record<string, unknown>;
+      source: "ai" | "title";
+      logoUrl?: string;
+    }>("/site-import", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  }
+  completeOauth(body: { code: string; state: string }) {
+    return this.request<{ connected: boolean; locationId: string | null }>("/oauth/complete", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
   brain(version?: number) {
     return this.request<BrainState>(
       `/brain${version === undefined ? "" : `?version=${encodeURIComponent(version)}`}`,

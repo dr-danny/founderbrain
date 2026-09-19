@@ -200,7 +200,7 @@ export async function ensureOpenRouterKey(
   const client =
     management ??
     (config.OPENROUTER_MANAGEMENT_KEY
-      ? createOpenRouterManagement(config.OPENROUTER_MANAGEMENT_KEY)
+      ? createOpenRouterManagement(config.OPENROUTER_MANAGEMENT_KEY, config.OPENROUTER_WORKSPACE_ID)
       : undefined);
   if (!client) {
     throw new DomainError(
@@ -388,7 +388,7 @@ export async function revokeOpenRouterKey(
   const client =
     management ??
     (config.OPENROUTER_MANAGEMENT_KEY
-      ? createOpenRouterManagement(config.OPENROUTER_MANAGEMENT_KEY)
+      ? createOpenRouterManagement(config.OPENROUTER_MANAGEMENT_KEY, config.OPENROUTER_WORKSPACE_ID)
       : undefined);
   if (client) {
     await client.deleteKey(row.key_hash);

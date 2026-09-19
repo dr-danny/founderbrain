@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="FounderBrain">
+  <rect width="512" height="512" rx="96" fill="#120c14"/>
+  <rect x="96" y="96" width="320" height="320" rx="64" fill="#1a121c"/>
+  <path fill="#f7efe6" d="M168 156h176c8 0 14 6 14 14v28c0 8-6 14-14 14H230v36h90c8 0 14 6 14 14v28c0 8-6 14-14 14h-90v88c0 8-6 14-14 14h-34c-8 0-14-6-14-14V170c0-8 6-14 14-14z"/>
+  <rect x="230" y="234" width="86" height="28" rx="6" fill="#60dbb3"/>
+</svg>

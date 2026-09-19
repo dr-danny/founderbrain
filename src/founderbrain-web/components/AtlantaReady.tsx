@@ -25,12 +25,14 @@ export function AtlantaReady({
   orientation,
   onContent,
   onOutreach,
+  onGhl,
   onMissions,
 }: {
   state: BrainState;
   orientation: OrientationState;
   onContent: () => void;
   onOutreach: () => void;
+  onGhl: () => void;
   onMissions: () => void;
 }) {
   const map = atlantaReadyMap(state.readiness, orientation);
@@ -82,6 +84,9 @@ export function AtlantaReady({
         </button>
         <button className="button secondary" type="button" onClick={onOutreach}>
           {orientation.outreachCompletedAt ? "Review outreach chapter" : "Outreach chapter"}
+        </button>
+        <button className="button secondary" type="button" onClick={onGhl}>
+          {orientation.ghlCompletedAt ? "Review HighLevel chapter" : "HighLevel chapter"}
         </button>
       </div>
       <small>Nothing is published or sent to customers.</small>

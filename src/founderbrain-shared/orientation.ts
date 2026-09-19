@@ -7,6 +7,7 @@ import { z } from "zod";
 export const ORIENTATION_FIRST_LOGIN_SCREENS = 4 as const;
 export const CONTENT_CHAPTER_SCREENS = 6 as const;
 export const OUTREACH_CHAPTER_SCREENS = 3 as const;
+export const GHL_CHAPTER_SCREENS = 4 as const;
 
 export const trackSchema = z.enum(["b2b", "b2c"]);
 export type FounderTrack = z.infer<typeof trackSchema>;
@@ -29,6 +30,13 @@ export const outreachAnswersSchema = z
   })
   .strict();
 
+export const ghlAnswersSchema = z
+  .object({
+    hasAccount: z.boolean().optional(),
+    connected: z.boolean().optional(),
+  })
+  .strict();
+
 const isoOrNull = z.string().datetime({ offset: true }).nullable();
 
 export const orientationStateSchema = z
@@ -42,6 +50,9 @@ export const orientationStateSchema = z
     outreachScreen: z.number().int().min(1).max(OUTREACH_CHAPTER_SCREENS),
     outreachCompletedAt: isoOrNull,
     outreachAnswers: outreachAnswersSchema,
+    ghlScreen: z.number().int().min(1).max(GHL_CHAPTER_SCREENS),
+    ghlCompletedAt: isoOrNull,
+    ghlAnswers: ghlAnswersSchema,
     updatedAt: z.string().datetime({ offset: true }),
   })
   .strict();
@@ -49,6 +60,7 @@ export const orientationStateSchema = z
 export type OrientationState = z.infer<typeof orientationStateSchema>;
 export type ContentAnswers = z.infer<typeof contentAnswersSchema>;
 export type OutreachAnswers = z.infer<typeof outreachAnswersSchema>;
+export type GhlAnswers = z.infer<typeof ghlAnswersSchema>;
 
 export const orientationPatchSchema = z
   .object({
@@ -61,6 +73,9 @@ export const orientationPatchSchema = z
     outreachScreen: z.number().int().min(1).max(OUTREACH_CHAPTER_SCREENS).optional(),
     outreachComplete: z.boolean().optional(),
     outreachAnswers: outreachAnswersSchema.optional(),
+    ghlScreen: z.number().int().min(1).max(GHL_CHAPTER_SCREENS).optional(),
+    ghlComplete: z.boolean().optional(),
+    ghlAnswers: ghlAnswersSchema.optional(),
   })
   .strict();
 
@@ -78,6 +93,9 @@ export function emptyOrientationState(now = new Date()): OrientationState {
     outreachScreen: 1,
     outreachCompletedAt: null,
     outreachAnswers: {},
+    ghlScreen: 1,
+    ghlCompletedAt: null,
+    ghlAnswers: {},
     updatedAt,
   };
 }
@@ -96,12 +114,14 @@ export function applyOrientationPatch(
     ...current,
     contentAnswers: { ...current.contentAnswers, ...patch.contentAnswers },
     outreachAnswers: { ...current.outreachAnswers, ...patch.outreachAnswers },
+    ghlAnswers: { ...current.ghlAnswers, ...patch.ghlAnswers },
     updatedAt: now.toISOString(),
   };
   if (patch.track !== undefined) next.track = patch.track;
   if (patch.firstLoginScreen !== undefined) next.firstLoginScreen = patch.firstLoginScreen;
   if (patch.contentScreen !== undefined) next.contentScreen = patch.contentScreen;
   if (patch.outreachScreen !== undefined) next.outreachScreen = patch.outreachScreen;
+  if (patch.ghlScreen !== undefined) next.ghlScreen = patch.ghlScreen;
 
   if (patch.firstLoginComplete) {
     next.firstLoginScreen = ORIENTATION_FIRST_LOGIN_SCREENS;
@@ -115,11 +135,21 @@ export function applyOrientationPatch(
     next.outreachScreen = OUTREACH_CHAPTER_SCREENS;
     next.outreachCompletedAt = next.outreachCompletedAt ?? now.toISOString();
   }
+  if (patch.ghlComplete) {
+    next.ghlScreen = GHL_CHAPTER_SCREENS;
+    next.ghlCompletedAt = next.ghlCompletedAt ?? now.toISOString();
+  }
   return orientationStateSchema.parse(next);
 }
 
 export type AtlantaArtifactKey =
-  "brainThesis" | "voice" | "firstOutput" | "contentChapter" | "outreachChapter" | "trackSetup";
+  | "brainThesis"
+  | "voice"
+  | "firstOutput"
+  | "contentChapter"
+  | "outreachChapter"
+  | "trackSetup"
+  | "ghlAccount";
 
 export interface AtlantaArtifact {
   key: AtlantaArtifactKey;
@@ -198,6 +228,12 @@ export function atlantaReadyMap(
             : "B2B email domain or B2C Instagram Business",
       day: "sunday",
       ready: trackSetup,
+    },
+    {
+      key: "ghlAccount",
+      label: "HighLevel connected",
+      day: "sunday",
+      ready: orientation.ghlAnswers.connected === true,
     },
   ];
   const readyCount = artifacts.filter((a) => a.ready).length;

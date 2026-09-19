@@ -96,3 +96,63 @@ export const openRouterProvider: Provider = async (body, key) => {
 
 /** @deprecated Use openRouterProvider. Kept as an alias for older test imports. */
 export const anthropicProvider = openRouterProvider;
+
+function pickFavicon(
+  meta: { favicon?: string; logo?: string; ogImage?: string; image?: string; "og:image"?: string },
+  pageUrl: string,
+): string {
+  for (const candidate of [meta.favicon, meta.logo]) {
+    if (typeof candidate !== "string" || !candidate.trim()) continue;
+    try {
+      const abs = new URL(candidate.trim(), pageUrl).href;
+      if (abs.startsWith("https://")) return abs;
+    } catch {
+      /* skip */
+    }
+  }
+  try {
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(pageUrl).hostname)}&sz=128`;
+  } catch {
+    return "";
+  }
+}
+
+export async function firecrawlScrape(
+  url: string,
+  key: string,
+): Promise<{ markdown: string; title: string; logoUrl: string }> {
+  const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const json = (await response.json().catch(() => ({}))) as {
+    success?: boolean;
+    data?: {
+      markdown?: string;
+      metadata?: {
+        title?: string;
+        ogImage?: string;
+        favicon?: string;
+        image?: string;
+        logo?: string;
+        "og:image"?: string;
+      };
+    };
+  };
+  const markdown = json.data?.markdown?.trim() ?? "";
+  const meta = json.data?.metadata ?? {};
+  const title = meta.title?.trim() ?? "";
+  const logoUrl = pickFavicon(meta, url);
+  if (!response.ok || (!markdown && !title))
+    throw new Error("firecrawl_failed");
+  return {
+    markdown: [title ? `# ${title}` : "", markdown].filter(Boolean).join("\n\n").slice(0, 20_000),
+    title,
+    logoUrl,
+  };
+}

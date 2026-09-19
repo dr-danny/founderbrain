@@ -13,7 +13,7 @@ import { BrainPanel } from "./components/BrainPanel";
 import { ConflictDialog } from "./components/ConflictDialog";
 import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
-import { ContentChapter, OutreachChapter } from "./components/ChapterFlows";
+import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
 import { AtlantaReady } from "./components/AtlantaReady";
 
 export function App() {
@@ -79,20 +79,52 @@ export function App() {
     return <AuthPage kind="boot" message={error || "Preparing your private workspace…"} />;
   }
 
-  if (!firstLoginComplete) {
+  const guidedOpen =
+    !draft.identity.venture.trim() ||
+    !draft.identity.role.trim() ||
+    !draft.identity.goal.trim() ||
+    !draft.customer.segment.trim() ||
+    !draft.customer.problem.trim() ||
+    !draft.offer.description.trim() ||
+    !draft.voice.tone.trim();
+  if (!firstLoginComplete || guidedOpen) {
     return (
+      <>
       <OrientationFlow
         screen={orientation.firstLoginScreen}
-        saving={orientationSaving}
+        saving={orientationSaving || app.saving}
         error={error}
+        welcomeDone={firstLoginComplete}
+        brain={draft}
+        track={orientation.track}
+        siteImportEnabled={Boolean(config.siteImportEnabled)}
+        onNamed={(name) => app.patch("identity", "name", name)}
         onAdvance={async (next) => {
           await app.saveOrientation({ firstLoginScreen: next });
         }}
-        onBack={async (prev) => {
-          await app.saveOrientation({ firstLoginScreen: prev });
-        }}
         onComplete={() => app.completeFirstLogin()}
+        onDecline={() => void app.signOut()}
+        onFill={async (section, field, value) => {
+          await app.commitField(section, field, value);
+        }}
+        onApplyIntake={async (proposal) => {
+          await app.applyIntake(proposal);
+        }}
+        onTrack={async (value) => {
+          await app.saveOrientation({ track: value });
+        }}
+        onImport={(url) => app.importSite(url)}
       />
+      {conflict ? (
+        <ConflictDialog
+          conflict={conflict}
+          draft={draft}
+          closeRef={closeConflict}
+          onKeepDraft={app.keepMyDraft}
+          onLoadServer={app.loadServerConflict}
+        />
+      ) : null}
+      </>
     );
   }
 
@@ -124,6 +156,23 @@ export function App() {
     );
   }
 
+  if (view === "ghl") {
+    return (
+      <GhlChapter
+        orientation={orientation}
+        saving={orientationSaving}
+        error={error}
+        connectEnabled={Boolean(config.crmConnectEnabled)}
+        connecting={app.connecting}
+        onConnect={() => app.startConnect()}
+        onPatch={async (patch) => {
+          await app.saveOrientation(patch);
+        }}
+        onFinished={() => setView("home")}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <TopBar
@@ -140,13 +189,9 @@ export function App() {
           view={view}
           mission={mission}
           readiness={state.readiness}
-          firstLoginDone={firstLoginComplete}
           onHome={() => setView("home")}
           onMissions={() => setView("missions")}
           onBrain={() => void app.openHistory()}
-          onAtlanta={() => setView("atlanta")}
-          onContent={() => setView("content")}
-          onOutreach={() => setView("outreach")}
           onSelectMission={(key) => {
             setMission(key);
             setView("missions");
@@ -186,6 +231,7 @@ export function App() {
               onAtlanta={() => setView("atlanta")}
               onContent={() => setView("content")}
               onOutreach={() => setView("outreach")}
+              onGhl={() => setView("ghl")}
             />
           )}
           {view === "atlanta" && (
@@ -194,6 +240,7 @@ export function App() {
               orientation={orientation}
               onContent={() => setView("content")}
               onOutreach={() => setView("outreach")}
+              onGhl={() => setView("ghl")}
               onMissions={() => {
                 const first = missions.find((key) => !state.readiness[key]) ?? "output";
                 setMission(first);

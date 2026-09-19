@@ -131,8 +131,8 @@ before(async () => {
     OPENROUTER_MANAGEMENT_KEY: "fixture-management-key-not-live",
     AI_MODEL: "anthropic/claude-sonnet-4",
     AI_MODEL_RUNNER: "anthropic/claude-sonnet-4",
-    AI_MODEL_THINKER: "anthropic/claude-3.5-haiku",
-    AI_MODEL_VERIFIER: "anthropic/claude-3.5-haiku",
+    AI_MODEL_THINKER: "anthropic/claude-haiku-4.5",
+    AI_MODEL_VERIFIER: "anthropic/claude-haiku-4.5",
     AI_INPUT_USD_PER_MILLION: 1,
     AI_OUTPUT_USD_PER_MILLION: 2,
     AI_WORKSPACE_DAILY_MICROUSD: 1000000,
@@ -199,15 +199,15 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
         headers: { "x-founderbrain-origin": config.ORIGIN_SECRET! },
       });
       assert.equal(cfg.statusCode, 200);
-      assert.deepEqual(cfg.json(), {
-        authMode: "hexclave",
-        hexclave: {
-          projectId: "7f2d1c3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f",
-          apiUrl: "https://api.hexclave.com",
-          publishableClientKey: null,
-        },
-        aiEnabled: true,
+      const json = cfg.json() as { authMode: string; hexclave: object; aiEnabled: boolean; siteImportEnabled?: boolean };
+      assert.equal(json.authMode, "hexclave");
+      assert.deepEqual(json.hexclave, {
+        projectId: "7f2d1c3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f",
+        apiUrl: "https://api.hexclave.com",
+        publishableClientKey: null,
       });
+      assert.equal(json.aiEnabled, true);
+      if (json.siteImportEnabled !== undefined) assert.equal(typeof json.siteImportEnabled, "boolean");
       assert.doesNotMatch(cfg.body, /ORIGIN_SECRET|ssk_|OPENROUTER|ANTHROPIC/i);
       await workspace("me");
       const me = await app.inject({ url: "/api/me", headers: headers("me") });
