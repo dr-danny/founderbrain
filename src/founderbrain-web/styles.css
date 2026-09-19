@@ -1395,15 +1395,22 @@ button:not(.link-button) {
   clip: rect(0, 0, 0, 0);
 }
 .welcome-choices {
-  margin-top: 1.85rem;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 2rem;
+}
+.welcome-choices .typeform-choice {
+  flex: 0 0 auto;
+  width: 10.5rem;
+  min-width: 9rem;
 }
 .welcome-choices .yes {
   background: var(--paper);
   color: var(--ink);
   border-color: var(--paper);
-  min-width: 7.5rem;
-  font-size: 1.05rem;
-  padding: 0.95rem 1.4rem;
 }
 .welcome-choices .no {
   background: transparent;

@@ -209,7 +209,7 @@ export function useFounderBrainApp() {
       try {
         nextOrientation = await api.orientation();
       } catch (err) {
-        if (!(err instanceof ApiError && err.status === 404)) throw err;
+        if (!(err instanceof ApiError && (err.status === 404 || err.status === 503))) throw err;
         nextOrientation = emptyOrientationState();
       }
       if (epoch !== sessionEpoch.current) return;
@@ -304,6 +304,40 @@ export function useFounderBrainApp() {
     });
     setMission("identity");
     setView("home");
+  }
+
+  async function commitField(
+    section: Exclude<Mission, "output">,
+    field: string,
+    value: string | boolean,
+  ) {
+    const next = patchBrain(latestDraft.current, section, field, value);
+    latestDraft.current = next;
+    setDraft(next);
+    setChanged(true);
+    await save(next);
+  }
+
+  async function applyIntake(proposal: {
+    identity?: Record<string, string>;
+    customer?: Record<string, string>;
+    offer?: Record<string, string>;
+    voice?: Record<string, string>;
+  }) {
+    let next = latestDraft.current;
+    for (const section of ["identity", "customer", "offer", "voice"] as const) {
+      const fields = proposal[section];
+      if (!fields) continue;
+      for (const [field, value] of Object.entries(fields)) {
+        if (typeof value === "string" && value.trim()) {
+          next = patchBrain(next, section, field, value);
+        }
+      }
+    }
+    latestDraft.current = next;
+    setDraft(next);
+    setChanged(true);
+    await save(next);
   }
 
   function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) {
@@ -705,6 +739,8 @@ export function useFounderBrainApp() {
     closeConflict,
     hexclave,
     patch,
+    commitField,
+    applyIntake,
     save,
     retrySave,
     approve,

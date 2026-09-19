@@ -89,6 +89,7 @@ export function App() {
     !draft.voice.tone.trim();
   if (!firstLoginComplete || guidedOpen) {
     return (
+      <>
       <OrientationFlow
         screen={orientation.firstLoginScreen}
         saving={orientationSaving || app.saving}
@@ -104,14 +105,26 @@ export function App() {
         onComplete={() => app.completeFirstLogin()}
         onDecline={() => void app.signOut()}
         onFill={async (section, field, value) => {
-          app.patch(section, field, value);
-          await app.save();
+          await app.commitField(section, field, value);
+        }}
+        onApplyIntake={async (proposal) => {
+          await app.applyIntake(proposal);
         }}
         onTrack={async (value) => {
           await app.saveOrientation({ track: value });
         }}
         onImport={(url) => app.importSite(url)}
       />
+      {conflict ? (
+        <ConflictDialog
+          conflict={conflict}
+          draft={draft}
+          closeRef={closeConflict}
+          onKeepDraft={app.keepMyDraft}
+          onLoadServer={app.loadServerConflict}
+        />
+      ) : null}
+      </>
     );
   }
 

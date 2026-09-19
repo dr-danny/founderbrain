@@ -97,6 +97,26 @@ export const openRouterProvider: Provider = async (body, key) => {
 /** @deprecated Use openRouterProvider. Kept as an alias for older test imports. */
 export const anthropicProvider = openRouterProvider;
 
+function pickFavicon(
+  meta: { favicon?: string; logo?: string; ogImage?: string; image?: string; "og:image"?: string },
+  pageUrl: string,
+): string {
+  for (const candidate of [meta.favicon, meta.logo]) {
+    if (typeof candidate !== "string" || !candidate.trim()) continue;
+    try {
+      const abs = new URL(candidate.trim(), pageUrl).href;
+      if (abs.startsWith("https://")) return abs;
+    } catch {
+      /* skip */
+    }
+  }
+  try {
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(pageUrl).hostname)}&sz=128`;
+  } catch {
+    return "";
+  }
+}
+
 export async function firecrawlScrape(
   url: string,
   key: string,

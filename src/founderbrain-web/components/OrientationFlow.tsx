@@ -85,6 +85,7 @@ export function OrientationFlow({
   onComplete,
   onDecline,
   onFill,
+  onApplyIntake,
   onTrack,
   onImport,
 }: {
@@ -100,6 +101,7 @@ export function OrientationFlow({
   onComplete: () => void | Promise<void>;
   onDecline: () => void;
   onFill: (section: "identity" | "customer" | "offer" | "voice", field: string, value: string) => Promise<void>;
+  onApplyIntake: (proposal: Proposal) => Promise<void>;
   onTrack: (value: "b2b" | "b2c") => Promise<void>;
   onImport: (url: string) => Promise<{ proposal: Proposal; logoUrl?: string }>;
 }) {
@@ -219,18 +221,7 @@ export function OrientationFlow({
     if (!proposal) return;
     setBusy(true);
     try {
-      for (const [field, value] of Object.entries(proposal.identity ?? {})) {
-        if (value) await onFill("identity", field, value);
-      }
-      for (const [field, value] of Object.entries(proposal.customer ?? {})) {
-        if (value) await onFill("customer", field, value);
-      }
-      for (const [field, value] of Object.entries(proposal.offer ?? {})) {
-        if (value) await onFill("offer", field, value);
-      }
-      for (const [field, value] of Object.entries(proposal.voice ?? {})) {
-        if (value) await onFill("voice", field, value);
-      }
+      await onApplyIntake(proposal);
       if (proposal.track) await onTrack(proposal.track);
       if (proposal.identity?.stage) writeKey(STAGE_KEY, "1");
       setProposal(null);
