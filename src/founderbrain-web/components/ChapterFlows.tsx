@@ -394,7 +394,7 @@ export function GhlChapter({
 }: ChapterProps & {
   connectEnabled?: boolean;
   connecting?: boolean;
-  onGhlPush?: () => Promise<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean }>;
+  onGhlPush?: () => Promise<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] }>;
   onConnect?: () => void | Promise<void>;
   loadUsage?: () => Promise<UsageResponse>;
 }) {
@@ -410,7 +410,7 @@ export function GhlChapter({
   const connected = orientation.ghlAnswers.connected === true;
   const [pushing, setPushing] = useState(false);
   const [pushed, setPushed] = useState(false);
-  const [pushResult, setPushResult] = useState<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean } | null>(null);
+  const [pushResult, setPushResult] = useState<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] } | null>(null);
   const [pushError, setPushError] = useState("");
 
   async function persist(patch: OrientationPatch) {
@@ -533,6 +533,7 @@ export function GhlChapter({
           Snapshot {pushResult.snapshot} · first pack {pushResult.firstPack} · {pushResult.pushed.length} values written
           {pushResult.skipped.length ? `, ${pushResult.skipped.length} already had your words` : ""} · verified in
           GoHighLevel: {pushResult.proven ? "yes" : "unverified"}
+          {pushResult.clinicPaste.length ? ` Paste by hand at the clinic: ${pushResult.clinicPaste.join(", ")}.` : ""}
         </p>
       ) : null}
       {pushError ? (

@@ -84,6 +84,8 @@ export function sectionsForPush(brain: Brain, firstPack: string): { gname: strin
   const snapshot = snapshotFor(brain);
   const essentials = snapshot === "B2B" ? "B2B Essentials" : "B2C Essentials";
   const packSection = SECTION_BY_PACK[firstPack];
+  if (!packSection)
+    throw new DomainError(422, "unknown_pack", "That first pack is not in the library. Pick from the six.");
   const wanted = [essentials, packSection].filter(Boolean) as string[];
   const out: { gname: string; guidance: string; key: string }[] = [];
   for (const section of wanted) {
@@ -173,12 +175,16 @@ export async function pushGhlValues(
   workspace: string,
   brain: Brain,
   firstPack: string,
-): Promise<{ snapshot: SnapshotName; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean }> {
+): Promise<{ snapshot: SnapshotName; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] }> {
   const connection = await (await import("./crm-oauth.ts")).readConnection(store, workspace, config);
   if (!connection)
     throw new DomainError(409, "crm_not_connected", "Connect GoHighLevel before pushing copy.");
   const wanted = sectionsForPush(brain, firstPack);
-  const copy = await generateCopy(config, store, workspace, brain, wanted);
+  // Booking links are the founder's own URLs, pasted at the clinic. AI never
+  // writes a link: it would invent one.
+  const linkKeys = wanted.filter((w) => /_link$/.test(w.key)).map((w) => w.gname);
+  const copyWanted = wanted.filter((w) => !/_link$/.test(w.key));
+  const copy = await generateCopy(config, store, workspace, brain, copyWanted);
 
   const listResponse = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
   if (!listResponse.ok)
@@ -208,7 +214,7 @@ export async function pushGhlValues(
     }
   }
   if (pushed.length === 0 && skipped.length === wanted.length)
-    return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven: true };
+    return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven: true, clinicPaste: linkKeys };
 
   // Prove it: nothing we claim to have written may still read empty or placeholder.
   const verify = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
@@ -221,7 +227,7 @@ export async function pushGhlValues(
   });
   if (!proven)
     throw new DomainError(502, "ghl_push_failed", "The push did not stick. Nothing was published. Check the snapshot names match the values list.");
-  return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven };
+  return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven, clinicPaste: linkKeys };
 }
 
 /** Export helper for tests: is this Brain ready to push (all five missions approved)? */

@@ -168,6 +168,7 @@ export class FounderBrainApi {
       pushed: string[];
       skipped: string[];
       proven: boolean;
+      clinicPaste: string[];
     }>(
       "/ghl/push",
       { method: "POST", body: JSON.stringify(pack ? { pack } : {}) },
