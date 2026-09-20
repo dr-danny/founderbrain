@@ -183,8 +183,9 @@ export function ContentChapter({ orientation, saving, error, onPatch, onFinished
       screen={screen}
       total={contentTotal}
       title={current.title}
-      continueLabel={current.continueLabel ?? (isChoice ? "Choose below" : "Continue")}
-      continueDisabled={isChoice ? true : continueDisabled}
+      continueLabel="Continue"
+      hideContinue={isChoice}
+      continueDisabled={continueDisabled}
       showBack={screen > 1}
       onBack={() => void goBack()}
       onContinue={() => void continueForward()}
@@ -197,6 +198,9 @@ export function ContentChapter({ orientation, saving, error, onPatch, onFinished
         confirmValue={confirm}
         onConfirm={setConfirm}
       />
+      {isChoice ? (
+        <p className="entry-lede typeform-lede">Choose below.</p>
+      ) : null}
       {current.choices ? (
         <div className="typeform-choices">
           {current.choices.map((choice) => (
@@ -465,9 +469,10 @@ export function GhlChapter({
             : connectEnabled
               ? "Connect GoHighLevel"
               : "Connect is not configured"
-          : (current.continueLabel ?? (isChoice ? "Choose below" : "Continue"))
+          : "Continue"
       }
-      continueDisabled={isChoice || (isConnect && !connected && !connectEnabled)}
+      hideContinue={isChoice}
+      continueDisabled={(isConnect && !connected && !connectEnabled)}
       showBack={screen > 1}
       onBack={() => void goBack()}
       onContinue={() => {
@@ -487,6 +492,9 @@ export function GhlChapter({
         onConfirm={() => undefined}
       />
       {current.usage ? <UsagePrice loadUsage={loadUsage} /> : null}
+      {isChoice ? (
+        <p className="entry-lede typeform-lede">Choose below.</p>
+      ) : null}
       {isConnect && connected ? (
         <p className="entry-lede typeform-lede">Connected. You can leave this chapter.</p>
       ) : null}
