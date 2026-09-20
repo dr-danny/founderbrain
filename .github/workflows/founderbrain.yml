@@ -49,7 +49,14 @@ jobs:
           RUNTIME_DB_ROLE=fb_runtime npm run fb:migrate
           RUNTIME_DB_ROLE=fb_worker npm run fb:migrate
       - run: npm run fb:build
-      - run: npm run fb:test
+      - name: Run actual tests (capture log)
+        run: npm run fb:test 2>&1 | tee /tmp/fb-test.log; test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fb-test-log
+          path: /tmp/fb-test.log
+          if-no-files-found: ignore
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
