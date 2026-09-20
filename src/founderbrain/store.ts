@@ -154,19 +154,8 @@ export class PgBrainStore {
           select founder_id, deleted_at from fb_user where subject = ${subject} for update
         `;
         if (existing[0]) {
-          if (existing[0].deleted_at !== null) {
-            // The founder deleted their workspace and signed in again: revive
-            // the identity into a fresh, empty workspace instead of locking
-            // them out forever (the content rows are already deleted).
-            await tx`
-              update fb_user set deleted_at = null
-              where subject = ${subject} and founder_id = ${existing[0].founder_id}
-            `;
-            await tx`
-              update founder set deleted_at = null, disabled_at = null
-              where id = ${existing[0].founder_id}
-            `;
-          }
+          if (existing[0].deleted_at !== null)
+            throw fail(410, "workspace_deleted", "This workspace was deleted.");
           const membership = await tx`
             select 1 from fb_member
             where subject = ${subject}
@@ -574,8 +563,10 @@ export class PgBrainStore {
         await tx`delete from ge_blob where founder_id = ${workspaceId}`;
         await tx`delete from ge_event where founder_id = ${workspaceId}`;
         await tx`update fb_member set revoked_at = now() where founder_id = ${workspaceId}`;
-        await tx`update fb_user set deleted_at = now() where subject = ${subject} and founder_id = ${workspaceId}`;
-        await tx`update founder set deleted_at = now(), disabled_at = now() where id = ${workspaceId}`;
+        // The identity stays alive: deletion wipes content, and the next
+        // sign-in lands in a fresh empty workspace instead of a permanent
+        // 410 lockout. Keep the founder row active and un-tombstoned.
+        await tx`update fb_member set revoked_at = null where founder_id = ${workspaceId}`;
       });
     } catch (error) {
       return safeDbError(error);

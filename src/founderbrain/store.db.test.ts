@@ -141,13 +141,13 @@ describe(
       }
     });
 
-    it("revives a deleted workspace into a fresh empty one on re-provision", { skip }, async () => {
+    it("wipes content but keeps the identity alive after deletion", { skip }, async () => {
       assert.ok(store);
       await store.deleteWorkspace(subject, workspace);
       const id2 = await store.ensureWorkspace(subject);
-      assert.notEqual(id2, workspace, "revival issues a fresh founder id");
+      assert.equal(id2, workspace, "the identity survives deletion");
       const revived = await store.read(id2);
-      assert.equal(revived.version, 0, "revived workspace starts empty");
+      assert.equal(revived.version, 0, "the workspace starts empty again");
       workspace = "";
     });
   },
