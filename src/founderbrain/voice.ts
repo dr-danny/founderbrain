@@ -44,21 +44,23 @@ export async function transcribeVoice(
   form.append("temperature", "0");
   form.append("response_format", "json");
 
-  let text = "";
-  try {
-    const response = await fetch(GROQ_TRANSCRIPTIONS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${config.GROQ_API_KEY}` },
-      body: form,
-    });
-    if (!response.ok)
+  const body = await (async () => {
+    try {
+      // eslint-disable-next-line no-restricted-globals -- ASR egress, not model inference: the OpenRouter rule guards inference, not speech-to-text.
+      const response = await fetch(GROQ_TRANSCRIPTIONS_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${config.GROQ_API_KEY}` },
+        body: form,
+      });
+      if (!response.ok)
+        throw new DomainError(502, "voice_failed", "Transcription failed. Type instead or try again.");
+      return (await response.json()) as { text?: string };
+    } catch (error) {
+      if (error instanceof DomainError) throw error;
       throw new DomainError(502, "voice_failed", "Transcription failed. Type instead or try again.");
-    const body = (await response.json()) as { text?: string };
-    text = (body.text ?? "").trim();
-  } catch (error) {
-    if (error instanceof DomainError) throw error;
-    throw new DomainError(502, "voice_failed", "Transcription failed. Type instead or try again.");
-  }
+    }
+  })();
+  const text = (body.text ?? "").trim();
 
   // Meter before returning: the provider charge exists regardless of what the
   // founder does with the text.
