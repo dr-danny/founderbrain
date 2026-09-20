@@ -391,13 +391,17 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       });
       assert.equal(deleted.statusCode, 200, deleted.body);
       assert.ok(deletedHashes.length > beforeDeletes, "OpenRouter key revoked on delete");
-      // Deletion wipes content but the identity revives into a fresh empty
-      // workspace on the next read, so the founder can start over.
+      assert.equal(
+        (await store.scoped(id, (tx) => tx`select * from ge_blob where founder_id = ${id}`)).length,
+        0,
+        "content wiped by deletion",
+      );
+      // Deletion wipes content but the identity stays alive: the next read lands
+      // in a fresh empty workspace so the founder can start over.
       assert.equal(
         (await app.inject({ url: "/api/brain", headers: headers("output") })).statusCode,
         200,
       );
-      assert.equal((await store.scoped(id, (tx) => tx`select * from ge_blob`)).length, 0);
     },
   );
   it("fails closed when OpenRouter revoke fails during workspace delete", { skip }, async () => {
@@ -513,7 +517,7 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       await store.deleteWorkspace(prefix + "|uncertain", id);
       const rec = await store.scoped(id, (tx) => tx`select * from fb_usage_reconciliation`);
       assert.equal(rec.length, 1);
-      assert.equal((await store.scoped(id, (tx) => tx`select * from ge_blob`)).length, 0);
+      assert.equal((await store.scoped(id, (tx) => tx`select * from ge_blob where founder_id = ${id}`)).length, 0);
     },
   );
   it(

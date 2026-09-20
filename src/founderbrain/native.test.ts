@@ -25,7 +25,10 @@ it("native concurrent delete/save leaves no content after deletion", { skip }, a
       assert.equal(outcomes[1]!.status, "fulfilled");
       assert.equal((await store.scoped(id, (tx) => tx`select 1 from ge_blob`)).length, 0);
       assert.equal((await store.scoped(id, (tx) => tx`select 1 from ge_file`)).length, 0);
-      await assert.rejects(store.ensureWorkspace(subject), { status: 410 });
+      // Deletion wipes content but keeps the identity alive; re-provision lands
+      // in a fresh empty workspace.
+      const idAfter = await store.ensureWorkspace(subject);
+      assert.equal(await store.read(idAfter).then((r) => r.version), 0);
     }
   } finally {
     await store.close();
