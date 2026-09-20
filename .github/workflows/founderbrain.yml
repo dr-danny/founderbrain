@@ -30,6 +30,7 @@ jobs:
       MIGRATION_DATABASE_URL: postgresql://postgres:ci-disposable-only@127.0.0.1:5432/founderbrain_test
       FB_TEST_MIGRATION_DATABASE_URL: postgresql://postgres:ci-disposable-only@127.0.0.1:5432/founderbrain_test
       FB_TEST_DATABASE_URL: postgresql://fb_runtime:ci-runtime-only@127.0.0.1:5432/founderbrain_test
+      GE_MASTER_KEY: c2hhcmVkLWRpc3Bvc2FibGUtY2ktbWFzdGVyLWtleS0zMmJ5dGVzLXRlc3Q=
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

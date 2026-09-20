@@ -562,11 +562,10 @@ export class PgBrainStore {
         await tx`delete from ge_file where founder_id = ${workspaceId}`;
         await tx`delete from ge_blob where founder_id = ${workspaceId}`;
         await tx`delete from ge_event where founder_id = ${workspaceId}`;
-        await tx`update fb_member set revoked_at = now() where founder_id = ${workspaceId}`;
         // The identity stays alive: deletion wipes content, and the next
         // sign-in lands in a fresh empty workspace instead of a permanent
-        // 410 lockout. Keep the founder row active and un-tombstoned.
-        await tx`update fb_member set revoked_at = null where founder_id = ${workspaceId}`;
+        // 410 lockout.
+        await tx`update founder set version = 0 where id = ${workspaceId}`;
       });
     } catch (error) {
       return safeDbError(error);
