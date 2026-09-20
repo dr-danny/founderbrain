@@ -273,10 +273,13 @@ export class PgBrainStore {
       return {
         workspaceId,
         version: fileVersion,
-        sha: contentHash(brain),
+        // Hash of the bytes as persisted, not of the re-parsed shape: zod
+        // default-injection after schema additions would otherwise drift every
+        // legacy blob's hash and falsely mark accepted artifacts stale.
+        sha: file.blob_sha,
         updatedAt: iso(file.at),
         brain,
-        readiness: readiness(brain),
+        readiness: readiness(brain, null, file.blob_sha),
         verified: true,
         artifact: null,
       } as BrainState;
@@ -430,14 +433,15 @@ export class PgBrainStore {
         `;
         const key = unwrapDataKey(workspaceId, founder.wrapped_key);
         return rows.map((row) => {
-          const brain = checkedBrain(
+          // Parsing still validates the blob; the hash is the persisted sha.
+          checkedBrain(
             JSON.parse(
               openBlob(workspaceId, key, row.blob_sha, row.ciphertext, row.nonce).toString("utf8"),
             ) as Brain,
           );
           const at = iso(row.at);
           if (!at) throw fail(503, "storage_unavailable", "Saved workspace history is invalid.");
-          return { version: asVersion(row.version), sha: contentHash(brain), at };
+          return { version: asVersion(row.version), sha: row.blob_sha, at };
         });
       });
     } catch (error) {

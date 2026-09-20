@@ -273,9 +273,11 @@ export async function buildApi(
     const body = parse(
       z
         .object({
-          audioBase64: z.string().min(64).max(32_000_000),
-          mime: z.string().regex(/^audio\/(webm|ogg|wav|mpeg)$/),
-          seconds: z.coerce.number().positive().max(600),
+          // Base64 of the 10 MiB decoded cap lands under this limit and under the
+          // 16 MiB route bodyLimit; codec parameters (audio/webm;codecs=opus) accepted.
+          audioBase64: z.string().min(64).max(14_000_000),
+          mime: z.string().regex(/^audio\/(webm|ogg|wav|mpeg)(;.*)?$/),
+          seconds: z.coerce.number().positive().max(300),
         })
         .strict(),
       req.body,
@@ -311,7 +313,7 @@ export async function buildApi(
     const workspace = context(req).workspace;
     const state = await store.read(workspace, query.version);
     const artifact = query.version ? null : await jobs.artifact(workspace);
-    return { ...state, readiness: readiness(state.brain, artifact), artifact };
+    return { ...state, readiness: readiness(state.brain, artifact, state.sha), artifact };
   });
   app.put("/api/brain", async (req) => {
     const body = parse(

@@ -192,6 +192,34 @@ export function App() {
     return (
       <>
         {accountChip}
+        {conflict ? (
+          <ConflictDialog
+            conflict={conflict}
+            draft={draft}
+            closeRef={closeConflict}
+            onKeepDraft={app.keepMyDraft}
+            onLoadServer={app.loadServerConflict}
+          />
+        ) : null}
+        {notice ? (
+          <p className="mission-toast notice" role="status">
+            {notice}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="mission-toast error" role="alert">
+            {error}
+            {sessionExpired ? (
+              <>
+                {" "}
+                <a href={window.location.pathname} target="_blank" rel="noopener">
+                  Open a new tab to sign in
+                </a>
+                , then come back here and retry.
+              </>
+            ) : null}
+          </p>
+        ) : null}
         <MissionTypeform
           mission={mission}
           draft={draft}

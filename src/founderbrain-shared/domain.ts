@@ -77,7 +77,21 @@ export const brainSchema = z
         sourceMaterial: text.default(""),
         ...section,
       })
-      .strict(),
+      .strict()
+      // Legacy stored brains predate this section: default it so every old
+      // revision still parses instead of 422ing on read.
+      .default({
+        channelsActive: "",
+        channelsDormant: "",
+        emailProvider: "",
+        domainStatus: "",
+        igAccountType: "",
+        customersNow: "",
+        avgMonthlyValue: "",
+        target90: "",
+        sourceMaterial: "",
+        approved: false,
+      }),
   })
   .strict();
 

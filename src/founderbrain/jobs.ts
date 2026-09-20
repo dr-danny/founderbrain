@@ -15,7 +15,6 @@ import postgres, { type TransactionSql } from "postgres";
 import {
   DomainError,
   canonicalize,
-  contentHash,
   generationPayload,
   readiness,
   type Artifact,
@@ -153,8 +152,8 @@ export class BrainJobs {
     }
     const state = await this.store.read(workspace);
     const ready = readiness(state.brain);
-    if (!ready.identity || !ready.customer || !ready.offer || !ready.voice) {
-      throw new DomainError(422, "brain_incomplete", "Approve the four input missions first.");
+    if (!ready.identity || !ready.customer || !ready.offer || !ready.voice || !ready.context) {
+      throw new DomainError(422, "brain_incomplete", "Approve the five input missions first.");
     }
     const { meta } = await loadOpenRouterApiKey(this.store, workspace);
     keyIsUsable(meta);
@@ -246,7 +245,7 @@ export class BrainJobs {
           id, founder_id, idempotency_key, source_version, source_hash,
           input_hash, input_blob_sha, status, reserved, budget_day
         ) values (
-          ${id}, ${workspace}, ${key}, ${state.version}, ${contentHash(state.brain)},
+          ${id}, ${workspace}, ${key}, ${state.version}, ${state.sha},
           ${hash(body)}, ${blob}, 'queued', ${reserve}, ${day}
         )
       `;

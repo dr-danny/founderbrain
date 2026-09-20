@@ -30,8 +30,14 @@ export function contentHash(brain: Brain): string {
   return createHash("sha256").update(canonicalize(brain)).digest("hex");
 }
 
-export function readiness(brain: Brain, artifact?: Artifact | null): Readiness {
-  return sharedReadiness(brain, artifact, artifact ? contentHash(brain) : null);
+export function readiness(
+  brain: Brain,
+  artifact?: Artifact | null,
+  persistedSha?: string | null,
+): Readiness {
+  // Hash of the persisted blob, not a rehash of the parsed shape: default
+  // injection after schema additions must not flip accepted artifacts stale.
+  return sharedReadiness(brain, artifact, persistedSha ?? (artifact ? contentHash(brain) : null));
 }
 
 export function validateBrain(value: unknown): Brain {
@@ -77,7 +83,7 @@ export function exportMarkdown(brain: Brain, version: number, updatedAt?: string
     flags.push("Fresh sending domain: SPF, DKIM and DMARC still to configure.");
   if (track === "b2c" && brain.context.igAccountType === "personal")
     flags.push("Instagram is a personal account; convert to Business/Creator.");
-  const sections: string[] = [
+  const sections: Array<string | null> = [
     "# Founder Brain",
     `Schema: 1`,
     `Renderer: 1`,
@@ -97,6 +103,7 @@ export function exportMarkdown(brain: Brain, version: number, updatedAt?: string
     "## Offer",
     line("What they sell", brain.offer.description || "unknown"),
     line("Delivery", brain.offer.delivery || "unknown"),
+    line("Why them", brain.offer.why || "unknown"),
     line("Problem it solves", brain.customer.problem || "unknown"),
     line("Pricing", brain.offer.price || "unknown"),
     ...(brain.offer.pricingModel ? [line("Pricing model", brain.offer.pricingModel)] : []),
@@ -108,7 +115,7 @@ export function exportMarkdown(brain: Brain, version: number, updatedAt?: string
     "",
     "## Proof",
     ...(proofValues.length ? proofValues.map((v) => line("Proof", v)) : ["Proof: unknown"]),
-    thinProof ? "Note: proof is thin. The content engine leans on story and point of view." : "",
+    thinProof ? "Note: proof is thin. The content engine leans on story and point of view." : null,
     "",
     "## Goal, next 90 days",
     line("Goal", brain.identity.goal || "unknown"),
@@ -139,7 +146,8 @@ export function exportMarkdown(brain: Brain, version: number, updatedAt?: string
     "> Hypotheses are not validated business facts. This export is derived; edit the saved Brain to make changes.",
     "",
   ];
-  return sections.filter((s) => s !== "").join("\n");
+  // "" keeps intentional blank separators; null marks an omitted optional line.
+  return sections.filter((section): section is string => section !== null).join("\n");
 }
 
 export function generationPayload(brain: Brain): {

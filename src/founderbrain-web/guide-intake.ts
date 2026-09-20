@@ -116,8 +116,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     placeholder: "The reason they pick you",
     kind: "long",
     section: "offer",
-    field: "outcome",
-    empty: (b) => !b.offer.outcome.trim(),
+    field: "why",
+    empty: (b) => !b.offer.why.trim(),
   },
   {
     id: "proof",

@@ -14,7 +14,7 @@ import { ceilMicro, recordUsageEvent, voiceCostRateUsdPerMinute } from "./usage.
 
 const GROQ_TRANSCRIPTIONS_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 /** Groq caps uploads at 25MB free / 100MB dev; keep generous headroom under both. */
-const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_SECONDS = 300;
 
 export type VoiceInput = { audio: Buffer; mime: string; seconds: number };
@@ -30,15 +30,15 @@ export async function transcribeVoice(
   if (!input.mime.startsWith("audio/"))
     throw new DomainError(422, "invalid_request", "Send an audio recording.");
   if (input.audio.length === 0 || input.audio.length > MAX_AUDIO_BYTES)
-    throw new DomainError(413, "voice_too_long", "That recording is too large. Keep clips under 5 minutes.");
+    throw new DomainError(413, "voice_too_long", "That recording is too large. Keep clips under 3 minutes.");
   // Client-reported duration, clamped: it only feeds metering, not the provider.
   const seconds = Math.min(Math.max(Math.ceil(input.seconds || 1), 1), MAX_SECONDS);
 
   const form = new FormData();
   form.append(
     "file",
-    new Blob([new Uint8Array(input.audio)], { type: input.mime }),
-    `voice.${input.mime === "audio/webm" ? "webm" : "ogg"}`,
+    new Blob([new Uint8Array(input.audio)], { type: input.mime.split(";")[0] }),
+    `voice.${input.mime.split(";")[0] === "audio/webm" ? "webm" : input.mime.split(";")[0] === "audio/wav" ? "wav" : input.mime.split(";")[0] === "audio/mpeg" ? "mp3" : "ogg"}`,
   );
   form.append("model", "whisper-large-v3-turbo");
   form.append("temperature", "0");

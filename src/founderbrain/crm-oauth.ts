@@ -178,14 +178,18 @@ export async function connectionStatus(
   return { connected: Boolean(row), locationId: row?.location_id ?? null };
 }
 
-/** Kept so a future push job can open the token. Not returned to the browser. */
+/** Kept so a future push job can open the token. Not returned to the browser.
+ *  Refreshes the access token through GoHighLevel when it is inside five
+ *  minutes of expiry (or past it), so a Connect made on Friday still works at
+ *  the clinic. A failed refresh is surfaced, never silently ignored. */
 export async function readConnection(
   store: PgBrainStore,
   workspace: string,
+  config?: Config,
 ): Promise<{ accessToken: string; refreshToken: string; locationId: string } | null> {
-  return store.scoped(workspace, async (tx) => {
+  const tokens = await store.scoped(workspace, async (tx) => {
     const rows = await tx`
-      select c.location_id, c.token_blob_sha, b.ciphertext, b.nonce, f.wrapped_key
+      select c.location_id, c.token_blob_sha, c.expires_at, b.ciphertext, b.nonce, f.wrapped_key
       from fb_crm_connection c
       join ge_blob b on b.founder_id = c.founder_id and b.sha = c.token_blob_sha
       join founder f on f.id = c.founder_id
@@ -195,6 +199,7 @@ export async function readConnection(
       | {
           location_id: string;
           token_blob_sha: string;
+          expires_at: string | null;
           ciphertext: Buffer;
           nonce: Buffer;
           wrapped_key: Buffer;
@@ -208,7 +213,44 @@ export async function readConnection(
       row.ciphertext,
       row.nonce,
     ).toString("utf8");
-    const tokens = JSON.parse(plain) as { accessToken: string; refreshToken: string };
-    return { ...tokens, locationId: row.location_id };
+    const parsed = JSON.parse(plain) as { accessToken: string; refreshToken: string };
+    return { ...parsed, locationId: row.location_id, expiresAt: row.expires_at ? Date.parse(row.expires_at) : 0 };
   });
+  if (!tokens) return null;
+  if (!config || !config.HIGHLEVEL_CLIENT_ID || !config.HIGHLEVEL_CLIENT_SECRET) return tokens;
+  const marginMs = 5 * 60 * 1000;
+  const expiresAt = "expiresAt" in tokens ? (tokens.expiresAt as number) : 0;
+  if (expiresAt - marginMs > Date.now()) {
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, locationId: tokens.locationId };
+  }
+  if (!tokens.refreshToken)
+    throw new DomainError(503, "crm_token_expired", "The GoHighLevel connection expired. Reconnect from the GoHighLevel chapter.");
+  const body = new URLSearchParams({
+    client_id: config.HIGHLEVEL_CLIENT_ID,
+    client_secret: config.HIGHLEVEL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: tokens.refreshToken,
+    user_type: "Location",
+  });
+  let json: { access_token?: string; refresh_token?: string; expires_in?: number; locationId?: string };
+  try {
+    const response = await fetch(TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+    if (!response.ok)
+      throw new DomainError(502, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
+    json = (await response.json()) as typeof json;
+  } catch (error) {
+    if (error instanceof DomainError) throw error;
+    throw new DomainError(502, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
+  }
+  const accessToken = json.access_token;
+  if (!accessToken)
+    throw new DomainError(502, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
+  const refreshed = {
+    accessToken,
+    refreshToken: json.refresh_token ?? tokens.refreshToken,
+    locationId: tokens.locationId,
+    expiresIn: json.expires_in ?? 86400,
+  };
+  await saveConnection(store, workspace, refreshed);
+  return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, locationId: refreshed.locationId };
 }

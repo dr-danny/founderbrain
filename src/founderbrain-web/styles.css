@@ -1943,3 +1943,27 @@ button:not(.link-button) {
   background: var(--paper);
   color: var(--ink);
 }
+
+/* Toasts on the full-screen mission typeform: fixed above the glass card. */
+.mission-toast {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(92vw, 42rem);
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background: rgba(18, 12, 20, 0.85);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.mission-toast.error {
+  border: 1px solid rgba(255, 120, 120, 0.5);
+}
+.mission-toast.notice {
+  border: 1px solid rgba(247, 239, 230, 0.25);
+}

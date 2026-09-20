@@ -21,11 +21,19 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     venture: "Venture",
     role: "Role",
     stage: "Stage",
+    track: "Track",
+    hybrid: "Genuinely both",
+    model: "Model",
     goal: "What needs to change?",
     approved: "Approved",
   },
   customer: {
     segment: "Customer segment",
+    buyer: "Who you actually sell to",
+    trigger: "What triggers them",
+    bestFit: "Three best-fit customers",
+    attention: "Where they spend attention",
+    adjacent: "Adjacent purchases",
     problem: "Problem",
     outcome: "Desired outcome",
     workaround: "Current workaround",
@@ -37,14 +45,29 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     description: "Offer",
     delivery: "Delivery",
     outcome: "Outcome",
-    cta: "Call to action",
+    why: "Why you, not the obvious alternative",
+    pricingModel: "Pricing model",
     price: "Price or pricing frame",
+    proof: "Proof",
+    cta: "Call to action",
     approved: "Approved",
   },
   voice: {
     tone: "Tone",
     boundaries: "Boundaries",
     sample: "Sample",
+    approved: "Approved",
+  },
+  context: {
+    channelsActive: "Channels you publish on today",
+    channelsDormant: "Dormant accounts",
+    emailProvider: "Work email provider",
+    domainStatus: "Sending domain status",
+    igAccountType: "Instagram account type",
+    customersNow: "Customers now",
+    avgMonthlyValue: "Average monthly value",
+    target90: "Target in 90 days",
+    sourceMaterial: "Source material",
     approved: "Approved",
   },
 };
@@ -74,7 +97,7 @@ export function diffBrains(left: Brain, right: Brain): BrainFieldDiff[] {
     changed: left.schemaVersion !== right.schemaVersion,
   });
 
-  for (const section of ["identity", "customer", "offer", "voice"] as const) {
+  for (const section of ["identity", "customer", "offer", "context", "voice"] as const) {
     const labels = FIELD_LABELS[section]!;
     const leftSection = left[section] as Record<string, unknown>;
     const rightSection = right[section] as Record<string, unknown>;

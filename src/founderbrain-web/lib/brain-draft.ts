@@ -11,7 +11,7 @@ export function patchBrain(
   field: string,
   value: string | boolean,
 ): Brain {
-  return {
+  const next = {
     ...current,
     [section]: {
       ...current[section],
@@ -19,6 +19,13 @@ export function patchBrain(
       approved: field === "approved" ? Boolean(value) : false,
     },
   } as Brain;
+  // Track fork: changing it reopens everything that forks on the track,
+  // exactly as the original intake re-asks audience and channels.
+  if (section === "identity" && field === "track") {
+    next.customer = { ...next.customer, approved: false };
+    next.context = { ...next.context, approved: false };
+  }
+  return next;
 }
 
 /**

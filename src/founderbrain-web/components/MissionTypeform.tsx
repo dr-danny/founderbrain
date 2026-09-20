@@ -212,9 +212,14 @@ export function MissionTypeform(props: {
   const track = draft.identity.track === "b2c" ? "b2c" : "b2b";
   const { screens, fields: fieldsByMission } = screensFor(track);
   const [idx, setIdx] = useState(() => screenIndexOf(props.mission, track));
+  // Reset only when the entry mission changes. A track flip re-forks later
+  // missions but must NOT teleport the walk back to the entry mission.
   useEffect(() => {
     setIdx(screenIndexOf(props.mission, track));
-  }, [props.mission, track]);
+  }, [props.mission]);
+  useEffect(() => {
+    setIdx((current) => Math.min(current, screens.length - 1));
+  }, [screens.length]);
 
   const total = screens.length;
   const current = screens[Math.min(Math.max(idx, 0), total - 1)]!;
@@ -265,7 +270,7 @@ export function MissionTypeform(props: {
     return (
       <TypeformShell
         kicker={`Mission ${index + 1} · ${active.title}`}
-        screen={idx + 1}
+        screen={Math.min(idx + 1, total)}
         total={total}
         title={sectionApproved ? `${active.title} is locked in. Keep it?` : `Lock in ${active.title.toLowerCase()}?`}
         hideContinue={!sectionApproved}
@@ -331,7 +336,7 @@ export function MissionTypeform(props: {
   return (
     <TypeformShell
       kicker={`Mission ${index + 1} · ${active.title}`}
-      screen={idx + 1}
+      screen={Math.min(idx + 1, total)}
       total={total}
       title={def.title}
       showBack

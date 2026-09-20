@@ -76,7 +76,8 @@ function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
   result.set("X-Content-Type-Options", "nosniff");
   result.set("X-Frame-Options", "DENY");
   result.set("Referrer-Policy", "no-referrer");
-  result.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  // Microphone stays allowed: voice dictation is a FounderBrain feature.
+  result.set("Permissions-Policy", "camera=(), geolocation=(), payment=()");
   result.set("Cross-Origin-Opener-Policy", "same-origin");
   result.set("Cross-Origin-Resource-Policy", "same-origin");
   result.set(
@@ -141,15 +142,21 @@ export function createFounderBrainWorker(
   return {
     async fetch(request: Request, env: FounderBrainEdgeEnv): Promise<Response> {
       const inbound = new URL(request.url);
-      if (isApi(inbound.pathname))
+      if (isApi(inbound.pathname)) {
+        // Voice transcription waits on Groq; the 10s default would cut it off.
+        const timeoutMs =
+          inbound.pathname === "/api/voice"
+            ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, 50_000)
+            : (options.timeoutMs ?? REQUEST_TIMEOUT_MS);
         return proxyApi(
           request,
           env,
           fetchImpl,
           inbound,
-          options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+          timeoutMs,
           options.allowInsecureApiOrigin === true,
         );
+      }
       return serveAsset(request, env);
     },
   };
