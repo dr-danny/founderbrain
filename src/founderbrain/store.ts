@@ -98,6 +98,10 @@ function requestHash(brain: Brain, expectedVersion: number): string {
 
 function safeDbError(error: unknown): never {
   if (error instanceof DomainError) throw error;
+  // Propagate the underlying cause into the log for triage; the founder still
+  // sees only the friendly message.
+  // eslint-disable-next-line no-console -- triage path: the cause must reach the CI log
+  if (error instanceof Error && error.message) console.error("[fb] storage cause:", error.message);
   throw fail(503, "storage_unavailable", "Storage is temporarily unavailable. Please try again.");
 }
 
