@@ -1,7 +1,5 @@
 ---
-description: Build or update your Founder Brain, the foundation for everything else
+description: Build or update your Founder Brain
 ---
 
-Use the founder-brain skill to build or update the founder's Founder Brain.
-
-If `./growth-engine/founder-brain.md` already exists, show a summary and ask whether to update or start again.
+Use the founder-brain skill. If `./growth-engine/founder-brain.md` already exists, summarise it in three lines and ask whether they want to update part of it or change their track. Never start a second Brain over the first.

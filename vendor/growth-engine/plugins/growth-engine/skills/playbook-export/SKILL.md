@@ -1,35 +1,51 @@
 ---
 name: playbook-export
-description: Generate the founder's personalised playbook insert, which is delivered as a PDF alongside the generic Growth Engine playbook body. Run it as session 3 homework. Trigger on "generate my playbook", "playbook insert", "print my playbook".
+description: Compile the founder's personalised playbook insert from their own files, four to six pages, delivered as a PDF alongside the generic Growth Engine playbook body. Made after Session 3, and again after the Sunday plan. Trigger on "generate my playbook", "playbook insert", "print my playbook", "make my playbook PDF".
 ---
 
 # Playbook Export
 
-Produces the four to six page personalised insert that prints with the generic playbook body.
+Produces the four to six page personalised insert that goes with the printed generic playbook.
+
+**Who is reading.** A founder who does not use a terminal. Never ask them to run a command.
 
 ## Prerequisites
 
-Read every file in `./growth-engine/`. If the folder is missing, check the parent folder and home directory before concluding the founder has done nothing.
+1. **Check the folder.** Read the session context. If it says this is not the founder folder, stop and tell them which folder to open.
+2. **Read every file in `./growth-engine/`,** except `people/`, `uploads/`, `.state/`, `outreach-firstlines.csv` and `dm-openers.md`. Those last ones hold real people's details, and none of them belongs in the insert.
+3. **If `founder-brain.md` does not exist,** there is nothing to compile yet. Say so plainly, and offer to build the Brain with them now. If they say yes, follow the `founder-brain` skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say "build my founder brain".
 
-If `founder-brain.md` does not exist, there is nothing to compile yet. Say so plainly, and offer to build the Brain with them now. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say "build my founder brain".
-
-This is a compilation task, not a generation task. Do not invent content that is not already in the founder's own files. If a section has no source file, leave it out and say so, rather than writing filler, and name the engine that would fill it.
+**This is a compilation task, not a generation task.** Do not invent content that is not already in the founder's own files. If a section has no source file, leave it out and say so, rather than writing filler, and name the engine that would fill it.
 
 ## Contents
 
 1. **Cover.** Founder name, business, track.
-2. **Your Brain.** Offer, audience, proof, voice, in one page.
-3. **Your content.** Pillars and the 30 pieces, titles and openers only, not full text.
-4. **Your engine 2.** B2B: the sequence. B2C: the hook bank and inbound scripts.
+2. **Your Brain.** Offer, audience, proof and voice, in one page.
+3. **Your content.** The pillars, and the first line of each of the 30 pieces, not the full text.
+4. **Your engine 2.**
+   - B2B: the sequence.
+   - B2C: the hook bank and inbound scripts.
+   - Never include the people list or anyone's details.
 5. **Your ops.** Bottleneck, snapshot, the pack to publish first, and its message copy.
-6. **Your 90 days.** The plan, the number, Monday's three actions, kill criteria.
+6. **Your 90 days.** The plan, the number, Monday's three actions, kill criteria. The plan is built in Atlanta on the Sunday, so at Session 3 this section is left out. Say so, and offer to compile the insert again after the Sunday.
 
 ## Output
 
-Write `./growth-engine/playbook-insert.md`, formatted for print. Clean headings, no clutter, generous white space, page breaks between sections.
+Write `./growth-engine/playbook-insert.md`, formatted for print:
+- clean headings, no clutter, generous white space
+- a page break between sections, as a line holding only `<div style="page-break-after: always"></div>`
 
-## Delivery
+**Limits.** Six pages maximum. Format it so it converts cleanly to PDF: no wide tables, and no colour dependence.
 
-The generic playbook body prints in two variants, B2B and B2C, and goes to the printer in early September. **The personalised insert is delivered as a PDF, not printed.** Founders receive it digitally before Atlanta and can print it themselves if they want a hard copy.
+## Check and save
 
-Keep the insert to six pages maximum. Format it so it converts cleanly to PDF: no wide tables, no colour dependence, page breaks between sections.
+1. **Check.** Use the `rules-reviewer` agent on `playbook-insert.md`. It should find nothing new, because it only compiles. Anything it holds came from a source file, so fix it there, then compile again.
+2. **Save.** Run `git add growth-engine` then `git commit -m "Playbook insert"`. Push if there is a remote.
+
+## The PDF
+
+**The personalised insert is delivered as a PDF, not printed.** The generic playbook body is printed in two variants, B2B and B2C. Founders receive the insert digitally before Atlanta, and can print it themselves if they want a hard copy.
+
+To make the PDF:
+- **If a PDF skill or tool is available to you,** make `growth-engine/playbook-insert.pdf` from the markdown, and tell them where it is.
+- **Otherwise,** tell them to open `playbook-insert.md` in any Markdown viewer, and use Print, then Save as PDF.

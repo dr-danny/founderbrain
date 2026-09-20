@@ -1,53 +1,89 @@
 ---
 name: status
-description: Show the founder where they are up to in the Launchhouse programme, which gates are met, and what is outstanding. Trigger on "where am I up to", "what have I done", "launchhouse status", "am I ready", "what's left", "check my progress", or at the start of any session.
+description: Show the founder where they are up to in the Launchhouse programme, which gate items are met, what is outstanding, and the one thing to do next. Trigger on "where am I up to", "what have I done", "launchhouse status", "am I ready", "what's left", "check my progress", or at the start of a working session.
 ---
 
 # Status
 
-Tells the founder exactly where they stand and what is outstanding.
+Tells the founder exactly where they stand and what to do next.
 
-## Check the folder
+**Who is reading.** A founder who does not use a terminal. Never ask them to run a command.
 
-Look for `./growth-engine/`. If it is not in the current folder, check the parent folder and the home directory before concluding it does not exist.
+## 1. Read the folder
 
-If you cannot find it, ask the founder where they built it. Do not assume they have done nothing. Scattered work is far more common than no work.
+1. **Check the folder.** Read the session context. If it says this is not the founder folder, stop and tell them which folder to open.
+2. **Get the gates table.** Use the `status-checker` agent to read `growth-engine/` against `../../references/gates.md`. It returns a table of every gate item for this founder's track: done, nearly empty, not done, needs asking, or not due yet, with the evidence for each.
+3. **Read these yourself:**
+   - the Brain's header and Flags
+   - `growth-engine/.state/setup.md`
+   - `growth-engine/.state/gate-answers.md`
 
-## Report
+## 2. Report
 
-Read whatever exists and report against this checklist. Show track first, because the checklist branches.
+**Track first**, because everything branches on it. Then, as a short checklist:
 
-| File | What it has to contain | Session |
-|---|---|---|
-| founder-brain.md | Brain locked, thesis written | 1 |
-| content-30.md and content-30.csv | 30 pieces generated and edited | 2 |
-| rss-feeds.md | Source list for the monthly refill | 2 |
-| outreach-sequence.md, outreach-firstlines.csv | B2B: sequence approved, list criteria defined, list built, first lines for the first 25 | 3 |
-| dm-openers.md, hook-bank.md, inbound-scripts.md | B2C: 25 openers, hook bank with offer tests, inbound scripts | 3 |
-| ops-workflow.md | Bottleneck named, snapshot chosen, copy written | 3 |
-| ghl-values.md | Every custom value the snapshot arrives without, written in their voice, starting with the pack ops-workflow.md names, and on B2C and Hybrid the two review emails. When it is missing, the next step is "fill my custom values" | After 3, before the clinic |
-| 90-day-plan.md | The number, Monday's three actions, kill criteria | Weekend |
-| playbook-insert.md | Brain, content, engine 2, ops and 90 day plan, gathered into one document | 3 |
+| Area | What it has to contain | Built | Checked |
+|---|---|---|---|
+| Founder Brain | Locked, track, thesis, voice | Session 1 | Gate A, end of Session 1 |
+| Content | 30 pieces, the sheet, the refill sources, 30 approved | After Session 1 | Gate B, Session 2 |
+| Engine 2, B2B | Route, sequence with opt-outs, criteria, 25 on the list, 25 first lines | After Session 2 | Gate C, Session 3 |
+| Engine 2, B2C | 25 targets, 25 openers, hook bank with offer tests, inbound scripts | After Session 2 | Gate C, Session 3 |
+| Operations | Bottleneck, the pack to publish first, its copy | After Session 2 | Gate C, Session 3, then loaded at the clinic on 23 September |
+| GoHighLevel values | Every value the snapshot arrives without, written in `ghl-values.md` | Before the clinic, usually the evening after Session 3 | Pasted in at the clinic, before anything is published |
+| Connections | GoHighLevel connected, plus Apollo and a mailbox for B2B | Session 2 | Before the clinic |
+| 90 day plan | The number, Monday's three actions, kill criteria | Atlanta, Sunday | |
+| Playbook insert | Brain, content, engine 2, ops and plan in one document | After Session 3 | |
 
-Every row says what the file has to contain, not when it is due. That is what
-lets you tell a founder whether a file counts, and it is the second column for
-that reason.
+Show only this founder's track. Never show the other track's row.
 
-Also check the Brain's Flags section and surface anything unresolved, particularly domain warmup status for B2B and Instagram account type for B2C.
+**For each row, say one of these:**
+- **Done**
+- **Nearly done**: say exactly what is missing, for example "22 of 30 approved"
+- **Not started**
 
-## A file you cannot account for
+**What counts as done**
+- File-backed items count only on what the file shows. Never mark something done because the founder says so.
+- Self-reported items show what `.state/gate-answers.md` records, or "not asked yet".
 
-The checklist above is the whole list. If the folder holds something that is not
-on it, say what you can see and move on.
+**The 90 day plan** is built in Atlanta on the Sunday. Before then its absence is expected. Do not count it against them.
 
-Never ask the founder to explain what one of their own files is for, and never
-offer them a list of things it might have been. They opened this to be told
-where they stand. A file this skill cannot name is this skill's gap, not their
-homework, and guessing at it in front of them turns a status check into a
-question they cannot answer.
+**B2C sends.** The 25 DMs go out by hand in Atlanta, on Saturday 26 September. Before then they are not due: never list them as missing. From that day, report how many people are at `sent` or later.
 
-## Be direct
+## 3. Flags and time-critical items
 
-Say what is missing and what to run next. One clear next action, not a list of six.
+Check the Brain's Flags section and surface anything unresolved. These two items quietly break the weekend, so raise them even if the founder asked about something else:
+- **B2B:** the sending domain, and whether SPF, DKIM and DMARC are set.
+- **B2C:** whether Instagram is Business or Creator and linked to a Facebook Page.
+
+## 4. Self-reported items, only when it matters
+
+When the founder asks "am I ready", or a gate is being checked this week, ask each self-reported item that is not yet answered. Ask one question at a time.
+
+Record each answer as a new dated line in `growth-engine/.state/gate-answers.md`, in the shape in `../../references/contract.md`. Then save it: `git add growth-engine` and `git commit -m "Gate answers"`.
+
+Otherwise, do not pester them with questions they did not ask for.
+
+## 5. A file you cannot account for
+
+The checklist is the whole list. If the folder holds something that is not on it, say what you can see and move on.
+
+Never ask the founder to explain what one of their own files is for, and never offer them a list of things it might have been. They opened this to be told where they stand. A file this skill cannot name is this skill's gap, not theirs to explain.
+
+## 6. One next action
+
+Say what is missing and what to do next. Give one clear next action, not a list of six, with the words or command that starts it:
+
+| What is missing | Next action |
+|---|---|
+| No Brain | `/growth-engine:brain` |
+| Brain has no Thesis, Voice or Locked date | `/growth-engine:brain`, update mode, to add what is missing |
+| No content | `/growth-engine:content` |
+| Content not approved | read and approve pieces, "approve 1 to 10" |
+| No engine 2 | `/growth-engine:engine2` |
+| No operations workflow | `/growth-engine:ops` |
+| Operations workflow built, no GoHighLevel values | `/growth-engine:values` |
+| Nothing connected | `/growth-engine:connect` |
+| Approved pieces not published | `/growth-engine:publish` |
+| B2B Apollo route, sequence not built | `/growth-engine:sequence` |
 
 If they are behind, say so plainly and tell them which single thing to do first. Do not soften it. The gates exist so nobody arrives in Atlanta unable to build.

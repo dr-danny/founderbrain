@@ -1,5 +1,5 @@
 ---
-description: Build your 90-day growth plan (Sunday in Atlanta)
+description: Build your 90 day plan
 ---
 
 Use the growth-plan skill.

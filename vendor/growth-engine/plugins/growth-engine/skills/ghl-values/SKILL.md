@@ -21,13 +21,13 @@ If the snapshot is already loaded, nothing changes except that the pasting can f
 
 ## Prerequisites
 
-1. **Find the folder.** Everything the engines wrote lives in `./growth-engine/`. If it is not in the folder Claude was opened in, check the folder above and the home folder before concluding it is missing. Founders open Claude in different folders, and this is the most common problem there is.
+1. **Check the folder.** Read the session context. If it says this is not the founder folder, stop and tell them which folder to open.
 2. **Read the Brain.** Read `./growth-engine/founder-brain.md`.
-   - If it genuinely does not exist, say plainly that the words are written from the Founder Brain, and offer to build it with them now. If they say yes, follow the founder-brain skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say "build my founder brain".
+   - If it genuinely does not exist, do not leave them stuck. Say in one plain sentence that this engine writes from their Founder Brain, about an hour of their own answers that every engine reads, and offer to build it with them now. If they say yes, follow the `founder-brain` skill, then come back here. If not now, give them the one next step for when they are ready: `/growth-engine:brain`, or say "build my founder brain".
    - Do not ask them to describe their business again from scratch, and do not guess at their offer, audience or voice.
 3. **Read `./growth-engine/ops-workflow.md`.** It names the pack to publish first and holds the copy already written for it. Reuse that copy rather than writing a second version of the same email. A file made in the app calls that pack a snapshot, using one of six names: Lead follow-up, Discovery booking, Proposal chase, Comment-to-DM capture, DM qualify and book, or Review request. Comment-to-DM capture is the Comment to DM pack. Read the name as the pack to publish first. The file is not out of date, and nothing in it needs redoing. Their snapshot still comes from the Brain.
    - If it does not exist, offer the operations engine first: it finds their bottleneck and writes copy this step reuses (`/growth-engine:ops`, or "build my ops engine"). If they would rather carry on now, ask which pack in their snapshot answers the job they most want off their plate, from the lists in `references/values.md`, write Essentials and that pack first, fresh from the Brain, and suggest the operations engine afterwards.
-4. **When something is missing or thin.** If something this step needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
+4. **When something is missing or thin.** If something this step needs is missing or thin, do not guess and do not stop. Ask for it, one question at a time, and say in a few words why you are asking. Make it easy to answer: a sentence in their own words, a pick from two or three options you suggest, something they already wrote pasted in, a file added with `/growth-engine:add-files`, or "not sure yet", which you note as a gap and work around. Never suggest a number, a result or a customer: those only ever come from them. If what they tell you belongs in the Brain, say so, and that "update my brain" puts it there.
 5. **Check for existing values.** If `ghl-values.md` already exists, ask whether they want to change the words or start again, and go straight there.
 
 ## Step 1: name their lists
@@ -46,7 +46,12 @@ Their track and hybrid flag decide their snapshot, and the snapshot decides the 
 
 In each `Essentials` list, 9 of the 11 must be filled before anything is published: the two client or customer welcome values are only needed if they switch that pair of workflows on. On Hybrid that pair is the customer welcome values, never the client ones.
 
-`Review request` has no custom values. Its two emails go into review templates instead, at `Reputation`, then the `Settings` tab, then the email request settings, then `Set Email Templates`: `Review Ask Email` in the `Live` slot and `Review Reminder Email` in the `Retry` slot. Write both anyway, in `ghl-values.md`, under a `## Review request templates` heading. `Review Ask Email` gets a subject and 2 to 4 short sentences that name the kind of work they do. `Review Reminder Email` gets a subject and 1 or 2 sentences, shorter than the ask, that can say it is the only reminder. Take them from `ops-workflow.md` when it has them, and write them fresh from the Brain when it does not. Neither holds a bracket, a merge field, a star rating or a reward, and neither tells the customer what to write. Leave out the business name and postal address, because the template has its own lines for them. Tell them these are pasted over the PLACEHOLDER words in those two templates at the clinic, keeping the `Review Link` element below their words and typing their business name and postal address over the template's last two PLACEHOLDER lines, and not into custom values, or they will hunt for values that do not exist. They are always pasted, by hand, whether or not `Review request` is published, because a review request sent by hand uses the same templates and would otherwise send the word PLACEHOLDER. Only if they are publishing `Review request` do they also open `Review Link` on the same tab, choose `Custom Link`, and paste their own review link over the example one.
+`Review request` has no custom values. Its two emails go into review templates instead, at `Reputation`, then the `Settings` tab, then the email request settings, then `Set Email Templates`: `Review Ask Email` in the `Live` slot and `Review Reminder Email` in the `Retry` slot. Still write both, on B2C and Hybrid, because no other step does unless `ops-workflow.md` names Review request.
+- **Where.** In `ghl-values.md`, under a `## Review request templates` heading. Take them from `ops-workflow.md` when it has them, and write them fresh from the Brain when it does not.
+- **Review Ask Email.** A subject of a few plain words, and 2 to 4 short sentences that thank them, name the kind of work the founder does rather than one customer's own job, and ask for an honest review at the link below.
+- **Review Reminder Email.** A subject, and 1 or 2 sentences, shorter than the ask, saying it is the only reminder.
+- **Neither holds** a name, number, result or customer the Brain does not record, a bracket, a merge field, a star rating or a reward, and neither tells the customer what to write. Leave out the business name and postal address, because the template has its own lines for them.
+- **Say where they go.** At the clinic they are always pasted over the PLACEHOLDER words in those two templates, keeping the `Review Link` element below their words, whether or not `Review request` is published. They never go into custom values. Say so, or they will hunt for values that do not exist.
 
 Confirm in one line before writing: "Your Brain says B2C, so you have the B2C snapshot: Essentials plus Comment to DM, DM qualify and book and Review request. That is 28 values and the two review emails. Right?"
 
@@ -112,11 +117,13 @@ Then two short sections:
 - **The contact fields**, which are not copy and are never pasted. `Enquiry message` holds what the person typed on the form. `Personal line` holds a sentence or two written for one person, which the founder or Claude fills later on that contact. `Work done` arrives with `Review request` only, and the founder types it once a job is finished.
 - **What was left out**, if anything, and why.
 
-## Step 6: read it back to them
+## Step 6: check and save
 
-Before anything goes into their account, show them the list and read two or three of the messages out. They are the only person who knows whether it sounds like them.
+First add one line to the Decisions block of `growth-engine/memory.md`: `- YYYY-MM-DD ghl values: <count> written for <snapshot>`.
 
-Check it yourself first, against the Brain: no number, result, customer count or testimonial the Brain does not record, no greeting inside a body, nothing in square or curly brackets, and nothing from the other track.
+1. **Check.** Use the `rules-reviewer` agent on `ghl-values.md`. Give it every figure the founder gave in this conversation.
+2. **Fix what it holds.** Ask about any held figure rather than guessing. Do this at most twice.
+3. **Save.** Run `git add growth-engine` then `git commit -m "GoHighLevel values: <snapshot>"`. Push if there is a remote. If the push fails, say it is saved on this computer.
 
 ## Step 7: put them into GoHighLevel
 
@@ -124,20 +131,27 @@ Check it yourself first, against the Brain: no number, result, customer count or
 
 **First, everything back to draft.** Straight after the load, they go to `Automation`, then `Workflows`, select the published ones and set them to draft under `Bulk Actions`, page by page, so nothing fires while they paste.
 
-**By hand, which is the normal way.** In their sub-account, open `Settings`, then `Custom Values`. Every name is already there, waiting, because the snapshot brought it. They open each one, paste the words from `ghl-values.md`, and save. Around fifteen minutes for the whole list. Read the names out one at a time if that helps, and keep their place. On B2C and Hybrid, the two review emails then go into their templates, as Step 1 says.
+**By hand, which is the normal way.** In their sub-account, open `Settings`, then `Custom Values`. Every name is already there, waiting, because the snapshot brought it. They open each one, paste the words from `ghl-values.md`, and save. Around fifteen minutes for the whole list. Read the names out one at a time if that helps, and keep their place.
 
 **Change the words only, never the name.** GoHighLevel builds the key from the name when the value is made. Rename one later and every step using it goes blank.
 
 **Over the API, only if they would rather.** By hand is the route to recommend. This one is for a founder who is comfortable with it, and it needs a Private Integration Token, which they make themselves, in their own sub-account, at `Settings`, then `Private Integrations`, ticking the custom values scopes and nothing else. Before they decide, say that the token is a password for their whole account and that it stops working 90 days after they make it. Offer it once, never insist, and never make it sound like the real way.
 
 If they choose it:
-- **How the token reaches you.** Ask them to put it in a plain text file outside their Launchhouse folder, their Documents folder is fine, and to tell you where it is. Check the path really is outside that folder before using it. The command reads that file itself, so you write the path and never the token, building the header as `"Authorization: Bearer $(cat <path>)"`. Never open or print that file yourself, because anything you read lands in this conversation. Never ask them to type or paste the token into the chat, and never repeat it back.
+- **How the token reaches you.** Ask them to put it in a plain text file outside their Launchhouse folder, their Documents folder is fine, and to tell you where it is. Check the path really is outside that folder before using it: a save runs `git add -A`, so a token left inside would reach GitHub. The command reads that file itself, so you write the path and never the token, building the header as `"Authorization: Bearer $(cat <path>)"`. Never open or print that file yourself, because anything you read lands in this conversation. Never ask them to type or paste the token into the chat, and never repeat it back.
 - **Never write it down and never print it.** Not in any file in their folder, not in `ghl-values.md`, `memory.md` or `ops-log.md`, not in a command you write out, and not in anything that reaches GitHub.
 - **Read what is in the account first, then ask.** Their sub-account id is in the address bar after `/location/`. Show the whole list before anything is written: every value you are about to create, every one you are about to change, what each of those holds now, and which of them already hold words they did not write. Wait for a yes. That one yes covers every create and change on the list you showed, and nothing else.
 - **Only their own snapshot's lists.** Never touch a value that is not on them, never delete one, and never write to a contact, a workflow, a tag or anything else in their account.
 - Create the ones that are missing and update the ones that are there. Creating a name twice fails rather than replacing it.
 - The endpoint is `https://services.leadconnectorhq.com/locations/<id>/customValues`, with a `Version: 2021-07-28` header.
 - **Delete the token with them before you close the job, whether it worked or not.** If they stop part way, a write fails, or they change their mind after making it, delete it then. Send them to `Settings`, then `Private Integrations`, and wait until they say it is gone. Then delete the file they put it in, and say so.
+
+**Then, on B2C and Hybrid, the two review emails, every time.** They go in whether or not `Review request` is published, because a review request sent by hand uses the same templates and would otherwise send the word PLACEHOLDER. This part is always done by hand, even when the values went in over the API.
+- Open `Reputation`, then the `Settings` tab, then the email request settings, then `Set Email Templates`.
+- Paste `Review Ask Email` over the PLACEHOLDER words in the `Live` slot, and `Review Reminder Email` over the PLACEHOLDER words in the `Retry` slot. The subject and body of each come from `## Review request templates` in `ghl-values.md`.
+- Keep the `Review Link` element below their words. It is what carries the link.
+- Type their business name and postal address over the last two PLACEHOLDER lines in each template. The words in `ghl-values.md` leave them out on purpose.
+- Only if they are publishing `Review request` do they also go to `Review Link` on the same tab, choose `Custom Link`, and paste their own review link over the example one.
 
 ## Step 8: prove it landed
 

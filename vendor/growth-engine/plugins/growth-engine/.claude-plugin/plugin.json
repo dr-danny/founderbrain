@@ -1,19 +1,10 @@
 {
   "name": "growth-engine",
-  "description": "The Oneday Launchhouse AI Growth Engine. Builds your Founder Brain, then your content engine, your outreach engine (B2B) or audience engine (B2C), your operations workflows, and your 90-day plan.",
-  "version": "0.2.0",
+  "version": "0.9.6",
+  "description": "The Launchhouse growth engine. Builds your Founder Brain and the files every later engine reads, in your own growth-engine folder, holds back anything that offers cold DM automation or promises replies, and has every figure checked before the work is called done.",
   "author": {
-    "name": "Philip Mudhir"
+    "name": "Oneday Launchhouse"
   },
-  "homepage": "https://launchhouse-oneday.replit.app/",
-  "repository": "https://github.com/Philm-moxywolf/Atlanta",
-  "license": "SEE LICENSE IN LICENSE",
-  "keywords": [
-    "growth",
-    "content",
-    "outreach",
-    "operations",
-    "b2b",
-    "b2c"
-  ]
+  "repository": "https://github.com/Philm-moxywolf/launchhouse-v3",
+  "license": "SEE LICENSE"
 }

@@ -1,5 +1,5 @@
 ---
-description: Generate your personalised playbook insert
+description: Compile your personalised playbook insert
 ---
 
 Use the playbook-export skill.
