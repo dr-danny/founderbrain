@@ -309,6 +309,8 @@ export function App() {
             <AtlantaReady
               state={state}
               orientation={orientation}
+              drafts={app.routineDrafts}
+              onDraftStatus={(id, status) => void app.setDraftStatus(id, status)}
               onContent={() => setView("content")}
               onOutreach={() => setView("outreach")}
               onGhl={() => setView("ghl")}

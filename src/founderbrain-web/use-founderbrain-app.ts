@@ -15,6 +15,8 @@ import {
   type HistoryItem,
   type Job,
   type MissionSection,
+  type RoutineDraft,
+  type RoutineSettings,
 } from "./types";
 import {
   PENDING_JOB_STORAGE_KEY,
@@ -64,6 +66,9 @@ export function useFounderBrainApp() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
+  const [routineSettings, setRoutineSettings] = useState<RoutineSettings | null>(null);
+  const routineLoaded = useRef(false);
   const [comparison, setComparison] = useState<BrainState | null>(null);
   const [conflict, setConflict] = useState<BrainState | null>(null);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
@@ -175,6 +180,7 @@ export function useFounderBrainApp() {
   }, [api, config, demoEntered]);
   useEffect(() => {
     if (api && email) void loadWorkspace();
+    if (api && email && config?.routinesEnabled) void loadRoutines();
   }, [api, email]);
   useEffect(() => {
     if (!conflict) return undefined;
@@ -291,6 +297,34 @@ export function useFounderBrainApp() {
       setConnecting(false);
       setError(friendlyError(err));
     }
+  }
+
+  async function loadRoutines() {
+    if (!api || routineLoaded.current) return;
+    routineLoaded.current = true;
+    try {
+      const result = await api.routines();
+      setRoutineDrafts(result.drafts);
+      setRoutineSettings(result.settings);
+      // First visit since routines shipped: register the browser timezone so
+      // the sweep can run in the founder's own wall clock.
+      if (!result.settings.timezone) {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) {
+          const saved = await api.saveRoutineSettings({ timezone: tz });
+          setRoutineSettings(saved);
+        }
+      }
+    } catch {
+      // Routines are an enhancement; never block the workspace on them.
+    }
+  }
+
+  async function setDraftStatus(id: string, status: "read" | "dismissed") {
+    if (!api) return;
+    if (status === "dismissed") setRoutineDrafts((rows) => rows.filter((r) => r.id !== id));
+    else setRoutineDrafts((rows) => rows.map((r) => (r.id === id ? { ...r, status } : r)));
+    await api.setRoutineDraftStatus(id, status);
   }
 
   async function importSite(url: string) {
@@ -802,6 +836,8 @@ export function useFounderBrainApp() {
     voiceSamples,
     addVoiceSample,
     deleteVoiceSample,
+    routineDrafts,
+    setDraftStatus,
     ghlPush,
     connecting,
     startConnect,

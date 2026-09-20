@@ -3,7 +3,13 @@
  * Progress is FounderBrain readiness + chapter completion — not an external form.
  */
 import { atlantaReadyMap, type OrientationState } from "../../founderbrain-shared/orientation";
-import type { BrainState } from "../types";
+import type { BrainState, RoutineDraft } from "../types";
+
+const draftKindCopy: Record<RoutineDraft["kind"], string> = {
+  monday_plan: "Weekly plan",
+  content_top_up: "Content refill",
+  readiness: "Readiness",
+};
 
 const dayCopy = {
   friday: {
@@ -23,6 +29,8 @@ const dayCopy = {
 export function AtlantaReady({
   state,
   orientation,
+  drafts,
+  onDraftStatus,
   onContent,
   onOutreach,
   onGhl,
@@ -30,6 +38,8 @@ export function AtlantaReady({
 }: {
   state: BrainState;
   orientation: OrientationState;
+  drafts: RoutineDraft[];
+  onDraftStatus: (id: string, status: "read" | "dismissed") => void;
   onContent: () => void;
   onOutreach: () => void;
   onGhl: () => void;
@@ -74,6 +84,41 @@ export function AtlantaReady({
           </ul>
         </section>
       ))}
+
+      {drafts.length > 0 ? (
+        <section className="atlanta-day atlanta-drafts">
+          <h2>This week</h2>
+          <p>Drafts your routine wrote. Read each before anything goes anywhere. Nothing here is published.</p>
+          <ul className="routine-drafts">
+            {drafts.map((draft) => (
+              <li key={draft.id} className="routine-draft">
+                <details
+                  onToggle={(event) => {
+                    if ((event.currentTarget as HTMLDetailsElement).open && draft.status === "pending")
+                      onDraftStatus(draft.id, "read");
+                  }}
+                >
+                  <summary>
+                    <b>{draft.title}</b>
+                    <span className="routine-kind">
+                      {draftKindCopy[draft.kind]} &middot;{" "}
+                      {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+                        new Date(draft.createdAt),
+                      )}
+                    </span>
+                  </summary>
+                  <pre className="routine-body">{draft.body}</pre>
+                  <div className="routine-actions">
+                    <button type="button" className="mission-save" onClick={() => onDraftStatus(draft.id, "dismissed")}>
+                      Dismiss
+                    </button>
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="home-actions">
         <button className="button primary" type="button" onClick={onMissions}>

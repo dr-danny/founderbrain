@@ -27,6 +27,7 @@ import {
   mutationKey,
 } from "./rate-limit.ts";
 import { ensureOpenRouterKey, revokeOpenRouterKey } from "./openrouter-keys.ts";
+import { getRoutineSettings, listRoutineDrafts, setRoutineDraftStatus, updateRoutineSettings } from "./routines.ts";
 import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { usageResponse, usageTotals } from "./usage.ts";
 import { readOrientation, writeOrientation } from "./orientation.ts";
@@ -240,6 +241,7 @@ export async function buildApi(
       aiEnabled: config.AI_ENABLED === "true",
       crmConnectEnabled: crmOAuthConfigured(config),
       siteImportEnabled: Boolean(config.FIRECRAWL_API_KEY),
+      routinesEnabled: config.ROUTINES_ENABLED === "true",
     };
   });
   app.get("/api/oauth/status", async (req) => connectionStatus(store, context(req).workspace));
@@ -304,6 +306,36 @@ export async function buildApi(
   app.delete("/api/voice-samples/:id", async (req) => {
     const query = parse(z.object({ id: z.string().min(36).max(36) }).strict(), req.query);
     return deleteVoiceSample(store, context(req).workspace, query.id);
+  });
+  app.get("/api/routines", async (req) => {
+    const workspace = context(req).workspace;
+    const [settings, drafts] = await Promise.all([
+      getRoutineSettings(store, workspace),
+      listRoutineDrafts(store, workspace),
+    ]);
+    return { settings, drafts };
+  });
+  app.post("/api/routines/settings", async (req) => {
+    const body = parse(
+      z
+        .object({
+          timezone: z.string().max(64).optional(),
+          mondayPlan: z.boolean().optional(),
+          contentTopUp: z.boolean().optional(),
+          readinessDigest: z.boolean().optional(),
+        })
+        .strict(),
+      req.body ?? {},
+    );
+    return updateRoutineSettings(store, context(req).workspace, body);
+  });
+  app.post("/api/routines/drafts/status", async (req) => {
+    const body = parse(
+      z.object({ id: z.string().min(36).max(36), status: z.enum(["read", "dismissed"]) }).strict(),
+      req.body,
+    );
+    await setRoutineDraftStatus(store, context(req).workspace, body.id, body.status);
+    return { ok: true };
   });
   app.post("/api/ghl/push", { bodyLimit: 1024 * 1024 }, async (req) => {
     const body = parse(

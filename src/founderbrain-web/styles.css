@@ -1820,6 +1820,50 @@ button:not(.link-button) {
   opacity: 0.45;
 }
 
+
+/* Routine drafts on Atlanta: draft-only, read before anything goes anywhere. */
+.routine-drafts {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.routine-draft summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(247, 239, 230, 0.22);
+  border-radius: 10px;
+  background: rgba(247, 239, 230, 0.04);
+  list-style: none;
+}
+.routine-draft summary::-webkit-details-marker {
+  display: none;
+}
+.routine-draft summary:hover {
+  border-color: rgba(247, 239, 230, 0.5);
+}
+.routine-kind {
+  color: var(--paper-muted);
+  font-size: 0.8rem;
+}
+.routine-body {
+  white-space: pre-wrap;
+  font-family: var(--font-brand);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 0.7rem 0 0.5rem;
+  color: var(--paper);
+}
+.routine-actions {
+  display: flex;
+  gap: 0.6rem;
+}
 /* Neither-fits Model follow-up (template PR #7): nearest pick plus a note. */
 .mission-neither .mission-choices {
   margin-top: 1.2rem;

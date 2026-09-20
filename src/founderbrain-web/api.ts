@@ -6,6 +6,16 @@
  * cookies (`credentials: 'omit'`).
  */
 import type { Artifact, Brain, BrainState, Config, HistoryItem, Job, Me, UsageResponse } from "./types";
+
+export type RoutineDraftRow = {
+  id: string;
+  kind: "monday_plan" | "content_top_up" | "readiness";
+  periodKey: string;
+  title: string;
+  body: string;
+  status: "pending" | "read" | "dismissed";
+  createdAt: string;
+};
 import type { OrientationPatch, OrientationState } from "../founderbrain-shared/orientation";
 
 export class ApiError extends Error {
@@ -129,6 +139,23 @@ export class FounderBrainApi {
   }
   startOauth() {
     return this.request<{ url: string }>("/oauth/start");
+  }
+  routines() {
+    return this.request<{ settings: { timezone: string; mondayPlan: boolean; contentTopUp: boolean; readinessDigest: boolean }; drafts: RoutineDraftRow[] }>(
+      "/routines",
+    );
+  }
+  saveRoutineSettings(patch: { timezone?: string; mondayPlan?: boolean; contentTopUp?: boolean; readinessDigest?: boolean }) {
+    return this.request<{ timezone: string; mondayPlan: boolean; contentTopUp: boolean; readinessDigest: boolean }>(
+      "/routines/settings",
+      { method: "POST", body: JSON.stringify(patch) },
+    );
+  }
+  setRoutineDraftStatus(id: string, status: "read" | "dismissed") {
+    return this.request<{ ok: boolean }>("/routines/drafts/status", {
+      method: "POST",
+      body: JSON.stringify({ id, status }),
+    });
   }
   importSite(url: string) {
     return this.request<{

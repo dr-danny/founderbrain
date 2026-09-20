@@ -32,6 +32,8 @@ const envSchema = z.object({
     .optional(),
   FOUNDERBRAIN_LOCAL_DEMO: z.enum(["true", "false"]).default("false"),
   AI_ENABLED: z.enum(["true", "false"]).default("false"),
+  /** Worker-side scheduled routines (Monday plan, content top-up, readiness). Off by default. */
+  ROUTINES_ENABLED: z.enum(["true", "false"]).default("false"),
   /** Management key for per-user OpenRouter key create/revoke. Never an inference key. */
   OPENROUTER_MANAGEMENT_KEY: z.string().min(16).optional(),
   /**

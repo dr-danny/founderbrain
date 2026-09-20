@@ -152,6 +152,7 @@ before(async () => {
     HEXCLAVE_API_URL: "https://api.hexclave.com",
     FOUNDERBRAIN_LOCAL_DEMO: "false",
     AI_ENABLED: "true",
+  ROUTINES_ENABLED: "false",
     OPENROUTER_MANAGEMENT_KEY: "fixture-management-key-not-live",
     AI_MODEL: "anthropic/claude-sonnet-4",
     AI_MODEL_RUNNER: "anthropic/claude-sonnet-4",

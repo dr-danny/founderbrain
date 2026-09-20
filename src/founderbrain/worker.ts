@@ -10,6 +10,7 @@
 import { loadConfig } from "./config.ts";
 import { PgBrainStore } from "./store.ts";
 import { BrainJobs } from "./jobs.ts";
+import { sweepOnce } from "./routines.ts";
 import { createFounderBrainLogger, logJobEvent } from "./logging.ts";
 
 const config = loadConfig();
@@ -35,9 +36,21 @@ for (const s of ["SIGTERM", "SIGINT"]) {
   });
 }
 log.info("FounderBrain worker started. No automatic retries of ambiguous paid calls.");
+const routinesEnabled = config.ROUTINES_ENABLED === "true";
+let lastSweep = 0;
 while (!stopped) {
   try {
     const worked = await jobs.tick();
+    if (routinesEnabled && Date.now() - lastSweep > 60_000) {
+      lastSweep = Date.now();
+      try {
+        const result = await sweepOnce(store, config);
+        if (result.generated > 0)
+          log.info({ generated: result.generated, scanned: result.scanned }, "Routine drafts generated.");
+      } catch {
+        log.error({ errorClass: "routine_sweep_failed" }, "Routine sweep failed; details withheld.");
+      }
+    }
     if (!worked) await new Promise((r) => setTimeout(r, 2000));
   } catch {
     // Never log the thrown value: it may wrap private Brain context.

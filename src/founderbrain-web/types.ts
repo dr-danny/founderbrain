@@ -37,7 +37,25 @@ export interface Config {
   aiEnabled: boolean;
   crmConnectEnabled?: boolean;
   siteImportEnabled?: boolean;
+  routinesEnabled?: boolean;
 }
+export interface RoutineDraft {
+  id: string;
+  kind: "monday_plan" | "content_top_up" | "readiness";
+  periodKey: string;
+  title: string;
+  body: string;
+  status: "pending" | "read" | "dismissed";
+  createdAt: string;
+}
+
+export interface RoutineSettings {
+  timezone: string;
+  mondayPlan: boolean;
+  contentTopUp: boolean;
+  readinessDigest: boolean;
+}
+
 export interface Me {
   email: string;
 }
