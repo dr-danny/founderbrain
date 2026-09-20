@@ -41,6 +41,8 @@ import {
 } from "./crm-oauth.ts";
 import { importSite } from "./site-import.ts";
 import { transcribeVoice } from "./voice.ts";
+import { addVoiceSample, deleteVoiceSample, listVoiceSamples, MIN_VOICE_SAMPLES } from "./voice-samples.ts";
+import { brainReadyForPush, defaultFirstPack, loadValueCatalog, pushGhlValues } from "./ghl-push.ts";
 
 const key = z
   .string()
@@ -288,6 +290,33 @@ export async function buildApi(
       seconds: body.seconds,
     });
   });
+  app.get("/api/voice-samples", async (req) => {
+    await loadValueCatalog();
+    return { samples: await listVoiceSamples(store, context(req).workspace), min: MIN_VOICE_SAMPLES };
+  });
+  app.post("/api/voice-samples", async (req) => {
+    const body = parse(
+      z.object({ name: z.string().min(2).max(120), text: z.string().min(40).max(20_000) }).strict(),
+      req.body,
+    );
+    return addVoiceSample(store, context(req).workspace, config, body);
+  });
+  app.delete("/api/voice-samples/:id", async (req) => {
+    const query = parse(z.object({ id: z.string().min(36).max(36) }).strict(), req.query);
+    return deleteVoiceSample(store, context(req).workspace, query.id);
+  });
+  app.post("/api/ghl/push", { bodyLimit: 1024 * 1024 }, async (req) => {
+    const body = parse(
+      z.object({ pack: z.string().max(40).optional() }).strict(),
+      req.body ?? {},
+    );
+    const state = await store.read(context(req).workspace);
+    if (!brainReadyForPush(state.brain))
+      throw new DomainError(422, "brain_incomplete", "Approve all five missions before pushing to GoHighLevel.");
+    const firstPack = body.pack ?? defaultFirstPack(state.brain);
+    await loadValueCatalog();
+    return pushGhlValues(config, store, context(req).workspace, state.brain, firstPack);
+  });
   app.post("/api/site-import", async (req) => {
     const body = parse(
       z.object({ url: z.string().url().max(300) }).strict(),
@@ -360,7 +389,14 @@ export async function buildApi(
     return reply
       .type("text/markdown; charset=utf-8")
       .header("Content-Disposition", 'attachment; filename="founder-brain.md"')
-      .send(exportMarkdown(state.brain, state.version, state.updatedAt));
+      .send(
+        exportMarkdown(
+          state.brain,
+          state.version,
+          state.updatedAt,
+          await store.firstCommittedAt(context(req).workspace),
+        ),
+      );
   });
   app.post("/api/jobs", async (req, reply) => {
     const body = parse(

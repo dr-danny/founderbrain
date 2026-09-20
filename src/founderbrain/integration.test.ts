@@ -79,6 +79,7 @@ const full = (): Brain => {
     track: "b2b",
     hybrid: false,
     model: "",
+    revenueBand: "",
     approved: true,
   };
   b.customer = {
@@ -110,6 +111,7 @@ const full = (): Brain => {
     tone: "Direct and warm",
     boundaries: "No invented claims",
     sample: "I would like to understand your day.",
+    sampleCount: 10,
     approved: true,
   };
   b.context = {

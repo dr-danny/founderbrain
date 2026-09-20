@@ -298,6 +298,22 @@ export function useFounderBrainApp() {
     return api.importSite(url);
   }
 
+  async function voiceSamples() {
+    if (!api) throw new Error("api_unavailable");
+    return api.voiceSamples();
+  }
+  async function addVoiceSample(name: string, text: string) {
+    if (!api) throw new Error("api_unavailable");
+    return api.addVoiceSample({ name, text });
+  }
+  async function deleteVoiceSample(id: string) {
+    if (!api) throw new Error("api_unavailable");
+    return api.deleteVoiceSample(id);
+  }
+  async function ghlPush(pack?: string) {
+    if (!api) throw new Error("api_unavailable");
+    return api.ghlPush(pack);
+  }
   async function transcribeVoice(blob: Blob, seconds: number) {
     if (!api) throw new Error("api_unavailable");
     const audioBase64 = await new Promise<string>((resolve, reject) => {
@@ -357,7 +373,7 @@ export function useFounderBrainApp() {
     await save(next);
   }
 
-  function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean) {
+  function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean | number) {
     if (saving) return;
     setDraft((current) => {
       const next = patchBrain(current, section, field, value);
@@ -783,6 +799,10 @@ export function useFounderBrainApp() {
     importSite,
     getUsage,
     transcribeVoice,
+    voiceSamples,
+    addVoiceSample,
+    deleteVoiceSample,
+    ghlPush,
     connecting,
     startConnect,
   };

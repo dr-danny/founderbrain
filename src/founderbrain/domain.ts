@@ -44,7 +44,12 @@ export function validateBrain(value: unknown): Brain {
   return sharedValidateBrain(value);
 }
 
-export function exportMarkdown(brain: Brain, version: number, updatedAt?: string | null): string {
+export function exportMarkdown(
+  brain: Brain,
+  version: number,
+  updatedAt?: string | null,
+  lockedAt?: string | null,
+): string {
   const line = (name: string, value: string) =>
     `${name}: ${value.replace(/\r\n?/g, "\n").replace(/\n/g, "\n  ") || "unknown"}`;
   const track = brain.identity.track;
@@ -95,7 +100,9 @@ export function exportMarkdown(brain: Brain, version: number, updatedAt?: string
     ...(track === "b2c" ? [line("Model", brain.identity.model || "unknown")] : []),
     line("Hybrid", brain.identity.hybrid ? "true" : "false"),
     line("Stage", brain.identity.stage),
-    line("Locked", updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : "unknown"),
+    line("Revenue band", brain.identity.revenueBand || "unknown"),
+    // v3: the Locked date is the day the Brain was first written; updates keep it.
+    line("Locked", lockedAt ? new Date(lockedAt).toISOString().slice(0, 10) : updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : "unknown"),
     "",
     "## Thesis",
     ...thesis,

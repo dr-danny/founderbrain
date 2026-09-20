@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { missions, missionCopy, type Mission } from "../mission-copy";
 import { sectionWouldApprove, type Artifact, type Brain, type Config, type MissionSection } from "../types";
 import { Output } from "./Output";
+import { VoiceSampleGate } from "./VoiceSampleGate";
 import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
 
@@ -32,6 +33,12 @@ const EVIDENCE_OPTIONS: ChoiceOption[] = [
   { value: "supported", label: "Supported" },
 ];
 
+const REVENUE_OPTIONS: ChoiceOption[] = [
+  { value: "pre", label: "Pre-revenue" },
+  { value: "under10k", label: "Under $10k a month" },
+  { value: "10to50k", label: "$10k to $50k" },
+  { value: "over50k", label: "Above $50k" },
+];
 const TRACK_OPTIONS: ChoiceOption[] = [
   { value: "b2b", label: "B2B" },
   { value: "b2c", label: "B2C" },
@@ -70,6 +77,7 @@ const MISSION_FIELDS: Record<Exclude<Mission, "output">, FieldDef[]> = {
     { field: "venture", title: "Venture", kind: "text", maxLength: 80, placeholder: "Venture name" },
     { field: "role", title: "Role", kind: "text", maxLength: 60, placeholder: "Founder, CTO, ..." },
     { field: "stage", title: "Stage", kind: "choice", maxLength: 20, placeholder: "", options: STAGE_OPTIONS },
+    { field: "revenueBand", title: "Revenue today?", kind: "choice", maxLength: 10, placeholder: "", options: REVENUE_OPTIONS },
     { field: "track", title: "B2B or B2C?", kind: "choice", maxLength: 4, placeholder: "", options: TRACK_OPTIONS },
     { field: "hybrid", title: "Do you genuinely serve both?", kind: "choice", maxLength: 5, placeholder: "", options: YESNO_OPTIONS },
     { field: "model", title: "Service or ecommerce?", kind: "choice", maxLength: 10, placeholder: "", options: MODEL_OPTIONS },
@@ -197,12 +205,15 @@ export function MissionTypeform(props: {
   jobNeedsReconcile: boolean;
   verified: boolean;
   canRetrySave: boolean;
-  onPatch: (section: Exclude<Mission, "output">, field: string, value: string | boolean) => void;
+  onPatch: (section: Exclude<Mission, "output">, field: string, value: string | boolean | number) => void;
   onSave: () => void;
   onRetrySave: () => void;
   onApprove: (section: MissionSection) => void;
   onFinished: () => void;
   onTranscribe?: (blob: Blob, seconds: number) => Promise<string>;
+  onVoiceSamples?: () => Promise<{ samples: Array<{ id: string; name: string; chars: number; createdAt: string }>; min: number }>;
+  onAddVoiceSample?: (name: string, text: string) => Promise<{ count: number }>;
+  onDeleteVoiceSample?: (id: string) => Promise<{ count: number }>;
   onText: (value: string) => void;
   onGenerate: () => void;
   onReconcile: () => void;
@@ -265,6 +276,34 @@ export function MissionTypeform(props: {
   const next = missions[index + 1];
   const sectionApproved = Boolean(draft[current.mission]?.approved);
   const canApprove = sectionWouldApprove(draft, current.mission as MissionSection);
+
+  if (current.kind === "confirm" && current.mission === "voice") {
+    return (
+      <VoiceSampleGate
+        shell={{
+          kicker: `Mission ${index + 1} · ${active.title}`,
+          screen: Math.min(idx + 1, total),
+          total,
+          sectionApproved,
+          canApprove,
+          title: sectionApproved ? `${active.title} is locked in. Keep it?` : `Lock in ${active.title.toLowerCase()}?`,
+          onBack: () => go(idx - 1),
+          onAdvance: () => go(idx + 1),
+          saving: props.saving,
+          onApprove: () => props.onApprove("voice"),
+          onSave: props.onSave,
+          canRetrySave: props.canRetrySave,
+          onRetrySave: props.onRetrySave,
+          changed: props.changed,
+          onCount: (n: number) => props.onPatch("voice", "sampleCount", n),
+        }}
+        listSamples={props.onVoiceSamples}
+        addSample={props.onAddVoiceSample}
+        deleteSample={props.onDeleteVoiceSample}
+        storedCount={draft.voice.sampleCount}
+      />
+    );
+  }
 
   if (current.kind === "confirm") {
     return (

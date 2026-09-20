@@ -390,9 +390,11 @@ export function GhlChapter({
   connecting = false,
   onConnect,
   loadUsage,
+  onGhlPush,
 }: ChapterProps & {
   connectEnabled?: boolean;
   connecting?: boolean;
+  onGhlPush?: () => Promise<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean }>;
   onConnect?: () => void | Promise<void>;
   loadUsage?: () => Promise<UsageResponse>;
 }) {
@@ -406,6 +408,10 @@ export function GhlChapter({
   const isChoice = Boolean(current.choices?.length);
   const isConnect = current.id === "ghl-connect";
   const connected = orientation.ghlAnswers.connected === true;
+  const [pushing, setPushing] = useState(false);
+  const [pushed, setPushed] = useState(false);
+  const [pushResult, setPushResult] = useState<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean } | null>(null);
+  const [pushError, setPushError] = useState("");
 
   async function persist(patch: OrientationPatch) {
     setLocalError("");
@@ -497,6 +503,42 @@ export function GhlChapter({
       ) : null}
       {isConnect && connected ? (
         <p className="entry-lede typeform-lede">Connected. You can leave this chapter.</p>
+      ) : null}
+      {isConnect && connected && !pushed ? (
+        <div className="mission-save-row">
+          <button
+            type="button"
+            className="typeform-external"
+            onClick={() => {
+              setPushing(true);
+              setPushError("");
+              void (onGhlPush?.() ?? Promise.reject(new Error("unavailable")))
+                .then((result) => {
+                  setPushResult(result);
+                  setPushed(true);
+                })
+                .catch((e: unknown) => {
+                  setPushing(false);
+                  setPushError(String(e instanceof Error ? e.message : e).slice(0, 200));
+                });
+            }}
+            disabled={pushing || saving}
+          >
+            {pushing ? "Writing your copy into GoHighLevel…" : "Fill my workflow copy"}
+          </button>
+        </div>
+      ) : null}
+      {pushResult ? (
+        <p className="entry-lede typeform-lede">
+          Snapshot {pushResult.snapshot} · first pack {pushResult.firstPack} · {pushResult.pushed.length} values written
+          {pushResult.skipped.length ? `, ${pushResult.skipped.length} already had your words` : ""} · verified in
+          GoHighLevel: {pushResult.proven ? "yes" : "unverified"}
+        </p>
+      ) : null}
+      {pushError ? (
+        <p className="entry-error" role="alert">
+          {pushError}
+        </p>
       ) : null}
       {current.choices ? (
         <div className="typeform-choices">

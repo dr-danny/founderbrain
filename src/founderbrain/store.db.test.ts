@@ -57,6 +57,7 @@ function filledBrain() {
     track: "b2b",
     hybrid: false,
     model: "",
+    revenueBand: "",
     approved: true,
   };
   return brain;

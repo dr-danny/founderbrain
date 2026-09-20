@@ -29,6 +29,7 @@ test("sectionWouldApprove matches shared readiness rules without requiring prior
     track: "b2b",
     hybrid: false,
     model: "",
+    revenueBand: "",
     approved: false,
   };
   assert.equal(sectionWouldApprove(brain, "identity"), true);
@@ -46,6 +47,7 @@ test("server readiness uses contentHash for accepted output", () => {
     track: "b2b",
     hybrid: false,
     model: "",
+    revenueBand: "",
     approved: true,
   };
   const hash = contentHash(brain);

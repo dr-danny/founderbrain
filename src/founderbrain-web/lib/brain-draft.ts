@@ -9,7 +9,7 @@ export function patchBrain(
   current: Brain,
   section: MissionSection,
   field: string,
-  value: string | boolean,
+  value: string | boolean | number,
 ): Brain {
   const next = {
     ...current,

@@ -140,6 +140,40 @@ export class FounderBrainApi {
       body: JSON.stringify({ url }),
     });
   }
+  voiceSamples() {
+    return this.request<{ samples: Array<{ id: string; name: string; chars: number; createdAt: string }>; min: number }>(
+      "/voice-samples",
+      {},
+      15_000,
+    );
+  }
+  addVoiceSample(input: { name: string; text: string }) {
+    return this.request<{ count: number }>(
+      "/voice-samples",
+      { method: "POST", body: JSON.stringify(input) },
+      20_000,
+    );
+  }
+  deleteVoiceSample(id: string) {
+    return this.request<{ count: number }>(
+      `/voice-samples/${id}`,
+      { method: "DELETE" },
+      15_000,
+    );
+  }
+  ghlPush(pack?: string) {
+    return this.request<{
+      snapshot: string;
+      firstPack: string;
+      pushed: string[];
+      skipped: string[];
+      proven: boolean;
+    }>(
+      "/ghl/push",
+      { method: "POST", body: JSON.stringify(pack ? { pack } : {}) },
+      60_000,
+    );
+  }
   transcribeVoice(audio: { audioBase64: string; mime: string; seconds: number }) {
     return this.request<{ text: string }>(
       "/voice",

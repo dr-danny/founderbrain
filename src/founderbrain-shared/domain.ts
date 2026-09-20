@@ -18,6 +18,8 @@ export const brainSchema = z
         venture: text,
         role: text,
         stage: z.enum(["exploring", "building", "launched", "growing"]),
+        // Revenue band from the original intake; asked alongside the product stage.
+        revenueBand: z.enum(["", "pre", "under10k", "10to50k", "over50k"]).default(""),
         goal: text,
         // Track fork from the original intake (Launchhouse founder-brain skill).
         track: z.enum(["b2b", "b2c"]).default("b2b"),
@@ -61,7 +63,16 @@ export const brainSchema = z
         ...section,
       })
       .strict(),
-    voice: z.object({ tone: text, boundaries: text, sample: text, ...section }).strict(),
+        voice: z
+      .object({
+        tone: text,
+        boundaries: text,
+        sample: text,
+        /** Founder-supplied voice samples on file; approval needs at least 10. */
+        sampleCount: z.number().int().min(0).max(50).default(0),
+        ...section,
+      })
+      .strict(),
     // Original intake groups 5 (channels) and the Numbers / Source material
     // sections of founder-brain.md.
     context: z
@@ -148,6 +159,7 @@ export function emptyBrain(): Brain {
       venture: "",
       role: "",
       stage: "exploring",
+      revenueBand: "",
       goal: "",
       track: "b2b",
       hybrid: false,
@@ -179,7 +191,7 @@ export function emptyBrain(): Brain {
       proof: "",
       approved: false,
     },
-    voice: { tone: "", boundaries: "", sample: "", approved: false },
+    voice: { tone: "", boundaries: "", sample: "", sampleCount: 0, approved: false },
     context: {
       channelsActive: "",
       channelsDormant: "",
@@ -237,7 +249,9 @@ export function readiness(
       brain.offer.approved &&
       present(brain.offer.description, brain.offer.delivery, brain.offer.outcome, brain.offer.cta),
     voice:
-      brain.voice.approved && present(brain.voice.tone, brain.voice.boundaries, brain.voice.sample),
+      brain.voice.approved &&
+      present(brain.voice.tone, brain.voice.boundaries, brain.voice.sample) &&
+      brain.voice.sampleCount >= 10,
     context:
       brain.context.approved &&
       present(brain.context.channelsActive, brain.context.customersNow, brain.context.target90),

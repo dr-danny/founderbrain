@@ -179,6 +179,7 @@ export function App() {
         connecting={app.connecting}
         onConnect={() => app.startConnect()}
         loadUsage={() => app.getUsage()}
+        onGhlPush={() => app.ghlPush()}
         onPatch={async (patch) => {
           await app.saveOrientation(patch);
         }}
@@ -244,6 +245,9 @@ export function App() {
           onTranscribe={(blob, seconds) =>
             app.transcribeVoice(blob, seconds).then((result) => result.text)
           }
+          onVoiceSamples={() => app.voiceSamples()}
+          onAddVoiceSample={(name, text) => app.addVoiceSample(name, text)}
+          onDeleteVoiceSample={(id) => app.deleteVoiceSample(id)}
           onText={app.setArtifactText}
           onGenerate={() => void app.generate()}
           onReconcile={() => void app.reconcileOutput()}

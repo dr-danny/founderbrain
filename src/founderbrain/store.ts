@@ -412,6 +412,25 @@ export class PgBrainStore {
     }
   }
 
+  /** The day the Brain was first written: the timestamp of revision 1. The
+   *  v3 contract keeps it on every update. */
+  async firstCommittedAt(workspaceId: string): Promise<string | null> {
+    await this.ready();
+    validOpaque(workspaceId, "workspace id", 64);
+    try {
+      return await this.sql.begin(async (tx) => {
+        await tx`select set_config('app.founder_id', ${workspaceId}, true)`;
+        const rows = await tx<{ at: string | null }[]>`
+          select min(v.at) as at from ge_file_version v
+          where v.founder_id = ${workspaceId} and v.path = ${BRAIN_PATH} and v.deleted = false
+        `;
+        return rows[0]?.at ? new Date(rows[0].at).toISOString() : null;
+      });
+    } catch (error) {
+      return safeDbError(error);
+    }
+  }
+
   async history(workspaceId: string): Promise<Array<{ version: number; sha: string; at: string }>> {
     await this.ready();
     validOpaque(workspaceId, "workspace id", 64);

@@ -144,10 +144,10 @@ export function createFounderBrainWorker(
       const inbound = new URL(request.url);
       if (isApi(inbound.pathname)) {
         // Voice transcription waits on Groq; the 10s default would cut it off.
-        const timeoutMs =
-          inbound.pathname === "/api/voice"
-            ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, 50_000)
-            : (options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+        const slowPaths = new Set(["/api/voice", "/api/ghl/push"]);
+        const timeoutMs = slowPaths.has(inbound.pathname)
+          ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, 50_000)
+          : (options.timeoutMs ?? REQUEST_TIMEOUT_MS);
         return proxyApi(
           request,
           env,
