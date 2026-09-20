@@ -112,6 +112,14 @@ const full = (): Brain => {
     sample: "I would like to understand your day.",
     approved: true,
   };
+  b.context = {
+    ...b.context,
+    channelsActive: "Referral email to partners",
+    customersNow: "12",
+    avgMonthlyValue: "400",
+    target90: "25 monthly orders",
+    approved: true,
+  };
   return b;
 };
 async function workspace(label: string) {
