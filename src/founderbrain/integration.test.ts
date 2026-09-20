@@ -391,9 +391,11 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       });
       assert.equal(deleted.statusCode, 200, deleted.body);
       assert.ok(deletedHashes.length > beforeDeletes, "OpenRouter key revoked on delete");
+      // Deletion wipes content but the identity revives into a fresh empty
+      // workspace on the next read, so the founder can start over.
       assert.equal(
         (await app.inject({ url: "/api/brain", headers: headers("output") })).statusCode,
-        410,
+        200,
       );
       assert.equal((await store.scoped(id, (tx) => tx`select * from ge_blob`)).length, 0);
     },

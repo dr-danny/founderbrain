@@ -141,10 +141,13 @@ describe(
       }
     });
 
-    it("tombstones the subject binding after deletion", { skip }, async () => {
+    it("revives a deleted workspace into a fresh empty one on re-provision", { skip }, async () => {
       assert.ok(store);
       await store.deleteWorkspace(subject, workspace);
-      await assert.rejects(store.ensureWorkspace(subject), { code: "workspace_deleted" });
+      const id2 = await store.ensureWorkspace(subject);
+      assert.notEqual(id2, workspace, "revival issues a fresh founder id");
+      const revived = await store.read(id2);
+      assert.equal(revived.version, 0, "revived workspace starts empty");
       workspace = "";
     });
   },
