@@ -1819,6 +1819,49 @@ button:not(.link-button) {
 .mission-save:disabled {
   opacity: 0.45;
 }
+
+/* Neither-fits Model follow-up (template PR #7): nearest pick plus a note. */
+.mission-neither .mission-choices {
+  margin-top: 1.2rem;
+}
+
+/* Offer-to-look-first (template references/sources.md): read the site before
+   the founder types from memory. */
+.mission-look-first {
+  margin-top: 1.2rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(247, 239, 230, 0.22);
+  border-radius: 12px;
+  background: rgba(247, 239, 230, 0.05);
+}
+.mission-look-first .typeform-lede {
+  margin: 0 0 0.9rem;
+}
+.mission-look-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: stretch;
+}
+.mission-look-url {
+  flex: 1 1 16rem;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(247, 239, 230, 0.4);
+  color: var(--paper);
+  font-family: var(--font-brand);
+  font-size: 1rem;
+  padding: 0.45rem 0.2rem;
+}
+.mission-look-url:focus {
+  outline: none;
+  border-bottom-color: rgba(247, 239, 230, 0.8);
+}
+.mission-look-row .typeform-choice {
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+}
 /* Output workspace inside the typeform panel keeps a readable width. */
 .typeform-stage .artifact,
 .typeform-stage .output-empty {

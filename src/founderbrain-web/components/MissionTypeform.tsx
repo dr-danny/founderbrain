@@ -46,6 +46,9 @@ const TRACK_OPTIONS: ChoiceOption[] = [
 const MODEL_OPTIONS: ChoiceOption[] = [
   { value: "service", label: "Service" },
   { value: "ecommerce", label: "Ecommerce" },
+  // Template PR #7: when neither fits, record the nearer one plus a flag,
+  // never a third value.
+  { value: "neither", label: "Neither - something else" },
 ];
 const YESNO_OPTIONS: ChoiceOption[] = [
   { value: "yes", label: "Yes" },
@@ -76,6 +79,7 @@ const MISSION_FIELDS: Record<Exclude<Mission, "output">, FieldDef[]> = {
     { field: "name", title: "Your name", kind: "text", maxLength: 40, placeholder: "Your first name" },
     { field: "venture", title: "Venture", kind: "text", maxLength: 80, placeholder: "Venture name" },
     { field: "role", title: "Role", kind: "text", maxLength: 60, placeholder: "Founder, CTO, ..." },
+    { field: "team", title: "Just you, or others too?", kind: "multi", maxLength: 400, placeholder: "If there are others, who runs which part of the selling" },
     { field: "stage", title: "Stage", kind: "choice", maxLength: 20, placeholder: "", options: STAGE_OPTIONS },
     { field: "revenueBand", title: "Revenue today?", kind: "choice", maxLength: 10, placeholder: "", options: REVENUE_OPTIONS },
     { field: "track", title: "B2B or B2C?", kind: "choice", maxLength: 4, placeholder: "", options: TRACK_OPTIONS },
@@ -111,6 +115,12 @@ const MISSION_FIELDS: Record<Exclude<Mission, "output">, FieldDef[]> = {
     { field: "sample", title: "Sample", kind: "multi", maxLength: 600, placeholder: "One sample sentence" },
   ],
 };
+
+/**
+ * Offer-to-look-first (template references/sources.md): at each big question,
+ * offer to look at the founder's site before they type from memory.
+ */
+const LOOK_FIRST_FIELDS = new Set(["segment", "description", "why", "proof"]);
 
 /** Customer fields fork on the track, exactly as the original intake did. */
 function customerFields(track: "b2b" | "b2c"): FieldDef[] {
@@ -211,6 +221,8 @@ export function MissionTypeform(props: {
   onApprove: (section: MissionSection) => void;
   onFinished: () => void;
   onTranscribe?: (blob: Blob, seconds: number) => Promise<string>;
+  /** Offer-to-look-first (template references/sources.md): scrape the founder's site to draft the answer. */
+  onLookFirst?: (url: string) => Promise<unknown>;
   onVoiceSamples?: () => Promise<{ samples: Array<{ id: string; name: string; chars: number; createdAt: string }>; min: number }>;
   onAddVoiceSample?: (name: string, text: string) => Promise<{ count: number }>;
   onDeleteVoiceSample?: (id: string) => Promise<{ count: number }>;
@@ -235,6 +247,21 @@ export function MissionTypeform(props: {
   const total = screens.length;
   const current = screens[Math.min(Math.max(idx, 0), total - 1)]!;
   const go = (next: number) => setIdx(Math.min(Math.max(next, 0), total - 1));
+
+  // Template PR #7 "Neither fits" follow-up for the Model choice, and the
+  // offer-to-look-first state (sources.md). Both reset as the walk moves.
+  const [neitherMode, setNeitherMode] = useState(false);
+  const [nearestPick, setNearestPick] = useState<"" | "service" | "ecommerce">("");
+  const [look, setLook] = useState<"idle" | "dismissed" | "done">("idle");
+  const [lookUrl, setLookUrl] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookError, setLookError] = useState("");
+  useEffect(() => {
+    setNeitherMode(false);
+    setNearestPick("");
+    setLook("idle");
+    setLookError("");
+  }, [idx]);
 
   if (current.kind === "output") {
     return (
@@ -369,7 +396,36 @@ export function MissionTypeform(props: {
       props.onPatch(current.mission, "hybrid", v === "yes");
       return;
     }
+    // "Neither" never becomes a third Model value: ask for the nearest plus
+    // what the business really is, then flag it (template PR #7).
+    if (def.field === "model" && v === "neither") {
+      setNeitherMode(true);
+      return;
+    }
+    if (def.field === "model" && neitherMode) {
+      setNeitherMode(false);
+      props.onPatch(current.mission, "modelNearestFit", true);
+    }
     props.onPatch(current.mission, def.field, v);
+  };
+  const commitNeither = () => {
+    if (!nearestPick) return;
+    props.onPatch("identity", "modelNearestFit", true);
+    props.onPatch("identity", "model", nearestPick);
+    advance();
+  };
+  const runLookFirst = async () => {
+    if (!props.onLookFirst || !lookUrl.trim()) return;
+    setLooking(true);
+    setLookError("");
+    try {
+      await props.onLookFirst(lookUrl.trim());
+      setLook("done");
+    } catch {
+      setLookError("Could not read that site. Type the answer instead.");
+    } finally {
+      setLooking(false);
+    }
   };
 
   return (
@@ -383,7 +439,38 @@ export function MissionTypeform(props: {
       onContinue={advance}
       saving={props.saving}
     >
-      {def.kind === "choice" && def.options ? (
+      {def.field === "model" && neitherMode ? (
+        <div className="mission-neither">
+          <div className="typeform-choices mission-choices">
+            {(["service", "ecommerce"] as const).map((pick) => (
+              <button
+                key={pick}
+                type="button"
+                className={nearestPick === pick ? "typeform-choice picked" : "typeform-choice"}
+                disabled={props.saving}
+                onClick={() => setNearestPick(pick)}
+              >
+                {pick === "service" ? "Nearest: Service" : "Nearest: Ecommerce"}
+              </button>
+            ))}
+          </div>
+          {nearestPick ? (
+            <VoiceField
+              label="What is the business, in a few words?"
+              value={draft.identity.modelNote}
+              maxLength={200}
+              placeholder="For example: a subscription app"
+              multiline={false}
+              serverTranscribe={props.onTranscribe}
+              onEnter={commitNeither}
+              onChange={(next) => props.onPatch("identity", "modelNote", next)}
+            />
+          ) : null}
+          <p className="entry-lede typeform-lede">
+            We record the nearest fit and flag it on the Brain, never a third value.
+          </p>
+        </div>
+      ) : def.kind === "choice" && def.options ? (
         <div className="typeform-choices mission-choices">
           {def.options.map((option) => (
             <button
@@ -398,16 +485,62 @@ export function MissionTypeform(props: {
           ))}
         </div>
       ) : (
-        <VoiceField
-          label={def.title}
-          value={value}
-          maxLength={def.maxLength}
-          placeholder={def.placeholder}
-          multiline={def.kind === "multi"}
-          serverTranscribe={props.onTranscribe}
-          onEnter={def.kind === "text" ? advance : undefined}
-          onChange={(next) => props.onPatch(current.mission, def.field, next)}
-        />
+        <>
+          {def.kind !== "choice" &&
+          value.trim() === "" &&
+          look === "idle" &&
+          LOOK_FIRST_FIELDS.has(def.field) &&
+          props.onLookFirst ? (
+            <div className="mission-look-first">
+              <p className="entry-lede typeform-lede">
+                Before you type this from memory, want me to look? I can read your website and draft the answer for you to correct.
+              </p>
+              <div className="mission-look-row">
+                <input
+                  className="mission-look-url"
+                  type="url"
+                  value={lookUrl}
+                  maxLength={200}
+                  placeholder="https://your-site.com"
+                  onChange={(e) => setLookUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void runLookFirst();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="typeform-choice yes"
+                  disabled={looking || !lookUrl.trim()}
+                  onClick={() => void runLookFirst()}
+                >
+                  {looking ? "Looking..." : "Look"}
+                </button>
+                <button
+                  type="button"
+                  className="typeform-choice"
+                  disabled={looking}
+                  onClick={() => setLook("dismissed")}
+                >
+                  I'll type it
+                </button>
+              </div>
+              {lookError ? <p className="entry-error">{lookError}</p> : null}
+            </div>
+          ) : null}
+          {look === "done" ? (
+            <p className="entry-lede typeform-lede">Read your site. Correct anything that is off, then continue.</p>
+          ) : null}
+          <VoiceField
+            label={def.title}
+            value={value}
+            maxLength={def.maxLength}
+            placeholder={def.placeholder}
+            multiline={def.kind === "multi"}
+            serverTranscribe={props.onTranscribe}
+            onEnter={def.kind === "text" ? advance : undefined}
+            onChange={(next) => props.onPatch(current.mission, def.field, next)}
+          />
+        </>
       )}
       {def.field === "evidence" && draft.customer.evidenceStatus !== "supported" ? (
         <p className="entry-lede typeform-lede">Only needed when evidence is supported.</p>

@@ -480,10 +480,16 @@ export function OrientationFlow({
   }
 
   if (step.kind === "choices") {
+    // Template PR #8: the track is confirmed from who pays, never asked cold.
+    const buyer = step.id === "track" ? brain.customer.segment.trim() : "";
+    const title =
+      step.id === "track" && buyer
+        ? `You said "${buyer}" pays you. Sell to other businesses, or individual consumers?`
+        : step.title;
     return (
       <TypeformShell
         kicker=""
-        title={step.title}
+        title={title}
         immersive
         hideContinue
         onContinue={() => undefined}

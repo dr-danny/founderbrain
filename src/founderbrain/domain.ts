@@ -88,6 +88,12 @@ export function exportMarkdown(
     flags.push("Fresh sending domain: SPF, DKIM and DMARC still to configure.");
   if (track === "b2c" && brain.context.igAccountType === "personal")
     flags.push("Instagram is a personal account; convert to Business/Creator.");
+  // From the standalone template (PR #7, #12): when neither Model value fits,
+  // the Brain records the nearer one plus a flag, never a third value.
+  if (brain.identity.modelNearestFit && (brain.identity.model === "service" || brain.identity.model === "ecommerce"))
+    flags.push(
+      `Model is ${brain.identity.model}, the nearest fit.${brain.identity.modelNote.trim() ? ` The business is really ${brain.identity.modelNote.trim()}.` : ""}`,
+    );
   const sections: Array<string | null> = [
     "# Founder Brain",
     `Schema: 1`,
@@ -96,6 +102,7 @@ export function exportMarkdown(
     "",
     line("Founder", brain.identity.name),
     line("Business", brain.identity.venture),
+    ...(brain.identity.team.trim() ? [line("Team", brain.identity.team)] : []),
     line("Track", track),
     ...(track === "b2c" ? [line("Model", brain.identity.model || "unknown")] : []),
     line("Hybrid", brain.identity.hybrid ? "true" : "false"),

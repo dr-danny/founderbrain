@@ -245,6 +245,10 @@ export function App() {
           onTranscribe={(blob, seconds) =>
             app.transcribeVoice(blob, seconds).then((result) => result.text)
           }
+          onLookFirst={async (url) => {
+            const result = await app.importSite(url);
+            await app.applyIntake(result.proposal);
+          }}
           onVoiceSamples={() => app.voiceSamples()}
           onAddVoiceSample={(name, text) => app.addVoiceSample(name, text)}
           onDeleteVoiceSample={(id) => app.deleteVoiceSample(id)}

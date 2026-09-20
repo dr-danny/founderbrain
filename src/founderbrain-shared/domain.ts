@@ -27,6 +27,12 @@ export const brainSchema = z
         hybrid: z.boolean().default(false),
         /** B2C only: what kind of product the founder sells. */
         model: z.enum(["", "service", "ecommerce"]).default(""),
+        /** Neither service nor ecommerce fit: the model is the nearer of the two, flagged. */
+        modelNearestFit: z.boolean().default(false),
+        /** What the business really is, in the founder's words, when the model is a nearest fit. */
+        modelNote: text.default(""),
+        /** The founder's team: who runs which part of the selling, in their words. */
+        team: text.default(""),
         ...section,
       })
       .strict(),
@@ -164,6 +170,9 @@ export function emptyBrain(): Brain {
       track: "b2b",
       hybrid: false,
       model: "",
+      modelNearestFit: false,
+      modelNote: "",
+      team: "",
       approved: false,
     },
     customer: {

@@ -14,6 +14,8 @@
 import { readFile } from "node:fs/promises";
 
 import { DomainError } from "./domain.ts";
+import { checkCopy } from "./copy-rules.ts";
+import { canonicalize } from "../founderbrain-shared/domain.ts";
 import { openRouterProvider } from "./provider.ts";
 import { present, type Brain } from "../founderbrain-shared/domain.ts";
 import type { Config } from "./config.ts";
@@ -105,7 +107,7 @@ async function generateCopy(
   workspace: string,
   brain: Brain,
   wanted: { gname: string; guidance: string; key: string }[],
-): Promise<Map<string, string>> {
+): Promise<{ copy: Map<string, string>; held: Array<{ name: string; code: string; reason: string }> }> {
   const loaded = await (await import("./openrouter-keys.ts")).loadOpenRouterApiKey(store, workspace);
   const catalogText = wanted.map((w) => `- ${w.gname} (key: ${w.key}): ${w.guidance}`).join("\n");
   const result = await openRouterProvider(
@@ -117,6 +119,9 @@ async function generateCopy(
         "For every requested value, write the copy the value's own guidance describes, in the founder's captured voice. " +
         "Return strict JSON: { \"<key>\": \"<copy>\" } for every requested key, nothing else. " +
         "Never invent numbers, results, customer names, prices, or claims that are not in the Brain; where the Brain lacks something the copy needs, keep the copy generic and honest instead of inventing. " +
+        "Never promise replies: nothing guarantees or promises that anyone replies, because replies depend on the list, the offer and the timing. " +
+        "Never write Instagram DM automation into the copy: no bots, blasts, or automated cold DMs. Automated sending is only for replying to people who wrote first. " +
+        "Never write the other track's material: B2C copy never mentions Apollo, ICPs, cold email, DKIM or DMARC; B2B copy never mentions hook banks, DM openers or inbound scripts. " +
         "Never write PLACEHOLDER or merge-field code. Match the track. Respect the voice boundaries.",
       messages: [{ role: "user", content: `BRAIN:\n${JSON.stringify(brain)}\n\nREQUESTED VALUES:\n${catalogText}` }],
     },
@@ -133,15 +138,27 @@ async function generateCopy(
     throw new DomainError(502, "copy_failed", "The copy could not be generated. Try again.");
   }
   const out = new Map<string, string>();
+  // Reviewer hardening, ported from the template's rules engine: values that
+  // promise replies, automate cold DMs, use the other track's method, or state
+  // a number the Brain does not confirm are held out of the push and reported.
+  const held: Array<{ name: string; code: string; reason: string }> = [];
+  const track = brain.identity.track === "b2c" ? "b2c" : "b2b";
+  const brainJson = canonicalize(brain);
   for (const w of wanted) {
     const value = parsed[w.key];
     if (typeof value === "string" && value.trim() && !/PLACEHOLDER/i.test(value)) {
-      out.set(w.gname, value.trim().slice(0, 4000));
+      const trimmed = value.trim().slice(0, 4000);
+      const finding = checkCopy(trimmed, { track, brainJson }).find((f) => f.kind === "HOLD");
+      if (finding) {
+        held.push({ name: w.gname, code: finding.code, reason: finding.reason });
+        continue;
+      }
+      out.set(w.gname, trimmed);
     }
   }
-  if (out.size === 0)
+  if (out.size === 0 && held.length === 0)
     throw new DomainError(502, "copy_failed", "The copy could not be generated. Try again.");
-  return out;
+  return { copy: out, held };
 }
 
 type GhlValue = { id: string; name: string; value?: string };
@@ -175,7 +192,7 @@ export async function pushGhlValues(
   workspace: string,
   brain: Brain,
   firstPack: string,
-): Promise<{ snapshot: SnapshotName; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] }> {
+): Promise<{ snapshot: SnapshotName; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[]; held: Array<{ name: string; code: string; reason: string }> }> {
   const connection = await (await import("./crm-oauth.ts")).readConnection(store, workspace, config);
   if (!connection)
     throw new DomainError(409, "crm_not_connected", "Connect GoHighLevel before pushing copy.");
@@ -184,7 +201,7 @@ export async function pushGhlValues(
   // writes a link: it would invent one.
   const linkKeys = wanted.filter((w) => /_link$/.test(w.key)).map((w) => w.gname);
   const copyWanted = wanted.filter((w) => !/_link$/.test(w.key));
-  const copy = await generateCopy(config, store, workspace, brain, copyWanted);
+  const { copy, held } = await generateCopy(config, store, workspace, brain, copyWanted);
 
   const listResponse = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
   if (!listResponse.ok)
@@ -214,7 +231,7 @@ export async function pushGhlValues(
     }
   }
   if (pushed.length === 0 && skipped.length === wanted.length)
-    return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven: true, clinicPaste: linkKeys };
+    return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven: true, clinicPaste: linkKeys, held };
 
   // Prove it: nothing we claim to have written may still read empty or placeholder.
   const verify = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
@@ -227,7 +244,7 @@ export async function pushGhlValues(
   });
   if (!proven)
     throw new DomainError(502, "ghl_push_failed", "The push did not stick. Nothing was published. Check the snapshot names match the values list.");
-  return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven, clinicPaste: linkKeys };
+  return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven, clinicPaste: linkKeys, held };
 }
 
 /** Export helper for tests: is this Brain ready to push (all five missions approved)? */
