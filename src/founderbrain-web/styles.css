@@ -1931,3 +1931,15 @@ button:not(.link-button) {
 .typeform-stage .welcome-choices .typeform-choice.yes {
   background: var(--paper);
 }
+
+/* Glass choice hover (Danny, 2026-09-19): the translucent glass background
+   out-specifies the old :hover fill in source order, leaving ink text on dark.
+   Re-state the hover inside the stage scope with higher specificity. */
+.typeform-stage .typeform-choice:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--ink);
+}
+.typeform-stage .typeform-choice.picked {
+  background: var(--paper);
+  color: var(--ink);
+}
