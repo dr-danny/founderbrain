@@ -32,7 +32,7 @@ test("settleSaveDecision clears changed when draft matches what was sent", () =>
     sha: "abc",
     updatedAt: null,
     brain: { ...brain, identity: { ...brain.identity, name: "Ada" } },
-    readiness: { identity: false, customer: false, offer: false, voice: false, output: false },
+    readiness: { identity: false, customer: false, offer: false, voice: false, context: false, output: false },
     verified: true,
   };
   const decision = settleSaveDecision(brain, saved, { brain, expectedVersion: 1, key: "k1" });
@@ -51,7 +51,7 @@ test("settleSaveDecision keeps local edits when draft moved on during save", () 
     sha: "def",
     updatedAt: null,
     brain: sent,
-    readiness: { identity: false, customer: false, offer: false, voice: false, output: false },
+    readiness: { identity: false, customer: false, offer: false, voice: false, context: false, output: false },
     verified: true,
   };
   const decision = settleSaveDecision(latest, saved, {

@@ -38,42 +38,108 @@ export function validateBrain(value: unknown): Brain {
   return sharedValidateBrain(value);
 }
 
-export function exportMarkdown(brain: Brain, version: number): string {
+export function exportMarkdown(brain: Brain, version: number, updatedAt?: string | null): string {
   const line = (name: string, value: string) =>
-    `${name}: ${value.replace(/\r\n?/g, "\n").replace(/\n/g, "\n  ") || "(not provided)"}`;
-  return [
-    "# FounderBrain",
+    `${name}: ${value.replace(/\r\n?/g, "\n").replace(/\n/g, "\n  ") || "unknown"}`;
+  const track = brain.identity.track;
+  const b2b = track === "b2b";
+  // Original founder-brain.md shape (Launchhouse founder-brain skill).
+  const thesis = [
+    line(
+      "Who they serve",
+      brain.customer.segment || "unknown",
+    ),
+    line("The problem in their words", brain.customer.problem || "unknown"),
+    line("Why them rather than the obvious alternative", brain.offer.why || "unknown"),
+  ];
+  const audience = b2b
+    ? [
+        line("ICP", brain.customer.segment || "unknown"),
+        line("Buyer persona", brain.customer.buyer || "unknown"),
+        line("Trigger events", brain.customer.trigger || "unknown"),
+        line("Three best-fit accounts", brain.customer.bestFit || "unknown"),
+      ]
+    : [
+        line("Persona", brain.customer.segment || "unknown"),
+        line("Desire", brain.customer.problem || "unknown"),
+        line("Attention map", brain.customer.attention || "unknown"),
+        line("Adjacent purchases", brain.customer.adjacent || "unknown"),
+      ];
+  const proofValues = [brain.offer.proof, brain.customer.evidence].filter((v) => v.trim());
+  const thinProof =
+    brain.customer.evidenceStatus !== "supported" || proofValues.length === 0;
+  const flags: string[] = [];
+  if (thinProof) flags.push("Thin proof: evidence is still a hypothesis.");
+  if (b2b && !brain.customer.bestFit.trim()) flags.push("No named best-fit list.");
+  if (!brain.offer.cta.trim() || !brain.offer.description.trim())
+    flags.push("Offer is incomplete or unclear.");
+  if (brain.context.domainStatus === "fresh")
+    flags.push("Fresh sending domain: SPF, DKIM and DMARC still to configure.");
+  if (track === "b2c" && brain.context.igAccountType === "personal")
+    flags.push("Instagram is a personal account; convert to Business/Creator.");
+  const sections: string[] = [
+    "# Founder Brain",
     `Schema: 1`,
     `Renderer: 1`,
     `Revision: ${version}`,
     "",
-    "## Identity",
-    ...Object.entries(brain.identity)
-      .filter(([k]) => k !== "approved")
-      .map(([k, v]) => line(k, String(v))),
-    `Approved: ${brain.identity.approved}`,
+    line("Founder", brain.identity.name),
+    line("Business", brain.identity.venture),
+    line("Track", track),
+    ...(track === "b2c" ? [line("Model", brain.identity.model || "unknown")] : []),
+    line("Hybrid", brain.identity.hybrid ? "true" : "false"),
+    line("Stage", brain.identity.stage),
+    line("Locked", updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : "unknown"),
     "",
-    "## Customer and thesis",
-    ...Object.entries(brain.customer)
-      .filter(([k]) => k !== "approved")
-      .map(([k, v]) => line(k, String(v))),
-    `Approved: ${brain.customer.approved}`,
+    "## Thesis",
+    ...thesis,
     "",
     "## Offer",
-    ...Object.entries(brain.offer)
-      .filter(([k]) => k !== "approved")
-      .map(([k, v]) => line(k, String(v))),
-    `Approved: ${brain.offer.approved}`,
+    line("What they sell", brain.offer.description || "unknown"),
+    line("Delivery", brain.offer.delivery || "unknown"),
+    line("Problem it solves", brain.customer.problem || "unknown"),
+    line("Pricing", brain.offer.price || "unknown"),
+    ...(brain.offer.pricingModel ? [line("Pricing model", brain.offer.pricingModel)] : []),
+    line("Outcome", brain.offer.outcome || "unknown"),
+    line("Call to action", brain.offer.cta || "unknown"),
+    "",
+    "## Audience",
+    ...audience,
+    "",
+    "## Proof",
+    ...(proofValues.length ? proofValues.map((v) => line("Proof", v)) : ["Proof: unknown"]),
+    thinProof ? "Note: proof is thin. The content engine leans on story and point of view." : "",
+    "",
+    "## Goal, next 90 days",
+    line("Goal", brain.identity.goal || "unknown"),
+    "",
+    "## Channels",
+    line("Active", brain.context.channelsActive || "unknown"),
+    line("Dormant", brain.context.channelsDormant || "unknown"),
+    ...(b2b
+      ? [line("Work email provider", brain.context.emailProvider || "unknown"), line("Domain status", brain.context.domainStatus || "unknown")]
+      : [line("Instagram account type", brain.context.igAccountType || "unknown")]),
+    "",
+    "## Numbers",
+    line("Customers now", brain.context.customersNow || "unknown"),
+    line("Average monthly value", brain.context.avgMonthlyValue || "unknown"),
+    line("Target in 90 days", brain.context.target90 || "unknown"),
+    "",
+    "## Source material",
+    line("Who they read and follow", brain.context.sourceMaterial || "unknown"),
     "",
     "## Voice",
-    ...Object.entries(brain.voice)
-      .filter(([k]) => k !== "approved")
-      .map(([k, v]) => line(k, String(v))),
-    `Approved: ${brain.voice.approved}`,
+    line("Tone", brain.voice.tone || "unknown"),
+    line("Boundaries", brain.voice.boundaries || "unknown"),
+    line("Verbatim sample", brain.voice.sample || "unknown"),
+    "",
+    "## Flags",
+    ...(flags.length ? flags : ["None flagged."]),
     "",
     "> Hypotheses are not validated business facts. This export is derived; edit the saved Brain to make changes.",
     "",
-  ].join("\n");
+  ];
+  return sections.filter((s) => s !== "").join("\n");
 }
 
 export function generationPayload(brain: Brain): {
@@ -97,6 +163,7 @@ export function generationPayload(brain: Brain): {
           customer: brain.customer,
           offer: brain.offer,
           voice: brain.voice,
+          context: brain.context,
         }),
       },
     ],

@@ -26,6 +26,9 @@ test("sectionWouldApprove matches shared readiness rules without requiring prior
     role: "Founder",
     stage: "exploring",
     goal: "Find a useful problem",
+    track: "b2b",
+    hybrid: false,
+    model: "",
     approved: false,
   };
   assert.equal(sectionWouldApprove(brain, "identity"), true);
@@ -40,6 +43,9 @@ test("server readiness uses contentHash for accepted output", () => {
     role: "Founder",
     stage: "exploring",
     goal: "Find a useful problem",
+    track: "b2b",
+    hybrid: false,
+    model: "",
     approved: true,
   };
   const hash = contentHash(brain);

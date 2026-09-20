@@ -76,6 +76,9 @@ const full = (): Brain => {
     role: "Founder",
     stage: "exploring",
     goal: "Find a useful problem",
+    track: "b2b",
+    hybrid: false,
+    model: "",
     approved: true,
   };
   b.customer = {
@@ -85,6 +88,11 @@ const full = (): Brain => {
     workaround: "unknown",
     evidenceStatus: "hypothesis",
     evidence: "",
+    buyer: '',
+    trigger: '',
+    bestFit: '',
+    attention: '',
+    adjacent: '',
     approved: true,
   };
   b.offer = {
@@ -93,6 +101,9 @@ const full = (): Brain => {
     outcome: "Learn what matters",
     cta: "Would you talk with me?",
     price: "",
+    why: '',
+    pricingModel: '',
+    proof: '',
     approved: true,
   };
   b.voice = {

@@ -54,6 +54,9 @@ function filledBrain() {
     role: "Founder",
     stage: "building",
     goal: "Validate demand",
+    track: "b2b",
+    hybrid: false,
+    model: "",
     approved: true,
   };
   return brain;

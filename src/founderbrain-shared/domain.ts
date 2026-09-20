@@ -19,6 +19,12 @@ export const brainSchema = z
         role: text,
         stage: z.enum(["exploring", "building", "launched", "growing"]),
         goal: text,
+        // Track fork from the original intake (Launchhouse founder-brain skill).
+        track: z.enum(["b2b", "b2c"]).default("b2b"),
+        /** Genuinely both motions: record the dominant one as track plus this flag. */
+        hybrid: z.boolean().default(false),
+        /** B2C only: what kind of product the founder sells. */
+        model: z.enum(["", "service", "ecommerce"]).default(""),
         ...section,
       })
       .strict(),
@@ -30,6 +36,13 @@ export const brainSchema = z
         workaround: text,
         evidenceStatus: z.enum(["hypothesis", "supported"]),
         evidence: text,
+        // Original intake audience group. B2B: buyer persona, trigger events,
+        // three named best-fit accounts. B2C: attention map, adjacent purchases.
+        buyer: text.default(""),
+        trigger: text.default(""),
+        bestFit: text.default(""),
+        attention: text.default(""),
+        adjacent: text.default(""),
         ...section,
       })
       .strict(),
@@ -40,17 +53,38 @@ export const brainSchema = z
         outcome: text,
         cta: text,
         price: text,
+        // Original intake offer-and-proof group: why them, the pricing model,
+        // and the countable proof written as the founder said it.
+        why: text.default(""),
+        pricingModel: z.enum(["", "one-off", "subscription", "retainer", "per-unit"]).default(""),
+        proof: text.default(""),
         ...section,
       })
       .strict(),
     voice: z.object({ tone: text, boundaries: text, sample: text, ...section }).strict(),
+    // Original intake groups 5 (channels) and the Numbers / Source material
+    // sections of founder-brain.md.
+    context: z
+      .object({
+        channelsActive: text.default(""),
+        channelsDormant: text.default(""),
+        emailProvider: z.enum(["", "google", "microsoft365", "other"]).default(""),
+        domainStatus: z.enum(["", "warm", "fresh"]).default(""),
+        igAccountType: z.enum(["", "personal", "business"]).default(""),
+        customersNow: text.default(""),
+        avgMonthlyValue: text.default(""),
+        target90: text.default(""),
+        sourceMaterial: text.default(""),
+        ...section,
+      })
+      .strict(),
   })
   .strict();
 
 export type Brain = z.infer<typeof brainSchema>;
 export type Stage = Brain["identity"]["stage"];
 export type EvidenceStatus = Brain["customer"]["evidenceStatus"];
-export type MissionSection = "identity" | "customer" | "offer" | "voice";
+export type MissionSection = "identity" | "customer" | "offer" | "voice" | "context";
 
 export interface Artifact {
   id: string;
@@ -66,6 +100,7 @@ export interface Readiness {
   customer: boolean;
   offer: boolean;
   voice: boolean;
+  context: boolean;
   output: boolean;
 }
 export interface BrainState {
@@ -94,7 +129,17 @@ export class DomainError extends Error {
 export function emptyBrain(): Brain {
   return {
     schemaVersion: 1,
-    identity: { name: "", venture: "", role: "", stage: "exploring", goal: "", approved: false },
+    identity: {
+      name: "",
+      venture: "",
+      role: "",
+      stage: "exploring",
+      goal: "",
+      track: "b2b",
+      hybrid: false,
+      model: "",
+      approved: false,
+    },
     customer: {
       segment: "",
       problem: "",
@@ -102,10 +147,37 @@ export function emptyBrain(): Brain {
       workaround: "",
       evidenceStatus: "hypothesis",
       evidence: "",
+      buyer: "",
+      trigger: "",
+      bestFit: "",
+      attention: "",
+      adjacent: "",
       approved: false,
     },
-    offer: { description: "", delivery: "", outcome: "", cta: "", price: "", approved: false },
+    offer: {
+      description: "",
+      delivery: "",
+      outcome: "",
+      cta: "",
+      price: "",
+      why: "",
+      pricingModel: "",
+      proof: "",
+      approved: false,
+    },
     voice: { tone: "", boundaries: "", sample: "", approved: false },
+    context: {
+      channelsActive: "",
+      channelsDormant: "",
+      emailProvider: "",
+      domainStatus: "",
+      igAccountType: "",
+      customersNow: "",
+      avgMonthlyValue: "",
+      target90: "",
+      sourceMaterial: "",
+      approved: false,
+    },
   };
 }
 
@@ -152,6 +224,9 @@ export function readiness(
       present(brain.offer.description, brain.offer.delivery, brain.offer.outcome, brain.offer.cta),
     voice:
       brain.voice.approved && present(brain.voice.tone, brain.voice.boundaries, brain.voice.sample),
+    context:
+      brain.context.approved &&
+      present(brain.context.channelsActive, brain.context.customersNow, brain.context.target90),
     output: Boolean(artifact?.acceptedAt && sourceHash && artifact.sourceHash === sourceHash),
   };
 }
@@ -174,7 +249,7 @@ export function validateBrain(value: unknown, sourceHashForOutput?: string | nul
   }
   const brain = result.data;
   const ready = readiness(brain, null, sourceHashForOutput ?? null);
-  for (const key of ["identity", "customer", "offer", "voice"] as const) {
+  for (const key of ["identity", "customer", "offer", "voice", "context"] as const) {
     if (brain[key].approved && !ready[key]) {
       throw new DomainError(
         422,

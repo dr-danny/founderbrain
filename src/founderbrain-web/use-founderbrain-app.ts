@@ -367,6 +367,11 @@ export function useFounderBrainApp() {
     setChanged(true);
     setError("");
     setNotice("");
+    // The chapters fork on the track: keep the orientation record in step
+    // with the Brain so Content/Outreach ask the right variant.
+    if (section === "identity" && field === "track" && (value === "b2b" || value === "b2c")) {
+      void saveOrientation({ track: value }).catch(() => undefined);
+    }
   }
 
   function settleSave(

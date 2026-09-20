@@ -358,7 +358,7 @@ export async function buildApi(
     return reply
       .type("text/markdown; charset=utf-8")
       .header("Content-Disposition", 'attachment; filename="founder-brain.md"')
-      .send(exportMarkdown(state.brain, state.version));
+      .send(exportMarkdown(state.brain, state.version, state.updatedAt));
   });
   app.post("/api/jobs", async (req, reply) => {
     const body = parse(
