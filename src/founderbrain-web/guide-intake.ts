@@ -122,7 +122,7 @@ export const GUIDE_STEPS: GuideStep[] = [
   {
     id: "proof",
     title: "What proof do you have?",
-    placeholder: "Numbers, names, repeats. Unknown is fine.",
+    placeholder: "Numbers, names, repeats. Leave blank if none.",
     kind: "long",
     section: "customer",
     field: "evidence",

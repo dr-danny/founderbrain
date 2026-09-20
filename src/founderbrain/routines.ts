@@ -283,7 +283,7 @@ async function generateMondayPlan(
   );
   const draft = titleBody(parseJsonObject(text));
   if (!draft)
-    throw new DomainError(502, "routine_failed", "The weekly plan draft failed. It will retry next sweep.");
+    throw new DomainError(422, "routine_failed", "The weekly plan draft failed. It will retry next sweep.");
   return { title: draft.title, body: worthALook(draft.body, brain) };
 }
 
@@ -309,7 +309,7 @@ async function generateContentTopUp(
   );
   const draft = titleBody(parseJsonObject(text));
   if (!draft)
-    throw new DomainError(502, "routine_failed", "The content draft could not be generated. It will retry next sweep.");
+    throw new DomainError(422, "routine_failed", "The content draft could not be generated. It will retry next sweep.");
   return { title: draft.title, body: worthALook(draft.body, brain) };
 }
 

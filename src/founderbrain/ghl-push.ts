@@ -130,12 +130,12 @@ async function generateCopy(
   const start = result.text.indexOf("{");
   const end = result.text.lastIndexOf("}");
   if (start < 0 || end <= start)
-    throw new DomainError(502, "copy_failed", "The copy could not be generated. Try again.");
+    throw new DomainError(422, "copy_failed", "The copy could not be generated. Try again.");
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(result.text.slice(start, end + 1)) as Record<string, unknown>;
   } catch {
-    throw new DomainError(502, "copy_failed", "The copy could not be generated. Try again.");
+    throw new DomainError(422, "copy_failed", "The copy could not be generated. Try again.");
   }
   const out = new Map<string, string>();
   // Reviewer hardening, ported from the template's rules engine: values that
@@ -157,7 +157,7 @@ async function generateCopy(
     }
   }
   if (out.size === 0 && held.length === 0)
-    throw new DomainError(502, "copy_failed", "The copy could not be generated. Try again.");
+    throw new DomainError(422, "copy_failed", "The copy could not be generated. Try again.");
   return { copy: out, held };
 }
 
@@ -205,7 +205,7 @@ export async function pushGhlValues(
 
   const listResponse = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
   if (!listResponse.ok)
-    throw new DomainError(502, "ghl_push_failed", "GoHighLevel did not answer the values list. Try again.");
+    throw new DomainError(422, "ghl_push_failed", "GoHighLevel did not answer the values list. Try again.");
   const listJson = (await listResponse.json()) as { customValues?: GhlValue[] };
   const existing = new Map((listJson.customValues ?? []).map((v) => [v.name, v]));
 
@@ -222,11 +222,11 @@ export async function pushGhlValues(
     }
     if (current) {
       const updated = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues/${current.id}`, { method: "PUT", body: { value } });
-      if (!updated.ok) throw new DomainError(502, "ghl_push_failed", `GoHighLevel refused "${w.gname}". Try again.`);
+      if (!updated.ok) throw new DomainError(422, "ghl_push_failed", `GoHighLevel refused "${w.gname}". Try again.`);
       pushed.push(w.gname);
     } else {
       const created = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`, { method: "POST", body: { name: w.gname, value } });
-      if (!created.ok) throw new DomainError(502, "ghl_push_failed", `GoHighLevel refused "${w.gname}". Try again.`);
+      if (!created.ok) throw new DomainError(422, "ghl_push_failed", `GoHighLevel refused "${w.gname}". Try again.`);
       pushed.push(w.gname);
     }
   }
@@ -235,7 +235,7 @@ export async function pushGhlValues(
 
   // Prove it: nothing we claim to have written may still read empty or placeholder.
   const verify = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
-  if (!verify.ok) throw new DomainError(502, "ghl_push_failed", "Could not verify the push. Check GoHighLevel and retry.");
+  if (!verify.ok) throw new DomainError(422, "ghl_push_failed", "Could not verify the push. Check GoHighLevel and retry.");
   const verifyJson = (await verify.json()) as { customValues?: GhlValue[] };
   const verifyMap = new Map((verifyJson.customValues ?? []).map((v) => [v.name, v.value]));
   const proven = [...copy.entries()].every(([gname]) => {
@@ -243,7 +243,7 @@ export async function pushGhlValues(
     return value !== undefined && !isUnfilled(value);
   });
   if (!proven)
-    throw new DomainError(502, "ghl_push_failed", "The push did not stick. Nothing was published. Check the snapshot names match the values list.");
+    throw new DomainError(422, "ghl_push_failed", "The push did not stick. Nothing was published. Check the snapshot names match the values list.");
   return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven, clinicPaste: linkKeys, held };
 }
 

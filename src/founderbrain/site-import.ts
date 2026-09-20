@@ -42,7 +42,7 @@ export async function importSite(
   try {
     scraped = await firecrawlScrape(url, config.FIRECRAWL_API_KEY);
   } catch {
-    throw new DomainError(502, "site_import_failed", "Could not read that website. We'll ask instead.");
+    throw new DomainError(422, "site_import_failed", "Could not read that website. We'll ask instead.");
   }
   // Meter the scrape before anything else can fail: the credit was spent.
   await recordUsageEvent(store, workspace, config, {
@@ -104,6 +104,6 @@ export async function importSite(
     }
   }
   const name = heading(markdown) || scraped.title;
-  if (!name) throw new DomainError(502, "site_import_failed", "Could not read that website. We'll ask instead.");
+  if (!name) throw new DomainError(422, "site_import_failed", "Could not read that website. We'll ask instead.");
   return { proposal: { identity: { venture: name } }, source: "title", logoUrl: scraped.logoUrl };
 }

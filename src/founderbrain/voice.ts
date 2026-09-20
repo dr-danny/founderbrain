@@ -53,11 +53,11 @@ export async function transcribeVoice(
         body: form,
       });
       if (!response.ok)
-        throw new DomainError(502, "voice_failed", "Transcription failed. Type instead or try again.");
+        throw new DomainError(422, "voice_failed", "Transcription failed. Type instead or try again.");
       return (await response.json()) as { text?: string };
     } catch (error) {
       if (error instanceof DomainError) throw error;
-      throw new DomainError(502, "voice_failed", "Transcription failed. Type instead or try again.");
+      throw new DomainError(422, "voice_failed", "Transcription failed. Type instead or try again.");
     }
   })();
   const text = (body.text ?? "").trim();

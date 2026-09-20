@@ -56,12 +56,32 @@ test("maps network failure to network ApiError", async () => {
   );
 });
 
-test("non-JSON error bodies still become ApiError", async () => {
+test("non-JSON error bodies still become ApiError with status in the fallback", async () => {
   stubFetch(() => Promise.resolve(new Response("<html>nope</html>", { status: 502 })));
   await expectApiError(
     () => new FounderBrainApi(async () => "token").me(),
     (err) => {
       assert.equal(err.status, 502);
+      assert.match(err.message, /502/);
+    },
+  );
+});
+
+test("JSON error without message still surfaces status and code", async () => {
+  stubFetch(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ error: "crm_oauth_failed" }), {
+        status: 422,
+        headers: { "content-type": "application/json" },
+      }),
+    ),
+  );
+  await expectApiError(
+    () => new FounderBrainApi(async () => "token").me(),
+    (err) => {
+      assert.equal(err.status, 422);
+      assert.equal(err.code, "crm_oauth_failed");
+      assert.match(err.message, /422 crm_oauth_failed/);
     },
   );
 });

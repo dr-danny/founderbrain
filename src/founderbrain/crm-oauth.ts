@@ -129,7 +129,7 @@ export async function exchangeCode(
     expires_in?: number;
   };
   if (!response.ok || !json.access_token || !json.locationId)
-    throw new DomainError(502, "crm_oauth_failed", "GoHighLevel did not complete Connect. Try again.");
+    throw new DomainError(422, "crm_oauth_failed", "GoHighLevel did not complete Connect. Try again.");
   return {
     accessToken: json.access_token,
     refreshToken: json.refresh_token ?? "",
@@ -236,15 +236,15 @@ export async function readConnection(
   try {
     const response = await fetch(TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
     if (!response.ok)
-      throw new DomainError(502, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
+      throw new DomainError(422, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
     json = (await response.json()) as typeof json;
   } catch (error) {
     if (error instanceof DomainError) throw error;
-    throw new DomainError(502, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
+    throw new DomainError(422, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
   }
   const accessToken = json.access_token;
   if (!accessToken)
-    throw new DomainError(502, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
+    throw new DomainError(422, "crm_token_refresh", "The GoHighLevel connection could not be refreshed. Reconnect from the GoHighLevel chapter.");
   const refreshed = {
     accessToken,
     refreshToken: json.refresh_token ?? tokens.refreshToken,

@@ -106,13 +106,15 @@ export class FounderBrainApi {
       committedVersion?: number;
     } & T;
     if (response.status === 401 && this.token) throw SESSION_EXPIRED;
-    if (!response.ok)
-      throw new ApiError(
-        response.status,
-        body.error ?? "request_failed",
-        body.message ?? "FounderBrain could not complete that request.",
-        body,
-      );
+    if (!response.ok) {
+      const code = body.error ?? "request_failed";
+      const message =
+        body.message ??
+        (code !== "request_failed"
+          ? `FounderBrain could not complete that request (${response.status} ${code}).`
+          : `FounderBrain could not complete that request (${response.status}).`);
+      throw new ApiError(response.status, code, message, body);
+    }
     return body as T;
   }
 

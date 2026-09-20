@@ -14,6 +14,10 @@ test("present rejects empty and placeholder values", () => {
   assert.equal(present("  "), false);
   assert.equal(present("tbd"), false);
   assert.equal(present("N/A"), false);
+  assert.equal(present("Unknown"), false);
+  assert.equal(present("not sure"), false);
+  assert.equal(present("0"), true);
+  assert.equal(present("none yet"), true);
   assert.equal(fieldNeedsAttention("unknown"), true);
 });
 
