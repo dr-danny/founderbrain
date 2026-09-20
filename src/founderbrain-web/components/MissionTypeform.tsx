@@ -490,7 +490,8 @@ export function MissionTypeform(props: {
           value.trim() === "" &&
           look === "idle" &&
           LOOK_FIRST_FIELDS.has(def.field) &&
-          props.onLookFirst ? (
+          props.onLookFirst &&
+          props.config.siteImportEnabled ? (
             <div className="mission-look-first">
               <p className="entry-lede typeform-lede">
                 Before you type this from memory, want me to look? I can read your website and draft the answer for you to correct.
