@@ -203,8 +203,11 @@ export function AtlantaReady({
                           <b>
                             Version {item.version}
                             <span className="atlanta-track-chip">
-                              {item.track === "b2c" ? "Sells to people (B2C)" : "Sells to businesses (B2B)"}
-                              {item.hybrid ? " · also B2B" : ""}
+                              {item.hybrid
+                                ? "Sells to businesses and people (Hybrid)"
+                                : item.track === "b2c"
+                                  ? "Sells to people (B2C)"
+                                  : "Sells to businesses (B2B)"}
                             </span>
                           </b>
                           <small>
@@ -214,9 +217,11 @@ export function AtlantaReady({
                           <small className="atlanta-version-changed">
                             {item.changed === undefined
                               ? null
-                              : item.changed.length === 5 || item.changed.length === 0
+                              : item.changed.length === 5
                                 ? "First version"
-                                : item.changed.length === 1
+                                : item.changed.length === 0
+                                  ? "Same content as the version before it"
+                                  : item.changed.length === 1
                                   ? `Changed: ${sectionFounderNames[item.changed[0] as keyof typeof sectionFounderNames]}`
                                   : `Changed: ${item.changed
                                       .map((key) => sectionFounderNames[key as keyof typeof sectionFounderNames])
