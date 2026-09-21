@@ -1734,48 +1734,6 @@ button:not(.link-button) {
   outline: 2px solid var(--ember);
   outline-offset: 2px;
 }
-.atlanta-home-progress {
-  margin-top: 1.25rem;
-}
-.atlanta-card .atlanta-day {
-  margin-top: 1.75rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid #e4e8eb;
-}
-.atlanta-card .atlanta-day h2 {
-  margin: 0 0 0.35rem;
-  font-size: 1.15rem;
-  letter-spacing: -0.02em;
-}
-.atlanta-card .atlanta-day > p {
-  margin: 0;
-  color: #667176;
-  max-width: 40rem;
-  line-height: 1.5;
-}
-.atlanta-artifacts {
-  list-style: none;
-  margin: 0.85rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.45rem;
-}
-.atlanta-artifacts li {
-  display: grid;
-  grid-template-columns: 1.25rem 1fr;
-  gap: 0.45rem;
-  align-items: start;
-  color: #4f585c;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-.atlanta-artifacts li.ready {
-  color: #0b5f3a;
-  font-weight: 600;
-}
-.atlanta-artifacts li.partial span {
-  color: #8a4b08;
-}
 @media (prefers-reduced-motion: reduce) {
   .typeform-bar-fill {
     transition: none;
@@ -2049,4 +2007,243 @@ button:not(.link-button) {
 }
 .mission-toast.notice {
   border: 1px solid rgba(247, 239, 230, 0.25);
+}
+
+/* Atlanta hub as a typeform stage (Danny, 2026-09-21): the hub reuses the
+   typeform photo/veil/glass panel classes, so it reads as the same app. These
+   overrides only adapt the dashboard content to the dark glass surface. */
+.typeform-hub-link {
+  position: absolute;
+  top: 14px;
+  left: clamp(1rem, 4vw, 2rem);
+  z-index: 4;
+  appearance: none;
+  border: 1px solid rgba(247, 239, 230, 0.22);
+  border-radius: 999px;
+  background: rgba(18, 12, 20, 0.45);
+  color: var(--paper-muted);
+  font-family: var(--font-brand);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+.typeform-hub-link:hover {
+  color: var(--paper);
+  border-color: rgba(247, 239, 230, 0.5);
+}
+.typeform-hub-link:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.atlanta-stage .typeform-panel {
+  min-height: min(92vh, 60rem);
+}
+.atlanta-body {
+  margin-top: 0;
+}
+.atlanta-lede {
+  margin: 1.15rem 0 0;
+  max-width: 46ch;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 1.5;
+  color: var(--paper-muted);
+}
+.atlanta-progress {
+  margin-top: 1.4rem;
+}
+.atlanta-progress b {
+  font-size: 1.6rem;
+  letter-spacing: -0.04em;
+}
+.atlanta-progress span {
+  font-size: 0.85rem;
+  color: var(--paper-muted);
+}
+.atlanta-progress progress {
+  height: 8px;
+  margin-top: 8px;
+}
+.atlanta-progress progress::-webkit-progress-bar {
+  background: rgba(247, 239, 230, 0.16);
+  border-radius: 999px;
+}
+.atlanta-progress progress::-webkit-progress-value {
+  background: var(--ember);
+  border-radius: 999px;
+}
+.atlanta-day {
+  margin-top: 1.6rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid rgba(247, 239, 230, 0.14);
+}
+.atlanta-day h2 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-brand);
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+}
+.atlanta-day > p {
+  margin: 0;
+  color: var(--paper-muted);
+  max-width: 46rem;
+  line-height: 1.5;
+}
+.atlanta-artifacts {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.atlanta-artifacts li {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: 0.45rem;
+  align-items: start;
+  color: var(--paper-muted);
+  font-size: 0.98rem;
+  line-height: 1.4;
+}
+.atlanta-artifacts li.ready {
+  color: #8ce6bd;
+  font-weight: 600;
+}
+.atlanta-artifacts li.partial span {
+  color: var(--ember);
+}
+.atlanta-muted {
+  margin: 0.85rem 0 0;
+  color: var(--paper-muted);
+  font-size: 0.95rem;
+}
+/* Version history on the hub: latest first, restore-to-switch. */
+.atlanta-versions {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 17rem;
+  overflow-y: auto;
+  padding-right: 0.4rem;
+}
+.atlanta-versions li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(247, 239, 230, 0.14);
+  border-radius: 10px;
+  background: rgba(247, 239, 230, 0.03);
+}
+.atlanta-versions li.current {
+  border-color: rgba(224, 137, 74, 0.55);
+}
+.atlanta-version-meta {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.atlanta-version-meta b {
+  font-family: var(--font-brand);
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+}
+.atlanta-version-meta small {
+  font-size: 0.78rem;
+  color: var(--paper-muted);
+}
+.atlanta-current-tag {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ember);
+}
+.atlanta-confirm {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.atlanta-version-btn {
+  appearance: none;
+  flex-shrink: 0;
+  border: 1px solid rgba(247, 239, 230, 0.22);
+  border-radius: 999px;
+  background: rgba(247, 239, 230, 0.06);
+  color: var(--paper);
+  font-family: var(--font-brand);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.atlanta-version-btn:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+.atlanta-version-btn.primary {
+  background: var(--ember);
+  border-color: var(--ember);
+  color: var(--ink);
+}
+.atlanta-version-btn.primary:hover {
+  background: var(--ember-deep);
+  border-color: var(--ember-deep);
+  color: var(--ink);
+}
+.atlanta-version-btn:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.atlanta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.8rem;
+  margin-top: 2rem;
+}
+.atlanta-actions .entry-cta {
+  margin-top: 0;
+}
+.atlanta-secondary {
+  appearance: none;
+  border: 1px solid rgba(247, 239, 230, 0.22);
+  border-radius: 2px;
+  background: rgba(247, 239, 230, 0.06);
+  color: var(--paper);
+  font-family: var(--font-brand);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 0.85rem 1.2rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.atlanta-secondary:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+.atlanta-secondary:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}
+.atlanta-panel small {
+  display: block;
+  margin-top: 1.4rem;
+  color: var(--paper-muted);
 }

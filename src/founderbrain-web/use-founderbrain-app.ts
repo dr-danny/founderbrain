@@ -538,17 +538,23 @@ export function useFounderBrainApp() {
     setConflict(null);
   }
 
-  async function openHistory() {
+  /** Fetch saved versions without moving the view; the Atlanta hub lists them. */
+  async function refreshHistory() {
     if (!api) return;
     const epoch = sessionEpoch.current;
     try {
       const result = await api.history();
       if (epoch !== sessionEpoch.current) return;
       setHistory(result.versions);
-      setView("brain");
-    } catch (err) {
-      if (epoch === sessionEpoch.current) setError(friendlyError(err));
+    } catch {
+      // The hub degrades to "Loading saved versions…"; no toast over the dashboard.
     }
+  }
+
+  async function openHistory() {
+    if (!api) return;
+    await refreshHistory();
+    setView("brain");
   }
 
   async function compare(version: number) {
@@ -580,6 +586,12 @@ export function useFounderBrainApp() {
       if (epoch === sessionEpoch.current) setError(friendlyError(err));
     }
   }
+
+  // The Atlanta hub lists all saved versions; fetch them whenever the hub opens
+  // (re-run when api appears, since the memo materializes after sign-in).
+  useEffect(() => {
+    if (view === "atlanta") void refreshHistory();
+  }, [view, api]);
 
   async function pollJob(id: string, epoch = sessionEpoch.current) {
     if (!api || epoch !== sessionEpoch.current) return;
@@ -823,6 +835,7 @@ export function useFounderBrainApp() {
     keepMyDraft,
     loadServerConflict,
     openHistory,
+    refreshHistory,
     compare,
     restore,
     generate,

@@ -2,10 +2,17 @@
  * One-idea-per-screen Typeform shell: progress, Back/Continue, Enter to advance.
  * Reuses the Atlanta entry visual language from AuthPage.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { progressLabel } from "../orientation-copy";
 import { BrandMark } from "./BrandMark";
 import { TypedText } from "./TypedText";
+
+/**
+ * Hub continuity (Danny, 2026-09-21): every typeform screen offers a one-tap
+ * exit back to the Atlanta hub so the interview and the hub read as one app.
+ * App provides the handler; shells render the pill when one exists.
+ */
+export const TypeformExitContext = createContext<(() => void) | null>(null);
 
 export function TypeformShell({
   kicker,
@@ -38,6 +45,7 @@ export function TypeformShell({
 }) {
   const continueRef = useRef<HTMLButtonElement>(null);
   const [titleDone, setTitleDone] = useState(false);
+  const onExit = useContext(TypeformExitContext);
 
   useEffect(() => {
     setTitleDone(false);
@@ -90,6 +98,11 @@ export function TypeformShell({
         />
       </div>
       <div className="entry-veil" aria-hidden="true" />
+      {onExit ? (
+        <button className="typeform-hub-link" type="button" onClick={onExit}>
+          <span aria-hidden="true">&larr;</span> Atlanta hub
+        </button>
+      ) : null}
       <section className="entry-panel typeform-panel" aria-labelledby="typeform-title">
         <header className="entry-brand-block">
           <BrandMark size={56} className="entry-mark" />

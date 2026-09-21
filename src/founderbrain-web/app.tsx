@@ -2,6 +2,7 @@
  * FounderBrain web shell: auth gates, first-login orientation, and layout wiring.
  * State machine lives in ./use-founderbrain-app; presentation under ./components.
  */
+import { type ReactNode } from "react";
 import { missions } from "./mission-copy";
 import { useFounderBrainApp } from "./use-founderbrain-app";
 import { AuthPage } from "./components/AuthPage";
@@ -14,6 +15,7 @@ import { ConflictDialog } from "./components/ConflictDialog";
 import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
+import { TypeformExitContext } from "./components/TypeformShell";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -47,6 +49,11 @@ export function App() {
     closeConflict,
     hexclave,
   } = app;
+
+  // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
+  const inTypeform = (node: ReactNode) => (
+    <TypeformExitContext.Provider value={() => setView("atlanta")}>{node}</TypeformExitContext.Provider>
+  );
 
   if (!config) {
     return <AuthPage kind="boot" message={error || "Opening your FounderBrain…"} />;
@@ -89,7 +96,7 @@ export function App() {
     !draft.offer.description.trim() ||
     !draft.voice.tone.trim();
   if (!firstLoginComplete || guidedOpen) {
-    return (
+    return inTypeform(
       <>
       {accountChip}
       <OrientationFlow
@@ -134,7 +141,7 @@ export function App() {
   }
 
   if (view === "content") {
-    return (
+    return inTypeform(
       <>
         {accountChip}
         <ContentChapter
@@ -151,7 +158,7 @@ export function App() {
   }
 
   if (view === "outreach") {
-    return (
+    return inTypeform(
       <>
         {accountChip}
         <OutreachChapter
@@ -168,7 +175,7 @@ export function App() {
   }
 
   if (view === "ghl") {
-    return (
+    return inTypeform(
       <>
         {accountChip}
         <GhlChapter
@@ -190,7 +197,7 @@ export function App() {
   }
 
   if (view === "missions") {
-    return (
+    return inTypeform(
       <>
         {accountChip}
         {conflict ? (
@@ -261,6 +268,61 @@ export function App() {
     );
   }
 
+  // Atlanta hub: the same immersive glass stage as the typeform screens, now
+  // the control room with versions and the jump-off points (Danny, 2026-09-21).
+  if (view === "atlanta") {
+    return inTypeform(
+      <>
+        {accountChip}
+        {notice ? (
+          <p className="mission-toast notice" role="status">
+            {notice}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="mission-toast error" role="alert">
+            {error}
+            {sessionExpired ? (
+              <>
+                {" "}
+                <a href={window.location.pathname} target="_blank" rel="noopener">
+                  Open a new tab to sign in
+                </a>
+                , then come back here and retry.
+              </>
+            ) : null}
+          </p>
+        ) : null}
+        <AtlantaReady
+          state={state}
+          orientation={orientation}
+          drafts={app.routineDrafts}
+          history={history}
+          onDraftStatus={(id, status) => void app.setDraftStatus(id, status)}
+          onContent={() => setView("content")}
+          onOutreach={() => setView("outreach")}
+          onGhl={() => setView("ghl")}
+          onMissions={() => {
+            const first = missions.find((key) => !state.readiness[key]) ?? "output";
+            setMission(first);
+            setView("missions");
+          }}
+          onBrain={() => void app.openHistory()}
+          onRestore={(v) => void app.restore(v)}
+        />
+        {conflict ? (
+          <ConflictDialog
+            conflict={conflict}
+            draft={draft}
+            closeRef={closeConflict}
+            onKeepDraft={app.keepMyDraft}
+            onLoadServer={app.loadServerConflict}
+          />
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <main className="app-shell">
       <TopBar
@@ -304,22 +366,6 @@ export function App() {
                 </>
               )}
             </p>
-          )}
-          {view === "atlanta" && (
-            <AtlantaReady
-              state={state}
-              orientation={orientation}
-              drafts={app.routineDrafts}
-              onDraftStatus={(id, status) => void app.setDraftStatus(id, status)}
-              onContent={() => setView("content")}
-              onOutreach={() => setView("outreach")}
-              onGhl={() => setView("ghl")}
-              onMissions={() => {
-                const first = missions.find((key) => !state.readiness[key]) ?? "output";
-                setMission(first);
-                setView("missions");
-              }}
-            />
           )}
           {view === "brain" && (
             <BrainPanel
