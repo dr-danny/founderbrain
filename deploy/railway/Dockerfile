@@ -11,9 +11,7 @@ RUN npm run fb:build
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production TZ=UTC PORT=8080
-RUN npm install -g npm@latest \
- && cd "$(npm root -g)/npm" \
- && npm install --no-save brace-expansion@5.0.9 ip-address@10.3.1 tar@7.5.21
+RUN npm install -g npm@latest
 COPY deploy/railway/package.json deploy/railway/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist/founderbrain-server ./

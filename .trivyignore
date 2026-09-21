@@ -1,0 +1,11 @@
+# npm CLI bundled dependencies inside node:22-bookworm-slim (npm@11.x).
+# The FounderBrain server never imports npm, tar, pacote, sigstore,
+# brace-expansion or ip-address: runtime dependencies come from
+# deploy/railway/package-lock.json, which is clean. These CVEs exist only
+# inside npm's own bundled tooling in the base image and clear when the
+# node base image ships a newer npm. Reviewed 2026-09-21, revisit when
+# node:22 updates npm.
+CVE-2026-14257
+CVE-2026-69152
+CVE-2026-69192
+CVE-2026-73566
