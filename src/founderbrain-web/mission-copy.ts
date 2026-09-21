@@ -62,3 +62,13 @@ export const sectionFounderNames: Record<MissionSection, string> = {
   voice: "How you sound",
   context: "Channels and numbers",
 };
+
+/** Founder-facing token count: 12403 -> "12.4k". */
+export const compactTokens = (n: number) =>
+  n < 1000 ? `${n}` : `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+
+/** Founder-facing dollar figure from micro USD. */
+export const compactUsd = (micro: number) => {
+  const usd = micro / 1_000_000;
+  return usd === 0 ? "$0.00" : `$${usd.toFixed(2)}`;
+};

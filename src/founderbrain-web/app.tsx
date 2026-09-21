@@ -86,7 +86,7 @@ export function App() {
   }
 
   // Signed-in views without the full TopBar still get the account chip top right.
-  const accountChip = email ? <AccountChip email={email} onSignOut={() => void app.signOut()} /> : null;
+  const accountChip = email ? <AccountChip email={email} usage={app.usage} onSignOut={() => void app.signOut()} /> : null;
   const guidedOpen =
     !draft.identity.venture.trim() ||
     !draft.identity.role.trim() ||

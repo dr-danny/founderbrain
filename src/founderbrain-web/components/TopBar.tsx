@@ -2,9 +2,27 @@
  * Minimal signed-in account chip for views without the full TopBar (Typeform
  * wizard and chapters). Same sign-out action, fixed top right.
  */
-export function AccountChip({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+export function AccountChip({
+  email,
+  usage,
+  onSignOut,
+}: {
+  email: string;
+  /** Founder-facing metered totals (tokens, site reads, price so far). */
+  usage?: import("../types").UsageResponse | null;
+  onSignOut: () => void;
+}) {
+  const tokens = usage ? usage.ai.inputTokens + usage.ai.outputTokens : null;
+  const tooltip = usage
+    ? `${usage.ai.events} AI actions · ${usage.firecrawl.scrapes} site reads (${usage.firecrawl.credits} credits)`
+    : undefined;
   return (
     <div className="account-chip">
+      {usage ? (
+        <span className="account-chip-usage" title={tooltip}>
+          {compactTokens(tokens!)} tokens used · {compactUsd(usage.totalMicroUsd)} so far
+        </span>
+      ) : null}
       <span className="account-chip-email">{email}</span>
       <button className="quiet" onClick={onSignOut}>
         Sign out
@@ -13,7 +31,7 @@ export function AccountChip({ email, onSignOut }: { email: string; onSignOut: ()
   );
 }
 import type { BrainState, Config } from "../types";
-import { stamp } from "../mission-copy";
+import { compactTokens, compactUsd, stamp } from "../mission-copy";
 import { BrandMark } from "./BrandMark";
 
 /**

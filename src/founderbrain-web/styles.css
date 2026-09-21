@@ -377,9 +377,24 @@ select:focus-visible {
 .account-chip .quiet:hover {
   color: var(--ember);
 }
+.account-chip-usage {
+  color: var(--paper);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+.account-chip-usage::after {
+  content: "";
+  align-self: stretch;
+  width: 1px;
+  background: rgba(247, 239, 230, 0.22);
+}
 @media (max-width: 40rem) {
   .account-chip-email {
     display: none;
+  }
+  .account-chip-usage {
+    white-space: normal;
   }
 }
 .mission-heading {

@@ -17,6 +17,7 @@ import {
   type MissionSection,
   type RoutineDraft,
   type RoutineSettings,
+  type UsageResponse,
 } from "./types";
 import {
   PENDING_JOB_STORAGE_KEY,
@@ -66,6 +67,7 @@ export function useFounderBrainApp() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
   // Settings are written by the routines toggle flow; the value is not rendered
   // anywhere while the feature stays draft-only (ROUTINES_ENABLED off).
@@ -184,6 +186,11 @@ export function useFounderBrainApp() {
     if (api && email) void loadWorkspace();
     if (api && email && config?.routinesEnabled) void loadRoutines();
   }, [api, email]);
+  // Tokens used (Danny, 2026-09-21): keep the account chip's spend line fresh
+  // wherever AI can run (missions run generation, chapters run site reads).
+  useEffect(() => {
+    if (api && email) void loadUsage();
+  }, [api, email, view]);
   useEffect(() => {
     if (!conflict) return undefined;
     const prior = document.activeElement as HTMLElement | null;
@@ -361,6 +368,19 @@ export function useFounderBrainApp() {
       reader.readAsDataURL(blob);
     });
     return api.transcribeVoice({ audioBase64, mime: blob.type || "audio/webm", seconds });
+  }
+
+  /** Founder-facing usage totals for the account chip (tokens, reads, price so far). */
+  async function loadUsage() {
+    if (!api) return;
+    const epoch = sessionEpoch.current;
+    try {
+      const result = await api.usage();
+      if (epoch !== sessionEpoch.current) return;
+      setUsage(result);
+    } catch {
+      // The chip simply omits the spend line when usage is unavailable.
+    }
   }
 
   async function getUsage() {
@@ -836,6 +856,8 @@ export function useFounderBrainApp() {
     loadServerConflict,
     openHistory,
     refreshHistory,
+    usage,
+    loadUsage,
     compare,
     restore,
     generate,
