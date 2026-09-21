@@ -2548,19 +2548,33 @@ button:not(.link-button) {
    and a branded typed-confirmation modal. */
 .account-chip-delete {
   appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  font-size: 0.72rem;
-  color: var(--paper-muted);
-  text-decoration: underline;
-  text-decoration-color: rgba(255, 138, 122, 0.5);
-  text-underline-offset: 0.2em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 0.3rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 138, 122, 0.35);
+  background: rgba(201, 72, 58, 0.14);
+  color: #ff8a7a;
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 .account-chip-delete:hover {
-  color: #ff8a7a;
+  background: rgba(201, 72, 58, 0.3);
+  border-color: rgba(255, 138, 122, 0.7);
+  color: var(--paper);
+}
+.account-chip-delete:focus-visible {
+  outline: 2px solid #ff8a7a;
+  outline-offset: 2px;
 }
 .delete-kicker {
   color: #ffb4a8;
