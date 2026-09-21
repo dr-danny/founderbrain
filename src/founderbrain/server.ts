@@ -164,8 +164,10 @@ export async function buildApi(
           options.openRouterManagement,
         );
       } catch (error) {
-        if (error instanceof DomainError && error.code === "openrouter_key_revoked") throw error;
         // Soft-fail provisioning so Brain edit/export still work if OpenRouter is down.
+        // A revoked key stays blocked for AI actions (keyIsUsable at spend time),
+        // but it must not brick the whole app: the preHandler used to rethrow
+        // openrouter_key_revoked and every API call for the account 403'd.
         log.warn(
           { errorClass: "openrouter_provision_deferred" },
           "OpenRouter key provisioning deferred.",
