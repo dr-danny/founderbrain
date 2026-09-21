@@ -104,3 +104,13 @@ There is no automatic merge of two workspaces. That remains a human data decisio
 | Staging acceptance | #16 | After #13–#15 |
 | Backups + key escrow | #17 | Cost + offline escrow |
 | Enable AI worker | #24 | OpenRouter management key, models, rates, caps |
+
+## Founder deleted and recreated in Hexclave (#37)
+
+Workspaces are keyed on the Hexclave subject (`fb_user.subject`), not email. If an operator deletes a Hexclave user and creates a new one for the same email:
+
+1. The founder signs in and gets a **new, empty workspace**. Their previous workspace remains encrypted under the old subject, intact but unreachable.
+2. There is no merge tooling in v1. If the founder wants their history, the operator either re-links by hand in the database (out of scope for pilot support) or the founder starts fresh.
+3. To start fresh deliberately: operator deletes the old workspace from the old subject's session (Brain panel -> Delete workspace), or leaves it dormant.
+
+Email is never the key (it is display-only and can be reassigned). Documented decision: accept the orphaned workspace rather than widen identity coupling.
