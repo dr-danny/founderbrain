@@ -794,6 +794,19 @@ export function useFounderBrainApp() {
     }
   }
 
+  /** Delete from the account-chip modal; the typed-phrase gate lives in the modal. */
+  async function deleteAccountNow() {
+    if (!api) return;
+    const epoch = sessionEpoch.current;
+    try {
+      await api.deleteWorkspace();
+      if (epoch !== sessionEpoch.current) return;
+      await leaveSession("Account deleted and session cleared.");
+    } catch (err) {
+      if (epoch === sessionEpoch.current) setError(friendlyError(err));
+    }
+  }
+
   function signOut() {
     void leaveSession("Signed out of the local demo.");
   }
@@ -865,6 +878,7 @@ export function useFounderBrainApp() {
     acceptOutput,
     signOut,
     deleteWorkspace,
+    deleteAccountNow,
     download,
     onSignInError,
     saveOrientation,

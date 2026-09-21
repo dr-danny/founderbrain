@@ -2543,3 +2543,72 @@ button:not(.link-button) {
 .account-chip-qr img {
   display: block;
 }
+
+/* Delete account (Danny, 2026-09-21): quiet danger link under the username row,
+   and a branded typed-confirmation modal. */
+.account-chip-delete {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.72rem;
+  color: var(--paper-muted);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 138, 122, 0.5);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.account-chip-delete:hover {
+  color: #ff8a7a;
+}
+.delete-kicker {
+  color: #ffb4a8;
+}
+.delete-phrase {
+  font-family: var(--font-brand);
+  letter-spacing: 0.02em;
+}
+.delete-confirm-input {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(247, 239, 230, 0.3);
+  background: rgba(18, 12, 20, 0.55);
+  color: var(--paper);
+  font-family: var(--font-brand);
+  font-size: 1rem;
+}
+.delete-confirm-input:focus {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.restore-danger {
+  appearance: none;
+  border: 1px solid #ff8a7a;
+  border-radius: 2px;
+  background: #c9483a;
+  color: var(--paper);
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.95rem 1.45rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+.restore-danger:hover:not(:disabled) {
+  background: #e05c4c;
+  border-color: #ff8a7a;
+}
+.restore-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.restore-danger:focus-visible {
+  outline: 2px solid #ff8a7a;
+  outline-offset: 3px;
+}

@@ -16,6 +16,7 @@ import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
 import { TypeformExitContext } from "./components/TypeformShell";
+import { DeleteAccountModal } from "./components/DeleteAccountModal";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -51,8 +52,21 @@ export function App() {
   } = app;
 
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
+  // The delete-account modal rides along so it works wherever the chip is.
   const inTypeform = (node: ReactNode) => (
-    <TypeformExitContext.Provider value={() => setView("atlanta")}>{node}</TypeformExitContext.Provider>
+    <TypeformExitContext.Provider value={() => setView("atlanta")}>
+      {node}
+      {deleteOpen ? (
+        <DeleteAccountModal
+          email={email ?? ""}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={() => {
+            setDeleteOpen(false);
+            void app.deleteAccountNow();
+          }}
+        />
+      ) : null}
+    </TypeformExitContext.Provider>
   );
 
   if (!config) {
@@ -86,7 +100,7 @@ export function App() {
   }
 
   // Signed-in views without the full TopBar still get the account chip top right.
-  const accountChip = email ? <AccountChip email={email} usage={app.usage} onSignOut={() => void app.signOut()} /> : null;
+  const accountChip = email ? <AccountChip email={email} usage={app.usage} onSignOut={() => void app.signOut()} onDeleteAccount={() => setDeleteOpen(true)} /> : null;
   const guidedOpen =
     !draft.identity.venture.trim() ||
     !draft.identity.role.trim() ||

@@ -6,11 +6,13 @@ export function AccountChip({
   email,
   usage,
   onSignOut,
+  onDeleteAccount,
 }: {
   email: string;
   /** Founder-facing metered totals (tokens, site reads, price so far). */
   usage?: import("../types").UsageResponse | null;
   onSignOut: () => void;
+  onDeleteAccount?: () => void;
 }) {
   const tokens = usage ? usage.ai.inputTokens + usage.ai.outputTokens : null;
   const tooltip = usage
@@ -29,6 +31,11 @@ export function AccountChip({
           Sign out
         </button>
       </div>
+      {onDeleteAccount ? (
+        <button className="account-chip-delete" type="button" onClick={onDeleteAccount}>
+          Delete account
+        </button>
+      ) : null}
       <div className="account-chip-footer">
         <span className="account-chip-maker">
           Made with <span className="maker-heart" aria-label="love">&hearts;</span> by Danny
