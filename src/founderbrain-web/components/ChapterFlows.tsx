@@ -12,6 +12,7 @@ import type {
   OutreachAnswers,
 } from "../../founderbrain-shared/orientation";
 import type { UsageResponse } from "../types";
+import { ApiError } from "../api";
 import {
   contentScreens,
   contentTotal,
@@ -519,7 +520,15 @@ export function GhlChapter({
                 })
                 .catch((e: unknown) => {
                   setPushing(false);
-                  setPushError(String(e instanceof Error ? e.message : e).slice(0, 200));
+                  // Known API failures (our own DomainError mapping) carry a founder-safe
+                  // message. Anything else is a raw internal TypeError - #77 surfaced the
+                  // Hexclave SDK's "Cannot read properties of undefined (reading 'has')"
+                  // straight into the chapter. Never print internals to a founder.
+                  setPushError(
+                    e instanceof ApiError
+                      ? String(e.message).slice(0, 200)
+                      : "Something went wrong starting the push. Try again.",
+                  );
                 });
             }}
             disabled={pushing || saving}

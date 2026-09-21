@@ -70,6 +70,12 @@ export async function loadValueCatalog(force = false): Promise<Map<string, Value
   return sections;
 }
 
+/** Verify loop budget (#76): GHL list reads can lag writes; 3 tries x 2s is plenty. */
+const VERIFY_ATTEMPTS = 3;
+const VERIFY_RETRY_MS = 2000;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 const SECTION_BY_PACK: Record<string, string> = {
   lead_follow_up: "B2B Lead follow-up",
   discovery_booking: "B2B Discovery booking",
@@ -234,16 +240,32 @@ export async function pushGhlValues(
     return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven: true, clinicPaste: linkKeys, held };
 
   // Prove it: nothing we claim to have written may still read empty or placeholder.
-  const verify = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
-  if (!verify.ok) throw new DomainError(422, "ghl_push_failed", "Could not verify the push. Check GoHighLevel and retry.");
-  const verifyJson = (await verify.json()) as { customValues?: GhlValue[] };
-  const verifyMap = new Map((verifyJson.customValues ?? []).map((v) => [v.name, v.value]));
-  const proven = [...copy.entries()].every(([gname]) => {
-    const value = verifyMap.get(gname);
-    return value !== undefined && !isUnfilled(value);
-  });
-  if (!proven)
-    throw new DomainError(422, "ghl_push_failed", "The push did not stick. Nothing was published. Check the snapshot names match the values list.");
+  // GHL's customValues list read can lag the writes by a few seconds (#76): the first
+  // verify after a fresh location's first push came back without the new values even
+  // though every write returned ok. Read back a few times before declaring failure.
+  let proven = false;
+  for (let attempt = 0; attempt < VERIFY_ATTEMPTS && !proven; attempt++) {
+    if (attempt > 0) await sleep(VERIFY_RETRY_MS);
+    const verify = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
+    if (!verify.ok)
+      throw new DomainError(422, "ghl_push_failed", "Could not verify the push. Check GoHighLevel and retry.");
+    const verifyJson = (await verify.json()) as { customValues?: GhlValue[] };
+    const verifyMap = new Map((verifyJson.customValues ?? []).map((v) => [v.name, v.value]));
+    proven = [...copy.entries()].every(([gname]) => {
+      const value = verifyMap.get(gname);
+      return value !== undefined && !isUnfilled(value);
+    });
+  }
+  if (!proven) {
+    const wrote = pushed.length > 0;
+    throw new DomainError(
+      422,
+      "ghl_push_failed",
+      wrote
+        ? "The copy is in GoHighLevel but the read-back check could not confirm it. Open the values list to confirm, or retry."
+        : "The push did not stick. Nothing was published. Check the snapshot names match the values list.",
+    );
+  }
   return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven, clinicPaste: linkKeys, held };
 }
 

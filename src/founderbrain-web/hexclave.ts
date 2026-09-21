@@ -43,17 +43,35 @@ export function createHexclave(config: HexclaveClientConfig): Hexclave {
     noAutomaticPrefetch: true,
     analytics: { enabled: false, replays: { enabled: false } },
   });
+  // #77: the SDK can throw a raw TypeError from its token store while a session is
+  // mid-handoff (seen once right after the OAuth callback as "Cannot read properties
+  // of undefined (reading 'has')"). Returning null instead routes the caller to the
+  // clean session-expired path instead of printing SDK internals to a founder.
+  const safeUser = async () => {
+    try {
+      return await app.getUser();
+    } catch {
+      return null;
+    }
+  };
+  const safeToken = async (user: { id: string } & { getAccessToken(): Promise<string | null> }) => {
+    try {
+      return await user.getAccessToken();
+    } catch {
+      return null;
+    }
+  };
   return {
     async currentSession() {
-      const user = await app.getUser();
+      const user = await safeUser();
       if (!user) return null;
       return {
         email: user.primaryEmail,
         async getToken() {
           // A new-tab sign-in replaces the SDK session. Read it again for each request,
           // but never send this founder's unsaved draft under another founder's token.
-          const current = await app.getUser();
-          return current?.id === user.id ? current.getAccessToken() : null;
+          const current = await safeUser();
+          return current?.id === user.id ? await safeToken(current) : null;
         },
         signOut: () => app.signOut({ redirectUrl: "/" }),
       };
