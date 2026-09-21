@@ -361,10 +361,10 @@ select:focus-visible {
   z-index: 1100;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 0.15rem;
-  padding: 0.5rem 0.8rem;
-  border-radius: 14px;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: 16px;
   border: 1px solid rgba(247, 239, 230, 0.18);
   background: rgba(18, 12, 20, 0.72);
   backdrop-filter: blur(6px);
@@ -374,7 +374,9 @@ select:focus-visible {
 .account-chip-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 0.55rem;
+  white-space: nowrap;
 }
 .account-chip .quiet {
   color: var(--paper);
@@ -389,6 +391,7 @@ select:focus-visible {
   white-space: nowrap;
   cursor: help;
   line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 @media (max-width: 40rem) {
   .account-chip-email {
@@ -2507,10 +2510,10 @@ button:not(.link-button) {
 .account-chip-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-  margin-top: 0.15rem;
-  padding-top: 0.35rem;
+  justify-content: center;
+  gap: 0.8rem;
+  margin-top: 0.2rem;
+  padding-top: 0.4rem;
   border-top: 1px solid rgba(247, 239, 230, 0.14);
 }
 .account-chip-maker {
@@ -2526,9 +2529,9 @@ button:not(.link-button) {
 
 /* Venmo QR under the Tip Jar row (Danny, 2026-09-21). */
 .account-chip-qr {
-  align-self: flex-end;
+  align-self: center;
   display: block;
-  margin-top: 0.45rem;
+  margin-top: 0.5rem;
   line-height: 0;
   border-radius: 8px;
   overflow: hidden;
