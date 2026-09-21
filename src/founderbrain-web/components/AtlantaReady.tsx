@@ -273,6 +273,42 @@ export function AtlantaReady({
             )}
           </section>
 
+          {/* The page ends where it started: your position, restated in plain
+              words, so scrolling the history never loses the thread. */}
+          <section className="atlanta-status atlanta-status-bottom" aria-label="Where you stand">
+            <div className="atlanta-status-text">
+              <b>
+                {missionsDone} of {missions.length} missions done
+              </b>
+              <span>
+                {nextMission ? (
+                  <>
+                    You are here:{" "}
+                    <b>
+                      {missionCopy[nextMission].number} {missionCopy[nextMission].title}
+                    </b>
+                    {" "}is the one still open. {map.readyCount} of {map.total} Atlanta items are
+                    ready, and your Brain is saved as version {state.version}.
+                  </>
+                ) : (
+                  <>
+                    Every mission is done. {map.readyCount} of {map.total} Atlanta items are
+                    ready, and your Brain is saved as version {state.version}.
+                  </>
+                )}
+              </span>
+              <span className="atlanta-status-note">
+                What the list above means: every time you save, FounderBrain keeps the whole
+                Brain as a new version. "Go back to this" restores that older save as the newest
+                one; the current one is never lost. Nothing was ever published or sent to
+                customers.
+              </span>
+            </div>
+            <button className="entry-cta" type="button" onClick={onMissions}>
+              {nextMission ? "Keep going" : "Review your work"}
+            </button>
+          </section>
+
           {drafts.length > 0 ? (
             <section className="atlanta-day atlanta-drafts">
               <h2>This week</h2>

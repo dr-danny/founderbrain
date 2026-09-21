@@ -2663,3 +2663,15 @@ button:not(.link-button) {
   border: 1px solid rgba(247, 239, 230, 0.14);
   color: var(--paper);
 }
+
+/* Bottom wrap-up (Danny, 2026-09-21): the position banner repeats at the end of
+   the page so the version list never leaves you lost. */
+.atlanta-status-bottom {
+  margin-top: 1.8rem;
+}
+.atlanta-status-note {
+  color: var(--paper-muted);
+  opacity: 0.85;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
