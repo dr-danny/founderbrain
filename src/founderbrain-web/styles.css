@@ -2465,3 +2465,40 @@ button:not(.link-button) {
 .restore-modal-actions .entry-cta {
   margin-top: 0;
 }
+
+/* Tip Jar (Danny, 2026-09-21): quiet ember link to the builder's Venmo. */
+.account-chip-tipjar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ember);
+  text-decoration: none;
+  padding: 0.15rem 0;
+  transition: color 0.2s ease;
+}
+.account-chip-tipjar:hover {
+  color: var(--paper);
+}
+.tipjar-coin {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  position: relative;
+}
+.tipjar-coin::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.24rem;
+  height: 0.24rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: currentColor;
+}
