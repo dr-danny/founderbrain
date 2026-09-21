@@ -72,18 +72,28 @@ export function AtlantaReady({
   const map = atlantaReadyMap(state.readiness, orientation);
   const byDay = (day: keyof typeof dayCopy) => map.artifacts.filter((a) => a.day === day);
   const versions = [...history].sort((a, b) => b.version - a.version);
-  const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<HistoryItem | null>(null);
   const [showAllVersions, setShowAllVersions] = useState(false);
-  const visibleVersions = showAllVersions ? versions : versions.slice(0, 3);
+  const visibleVersions = showAllVersions ? versions : versions.slice(0, 8);
 
   // Where the founder is: missions done, and the next one by number.
   const missionsDone = missions.filter((key) => state.readiness[key]).length;
   const nextMission = missions.find((key) => !state.readiness[key]);
 
-  // Clear any pending restore confirm when the version set changes.
+  // Close the restore modal when the version set changes (e.g. after restoring).
   useEffect(() => {
-    setConfirmRestore(null);
+    setRestoreTarget(null);
   }, [state.version, history.length]);
+
+  // Escape closes the restore modal.
+  useEffect(() => {
+    if (!restoreTarget) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRestoreTarget(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [restoreTarget]);
 
   return (
     <main className="entry-stage typeform-stage atlanta-stage">
@@ -214,6 +224,11 @@ export function AtlantaReady({
                             {stamp(item.at)}
                             {item.venture ? ` · ${item.venture}` : ""}
                           </small>
+                          {item.approved ? (
+                            <small>
+                              Profile complete at this save: {item.approved.length} of 5 parts
+                            </small>
+                          ) : null}
                           <small className="atlanta-version-changed">
                             {item.changed === undefined
                               ? null
@@ -230,31 +245,11 @@ export function AtlantaReady({
                         </div>
                         {current ? (
                           <span className="atlanta-current-tag">This is the one in use</span>
-                        ) : confirmRestore === item.version ? (
-                          <span className="atlanta-confirm">
-                            <button
-                              type="button"
-                              className="atlanta-version-btn primary"
-                              onClick={() => {
-                                setConfirmRestore(null);
-                                onRestore(item.version);
-                              }}
-                            >
-                              Go back to this version
-                            </button>
-                            <button
-                              type="button"
-                              className="atlanta-version-btn"
-                              onClick={() => setConfirmRestore(null)}
-                            >
-                              Cancel
-                            </button>
-                          </span>
                         ) : (
                           <button
                             type="button"
                             className="atlanta-version-btn"
-                            onClick={() => setConfirmRestore(item.version)}
+                            onClick={() => setRestoreTarget(item)}
                           >
                             Go back to this
                           </button>
@@ -330,6 +325,79 @@ export function AtlantaReady({
           <small>Nothing is published or sent to customers.</small>
         </div>
       </section>
+      {restoreTarget ? (
+        <div
+          className="restore-modal-overlay"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setRestoreTarget(null);
+          }}
+        >
+          <div className="restore-modal" role="dialog" aria-modal="true" aria-labelledby="restore-modal-title">
+            <p className="entry-kicker">GOING BACK</p>
+            <h2 id="restore-modal-title" className="restore-modal-title">
+              Go back to version {restoreTarget.version}?
+            </h2>
+            <div className="restore-modal-body">
+              <p>
+                <b>What this is:</b> version {restoreTarget.version}, saved {stamp(restoreTarget.at)}
+                {restoreTarget.venture ? ` for ${restoreTarget.venture}` : ""}
+                {restoreTarget.track ? (
+                  <>
+                    {" "}
+                    &mdash;{" "}
+                    {restoreTarget.hybrid
+                      ? "selling to businesses and people (Hybrid)"
+                      : restoreTarget.track === "b2c"
+                        ? "selling to people (B2C)"
+                        : "selling to businesses (B2B)"}
+                  </>
+                ) : null}
+                .
+              </p>
+              <p>
+                <b>What changed in it:</b>{" "}
+                {restoreTarget.changed === undefined
+                  ? "not recorded"
+                  : restoreTarget.changed.length === 5
+                    ? "it was the first version"
+                    : restoreTarget.changed.length === 0
+                      ? "nothing, it matched the version before it"
+                      : restoreTarget.changed
+                          .map((key) => sectionFounderNames[key as keyof typeof sectionFounderNames])
+                          .join(", ")}
+                .
+              </p>
+              <p>
+                <b>What will happen:</b> version {restoreTarget.version} becomes your current
+                Brain again. The version you are on now (v{state.version}) stays in your history,
+                so you can always come back. Nothing is ever deleted, and nothing is published or
+                sent to customers.
+              </p>
+            </div>
+            <div className="restore-modal-actions">
+              <button
+                type="button"
+                className="entry-cta restore-modal-confirm"
+                autoFocus
+                onClick={() => {
+                  setRestoreTarget(null);
+                  onRestore(restoreTarget.version);
+                }}
+              >
+                Yes, make version {restoreTarget.version} current
+              </button>
+              <button
+                type="button"
+                className="atlanta-secondary"
+                onClick={() => setRestoreTarget(null)}
+              >
+                Keep version {state.version}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
