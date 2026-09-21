@@ -2,11 +2,17 @@
  * First-run Typeform: name, ready, optional website, then Founder Brain intake.
  * Cursor-based so Back can reopen earlier answers.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Brain } from "../types";
 import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
-import { GUIDE_STEPS, readStepValue, type GuideStep } from "../guide-intake";
+import {
+  GUIDE_STEPS,
+  guideIsComplete,
+  nextGuideStep,
+  readStepValue,
+  type GuideStep,
+} from "../guide-intake";
 
 const NAME_KEY = "founderbrain.what-to-call-you";
 const YES_KEY = "founderbrain.welcome-yes";
@@ -143,6 +149,26 @@ export function OrientationFlow({
     setDraft(readStepValue(brain, track, step));
   }, [step?.id]);
 
+  // The stored cursor must never sit on a filled guide step while an earlier
+  // guide step is still empty: that state only arises from a stale cursor
+  // (workspace deleted, storage reset, or an import failure that shifted the
+  // sequence) and produced a silent intake loop (#66). Snap back to the first
+  // empty step instead of letting Continue write and bounce forever.
+  const clampedRef = useRef(false);
+  useEffect(() => {
+    if (clampedRef.current) return;
+    clampedRef.current = true;
+    const empty = nextGuideStep(brain, track);
+    if (!empty || !step) return;
+    if (empty.id === step.id) return;
+    const emptyIdx = seq.indexOf(`g:${empty.id}`);
+    if (emptyIdx >= 0 && emptyIdx < safe) {
+      moveTo(emptyIdx);
+    }
+    // Run once on mount: brain and cursor are read before first paint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function moveTo(next: number) {
     setLocalError("");
     setProposal(null);
@@ -155,9 +181,26 @@ export function OrientationFlow({
     moveTo(safe - 1);
   }
 
+  /** Leave the intake when the guide is complete; otherwise go to the first
+   *  empty step instead of silently completing a partial guide (#66). */
+  function finishOrRoute() {
+    const empty = nextGuideStep(brain, track);
+    if (!empty) {
+      void onComplete();
+      return;
+    }
+    const emptyIdx = seq.indexOf(`g:${empty.id}`);
+    if (emptyIdx >= 0) {
+      moveTo(emptyIdx);
+      return;
+    }
+    // Unreachable step (should not happen: the sequence holds every guide step).
+    setLocalError("A few answers are still missing. Continue to fill them in.");
+  }
+
   function goNext() {
     if (safe >= seq.length - 1) {
-      void onComplete();
+      finishOrRoute();
       return;
     }
     moveTo(safe + 1);
@@ -198,7 +241,9 @@ export function OrientationFlow({
     if (!siteImportEnabled) {
       writeKey(SITE_KEY, "skip");
       setWantSite(false);
-      goNext();
+      // Dropping site-url shifts every later index; land on venture explicitly
+      // so the venture question is never skipped (#66).
+      moveTo(sequence(false).indexOf("g:venture"));
       return;
     }
     setBusy(true);
@@ -211,7 +256,8 @@ export function OrientationFlow({
       setLocalError(err instanceof Error ? err.message : "Could not read that website. We'll ask instead.");
       writeKey(SITE_KEY, "skip");
       setWantSite(false);
-      goNext();
+      // Same index shift as the disabled-import path: never skip venture (#66).
+      moveTo(sequence(false).indexOf("g:venture"));
     } finally {
       setBusy(false);
     }
@@ -467,7 +513,7 @@ export function OrientationFlow({
         title="Got it."
         continueLabel="Continue"
         immersive
-        onContinue={() => void onComplete()}
+        onContinue={() => finishOrRoute()}
         {...frame}
       >
         {(error || localError) && (
