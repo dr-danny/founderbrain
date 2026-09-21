@@ -2523,3 +2523,20 @@ button:not(.link-button) {
   font-size: 0.78rem;
   vertical-align: -0.05em;
 }
+
+/* Venmo QR under the Tip Jar row (Danny, 2026-09-21). */
+.account-chip-qr {
+  align-self: flex-end;
+  display: block;
+  margin-top: 0.45rem;
+  line-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+.account-chip-qr:hover {
+  transform: scale(1.04);
+}
+.account-chip-qr img {
+  display: block;
+}

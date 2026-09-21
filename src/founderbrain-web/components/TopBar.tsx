@@ -44,6 +44,15 @@ export function AccountChip({
           Tip Jar
         </a>
       </div>
+      <a
+        className="account-chip-qr"
+        href="https://venmo.com/Danny-Mehditash"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Scan to tip Danny on Venmo"
+      >
+        <img src="/venmo-qr.svg" width={64} height={64} alt="QR code linking to Danny's Venmo" />
+      </a>
     </div>
   );
 }
