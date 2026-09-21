@@ -1,12 +1,13 @@
 /**
- * Atlanta hub: the same cinematic stage as the typeform experience (Danny,
- * 2026-09-21), now the control room. Readiness by day, routine drafts, and the
- * full Brain version history with restore-to-switch. Nothing is published.
+ * Atlanta hub: the same cinematic stage as the typeform experience. The control
+ * room: an explicit where-you-are banner, founder-language readiness by day
+ * (every row jumps to the work it belongs to), routine drafts, and a readable
+ * history of every saved version. Nothing is published or sent to customers.
  */
 import { useEffect, useState } from "react";
 import { atlantaReadyMap, type OrientationState } from "../../founderbrain-shared/orientation";
 import type { BrainState, HistoryItem, RoutineDraft } from "../types";
-import { stamp } from "../mission-copy";
+import { missionCopy, missions, sectionFounderNames, stamp } from "../mission-copy";
 import { BrandMark } from "./BrandMark";
 
 const draftKindCopy: Record<RoutineDraft["kind"], string> = {
@@ -18,17 +19,28 @@ const draftKindCopy: Record<RoutineDraft["kind"], string> = {
 const dayCopy = {
   friday: {
     title: "Friday · Foundation",
-    lede: "Ideal customer, value proposition, and a Sales Challenge to test messaging.",
+    lede: "Who you serve, what you promise, and a short message to test it in real conversations.",
   },
   saturday: {
     title: "Saturday · Content + Outreach",
-    lede: "Refine voice, execute the content engine, and run outreach. Tooling like Apollo stays weekend work.",
+    lede: "Fine-tune how you sound, build your content engine, and start talking to the people on your list.",
   },
   sunday: {
     title: "Sunday · Operations + Assemble",
-    lede: "System connections, workflow automation, objection handling, and a 90-day plan pressure-test.",
+    lede: "Connect your systems, automate the busywork, handle objections, and pressure-test your 90-day plan.",
   },
 } as const;
+
+/** Where each readiness row takes the founder. */
+const artifactTargets: Record<string, string> = {
+  brainThesis: "mission-identity",
+  firstOutput: "mission-output",
+  voice: "mission-voice",
+  contentChapter: "chapter-content",
+  outreachChapter: "chapter-outreach",
+  trackSetup: "mission-context",
+  ghlAccount: "chapter-ghl",
+};
 
 export function AtlantaReady({
   state,
@@ -40,6 +52,7 @@ export function AtlantaReady({
   onOutreach,
   onGhl,
   onMissions,
+  onOpenArtifact,
   onBrain,
   onRestore,
 }: {
@@ -52,6 +65,7 @@ export function AtlantaReady({
   onOutreach: () => void;
   onGhl: () => void;
   onMissions: () => void;
+  onOpenArtifact: (target: string) => void;
   onBrain: () => void;
   onRestore: (version: number) => void;
 }) {
@@ -59,6 +73,12 @@ export function AtlantaReady({
   const byDay = (day: keyof typeof dayCopy) => map.artifacts.filter((a) => a.day === day);
   const versions = [...history].sort((a, b) => b.version - a.version);
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  const visibleVersions = showAllVersions ? versions : versions.slice(0, 3);
+
+  // Where the founder is: missions done, and the next one by number.
+  const missionsDone = missions.filter((key) => state.readiness[key]).length;
+  const nextMission = missions.find((key) => !state.readiness[key]);
 
   // Clear any pending restore confirm when the version set changes.
   useEffect(() => {
@@ -88,26 +108,54 @@ export function AtlantaReady({
         </header>
         <p className="entry-kicker">ATLANTA &middot; SEP 25&ndash;27</p>
         <h1 id="atlanta-title" className="entry-title">
-          {map.green ? "You are Green for Atlanta." : "What ready means in Atlanta."}
+          {map.green ? "You are ready for Atlanta." : "Here is where you stand for Atlanta."}
         </h1>
         <div className="typeform-body in atlanta-body">
-          <p className="atlanta-lede">
-            The weekend is the event. FounderBrain is how you arrive with real artifacts &mdash; not
-            a recording, not a Google Form.
-          </p>
+          {/* Where you are, stated outright. The button is the next thing to click. */}
+          <section className="atlanta-status" aria-label="Where you are">
+            <div className="atlanta-status-text">
+              <b>
+                {missionsDone} of {missions.length} missions done
+              </b>
+              <span>
+                {nextMission ? (
+                  <>
+                    Next up:{" "}
+                    <b>
+                      {missionCopy[nextMission].number} {missionCopy[nextMission].title}
+                    </b>
+                  </>
+                ) : (
+                  "Every mission is done. Walk the chapters below."
+                )}
+              </span>
+            </div>
+            <button className="entry-cta" type="button" onClick={onMissions}>
+              {nextMission ? "Keep going" : "Review your work"}
+            </button>
+          </section>
+
           <div className="progress atlanta-progress">
             <b>
               {map.readyCount}/{map.total}
             </b>
             <span>
-              {map.green ? "Green — all artifacts ready" : "artifacts ready · partial is not Green"}
+              {map.green
+                ? "Everything on this list is done."
+                : "of the list below is done. Finish the rest before the weekend."}
             </span>
             <progress
               value={map.readyCount}
               max={map.total}
-              aria-label={`${map.readyCount} of ${map.total} Atlanta artifacts ready`}
+              aria-label={`${map.readyCount} of ${map.total} Atlanta items done`}
             />
           </div>
+
+          <p className="atlanta-lede">
+            The weekend is the event. FounderBrain gets the work done before you land: your
+            business profile, your content, your outreach, and your systems. Everything below
+            opens the exact place where that work happens.
+          </p>
 
           {(Object.keys(dayCopy) as Array<keyof typeof dayCopy>).map((day) => (
             <section key={day} className="atlanta-day">
@@ -116,69 +164,112 @@ export function AtlantaReady({
               <ul className="atlanta-artifacts">
                 {byDay(day).map((artifact) => (
                   <li key={artifact.key} className={artifact.ready ? "ready" : "partial"}>
-                    <span aria-hidden="true">{artifact.ready ? "✓" : "○"}</span>
-                    {artifact.label}
+                    <button
+                      type="button"
+                      className="atlanta-artifact"
+                      onClick={() => onOpenArtifact(artifactTargets[artifact.key] ?? "mission-identity")}
+                    >
+                      <span className="atlanta-artifact-mark" aria-hidden="true">
+                        {artifact.ready ? "✓" : "○"}
+                      </span>
+                      <span className="atlanta-artifact-label">{artifact.label}</span>
+                      <span className="atlanta-artifact-go" aria-hidden="true">
+                        {artifact.ready ? "Open" : "Start"}
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
             </section>
           ))}
 
-          <section className="atlanta-day atlanta-versions">
-            <h2>Versions</h2>
+          <section className="atlanta-day atlanta-versions-section">
+            <h2>Your history</h2>
             <p>
-              Every save is kept. Restoring an older version brings it back as the newest version;
-              nothing is deleted.
+              Every save is kept as its own version, so you can always go back. Each version shows
+              what your business was and exactly what changed. Restoring an older version brings it
+              back as the newest save; nothing is ever deleted.
             </p>
             {versions.length === 0 ? (
-              <p className="atlanta-muted">Loading saved versions…</p>
+              <p className="atlanta-muted">Loading your saves…</p>
             ) : (
-              <ol className="atlanta-versions">
-                {versions.map((item) => {
-                  const current = item.version === state.version;
-                  return (
-                    <li key={item.version} className={current ? "current" : ""}>
-                      <div className="atlanta-version-meta">
-                        <b>v{item.version}</b>
-                        <small>
-                          {stamp(item.at)} · {item.sha.slice(0, 8)}
-                        </small>
-                      </div>
-                      {current ? (
-                        <span className="atlanta-current-tag">Current</span>
-                      ) : confirmRestore === item.version ? (
-                        <span className="atlanta-confirm">
-                          <button
-                            type="button"
-                            className="atlanta-version-btn primary"
-                            onClick={() => {
-                              setConfirmRestore(null);
-                              onRestore(item.version);
-                            }}
-                          >
-                            Restore v{item.version}
-                          </button>
+              <>
+                <ol className="atlanta-versions">
+                  {visibleVersions.map((item) => {
+                    const current = item.version === state.version;
+                    return (
+                      <li key={item.version} className={current ? "current" : ""}>
+                        <div className="atlanta-version-meta">
+                          <b>
+                            Version {item.version}
+                            <span className="atlanta-track-chip">
+                              {item.track === "b2c" ? "Sells to people (B2C)" : "Sells to businesses (B2B)"}
+                              {item.hybrid ? " · also B2B" : ""}
+                            </span>
+                          </b>
+                          <small>
+                            {stamp(item.at)}
+                            {item.venture ? ` · ${item.venture}` : ""}
+                          </small>
+                          <small className="atlanta-version-changed">
+                            {item.changed === undefined
+                              ? null
+                              : item.changed.length === 5 || item.changed.length === 0
+                                ? "First version"
+                                : item.changed.length === 1
+                                  ? `Changed: ${sectionFounderNames[item.changed[0] as keyof typeof sectionFounderNames]}`
+                                  : `Changed: ${item.changed
+                                      .map((key) => sectionFounderNames[key as keyof typeof sectionFounderNames])
+                                      .join(", ")}`}
+                          </small>
+                        </div>
+                        {current ? (
+                          <span className="atlanta-current-tag">This is the one in use</span>
+                        ) : confirmRestore === item.version ? (
+                          <span className="atlanta-confirm">
+                            <button
+                              type="button"
+                              className="atlanta-version-btn primary"
+                              onClick={() => {
+                                setConfirmRestore(null);
+                                onRestore(item.version);
+                              }}
+                            >
+                              Go back to this version
+                            </button>
+                            <button
+                              type="button"
+                              className="atlanta-version-btn"
+                              onClick={() => setConfirmRestore(null)}
+                            >
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
                           <button
                             type="button"
                             className="atlanta-version-btn"
-                            onClick={() => setConfirmRestore(null)}
+                            onClick={() => setConfirmRestore(item.version)}
                           >
-                            Cancel
+                            Go back to this
                           </button>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="atlanta-version-btn"
-                          onClick={() => setConfirmRestore(item.version)}
-                        >
-                          Restore
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+                {versions.length > 3 ? (
+                  <button
+                    type="button"
+                    className="atlanta-version-btn atlanta-show-all"
+                    onClick={() => setShowAllVersions((value) => !value)}
+                  >
+                    {showAllVersions
+                      ? "Show latest only"
+                      : `Show all ${versions.length} versions`}
+                  </button>
+                ) : null}
+              </>
             )}
           </section>
 
@@ -218,20 +309,17 @@ export function AtlantaReady({
           ) : null}
 
           <div className="atlanta-actions">
-            <button className="entry-cta" type="button" onClick={onMissions}>
-              Continue missions
-            </button>
             <button className="atlanta-secondary" type="button" onClick={onContent}>
-              {orientation.contentCompletedAt ? "Review content chapter" : "Content chapter"}
+              {orientation.contentCompletedAt ? "Review your content plan" : "Set up your content plan"}
             </button>
             <button className="atlanta-secondary" type="button" onClick={onOutreach}>
-              {orientation.outreachCompletedAt ? "Review outreach chapter" : "Outreach chapter"}
+              {orientation.outreachCompletedAt ? "Review your outreach plan" : "Set up your outreach plan"}
             </button>
             <button className="atlanta-secondary" type="button" onClick={onGhl}>
-              {orientation.ghlCompletedAt ? "Review GoHighLevel chapter" : "GoHighLevel chapter"}
+              {orientation.ghlCompletedAt ? "Review GoHighLevel" : "Connect GoHighLevel"}
             </button>
             <button className="atlanta-secondary" type="button" onClick={onBrain}>
-              Brain &amp; exports
+              Your files & downloads
             </button>
           </div>
           <small>Nothing is published or sent to customers.</small>

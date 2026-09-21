@@ -63,6 +63,13 @@ export interface HistoryItem {
   version: number;
   sha: string;
   at: string;
+  /** What the workspace was at this save (from /api/history). */
+  venture?: string;
+  track?: "b2b" | "b2c";
+  hybrid?: boolean;
+  approved?: string[];
+  /** Sections that differ from the version before; all sections for the first save. */
+  changed?: string[];
 }
 export interface Job {
   id: string;

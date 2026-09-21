@@ -248,6 +248,13 @@ export function MissionTypeform(props: {
   const current = screens[Math.min(Math.max(idx, 0), total - 1)]!;
   const go = (next: number) => setIdx(Math.min(Math.max(next, 0), total - 1));
 
+  // Founder-facing position (Danny, 2026-09-21): the cumulative "43 of 43" counter
+  // never said where inside a mission the founder stands. Map it explicitly.
+  const missionScreens = screens.filter((screen) => screen.mission === current.mission);
+  const posInMission = missionScreens.indexOf(current) + 1;
+  const missionNumber = missions.indexOf(current.mission as Mission) + 1;
+  const progressText = `Mission ${missionNumber} of ${missions.length} · step ${posInMission} of ${missionScreens.length}`;
+
   // Template PR #7 "Neither fits" follow-up for the Model choice, and the
   // offer-to-look-first state (sources.md). Both reset as the walk moves.
   const [neitherMode, setNeitherMode] = useState(false);
@@ -269,6 +276,7 @@ export function MissionTypeform(props: {
         kicker={`Mission ${missions.indexOf("output") + 1} · ${missionCopy.output.title}`}
         screen={total}
         total={total}
+        progressText={`Mission ${missions.length} of ${missions.length} · your first output`}
         title="Your first output"
         continueLabel="Done"
         showBack
@@ -433,6 +441,7 @@ export function MissionTypeform(props: {
       kicker={`Mission ${index + 1} · ${active.title}`}
       screen={Math.min(idx + 1, total)}
       total={total}
+      progressText={progressText}
       title={def.title}
       showBack
       onBack={() => (idx === 0 ? props.onFinished() : go(idx - 1))}

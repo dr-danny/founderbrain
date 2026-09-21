@@ -28,6 +28,8 @@ export function TypeformShell({
   saving = false,
   immersive = false,
   hideContinue = false,
+  /** Founder-facing position text (e.g. "Mission 3 of 6 · step 2 of 5"). Overrides screen/total. */
+  progressText,
 }: {
   kicker: string;
   screen: number;
@@ -42,6 +44,7 @@ export function TypeformShell({
   saving?: boolean;
   immersive?: boolean;
   hideContinue?: boolean;
+  progressText?: string;
 }) {
   const continueRef = useRef<HTMLButtonElement>(null);
   const [titleDone, setTitleDone] = useState(false);
@@ -76,7 +79,7 @@ export function TypeformShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [continueDisabled, saving, onContinue, hideContinue, titleDone]);
 
-  const label = progressLabel(screen, total);
+  const label = progressText ?? progressLabel(screen, total);
 
   return (
     <main className={immersive ? "entry-stage typeform-stage immersive" : "entry-stage typeform-stage"}>

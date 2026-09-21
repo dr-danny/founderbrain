@@ -307,6 +307,14 @@ export function App() {
             setMission(first);
             setView("missions");
           }}
+          onOpenArtifact={(target) => {
+            if (target === "chapter-content") return setView("content");
+            if (target === "chapter-outreach") return setView("outreach");
+            if (target === "chapter-ghl") return setView("ghl");
+            const mission = target.replace("mission-", "") as (typeof missions)[number];
+            setMission(mission);
+            setView("missions");
+          }}
           onBrain={() => void app.openHistory()}
           onRestore={(v) => void app.restore(v)}
         />

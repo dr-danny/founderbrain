@@ -190,31 +190,31 @@ export function atlantaReadyMap(
   const artifacts: AtlantaArtifact[] = [
     {
       key: "brainThesis",
-      label: "Brain + thesis saved (Identity, Customer, Offer)",
+      label: "Your business profile: who you are, who you serve, what you sell",
       day: "friday",
       ready: brainThesis,
     },
     {
       key: "voice",
-      label: "Voice saved",
+      label: "How you sound: your tone, boundaries, and a sample of your words",
       day: "saturday",
       ready: readiness.voice,
     },
     {
       key: "firstOutput",
-      label: "One private first output accepted",
+      label: "Your first AI-written message, reviewed and approved",
       day: "friday",
       ready: readiness.output,
     },
     {
       key: "contentChapter",
-      label: "Content chapter: 30 pieces, bottleneck, workflow",
+      label: "Your content plan: what you post and how to keep it flowing",
       day: "saturday",
       ready: orientation.contentCompletedAt !== null,
     },
     {
       key: "outreachChapter",
-      label: "Outreach chapter: copy + list / 25 accounts",
+      label: "Your outreach plan: who to contact and what to say",
       day: "saturday",
       ready: orientation.outreachCompletedAt !== null,
     },
@@ -222,16 +222,16 @@ export function atlantaReadyMap(
       key: "trackSetup",
       label:
         orientation.track === "b2c"
-          ? "Instagram set to Business"
+          ? "Your Instagram is a business account"
           : orientation.track === "b2b"
-            ? "Email domain ready"
-            : "B2B email domain or B2C Instagram Business",
+            ? "Your email domain is set up and ready to send"
+            : "Your email domain or Instagram business account is set up",
       day: "sunday",
       ready: trackSetup,
     },
     {
       key: "ghlAccount",
-      label: "GoHighLevel connected",
+      label: "Your GoHighLevel account is connected",
       day: "sunday",
       ready: orientation.ghlAnswers.connected === true,
     },

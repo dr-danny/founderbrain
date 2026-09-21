@@ -4,6 +4,7 @@
  * the same copy without pulling UI.
  */
 export type Mission = "identity" | "customer" | "offer" | "context" | "voice" | "output";
+type MissionSection = Exclude<Mission, "output">;
 
 export const missionCopy: Record<Mission, { number: string; title: string; note: string }> = {
   identity: {
@@ -49,3 +50,15 @@ export const stamp = (at: string | null) =>
         minute: "2-digit",
       }).format(new Date(at))
     : "Not saved yet";
+
+/**
+ * Founder-facing names for the five Brain sections, used wherever a version or
+ * a diff is shown (hub history, Brain panel). No internal jargon.
+ */
+export const sectionFounderNames: Record<MissionSection, string> = {
+  identity: "Who you are",
+  customer: "Who you serve",
+  offer: "What you sell",
+  voice: "How you sound",
+  context: "Channels and numbers",
+};

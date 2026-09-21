@@ -2247,3 +2247,111 @@ button:not(.link-button) {
   margin-top: 1.4rem;
   color: var(--paper-muted);
 }
+
+/* Where-you-are banner (Danny, 2026-09-21): explicit position + the next click. */
+.atlanta-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem 1.4rem;
+  margin-top: 1.6rem;
+  padding: 1.05rem 1.25rem;
+  border: 1px solid rgba(224, 137, 74, 0.45);
+  border-radius: 14px;
+  background: rgba(224, 137, 74, 0.08);
+}
+.atlanta-status-text {
+  display: grid;
+  gap: 0.2rem;
+}
+.atlanta-status-text b {
+  font-family: var(--font-brand);
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+}
+.atlanta-status-text span {
+  font-size: 0.95rem;
+  color: var(--paper-muted);
+}
+.atlanta-status-text span b {
+  font-size: 0.95rem;
+  color: var(--ember);
+}
+.atlanta-status .entry-cta {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+/* Readiness rows are buttons: every row opens the exact work. */
+.atlanta-artifacts li {
+  display: block;
+}
+.atlanta-artifact {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.35rem 1fr auto;
+  gap: 0.55rem;
+  align-items: baseline;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  padding: 0.45rem 0.6rem;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.atlanta-artifact:hover {
+  background: rgba(247, 239, 230, 0.07);
+  border-color: rgba(247, 239, 230, 0.25);
+}
+.atlanta-artifact:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.atlanta-artifact-mark {
+  font-weight: 800;
+}
+.atlanta-artifact-go {
+  font-family: var(--font-brand);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ember);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.atlanta-artifact:hover .atlanta-artifact-go,
+.atlanta-artifact:focus-visible .atlanta-artifact-go {
+  opacity: 1;
+}
+/* Track chip on version rows. */
+.atlanta-track-chip {
+  margin-left: 0.6rem;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--paper-muted);
+  border: 1px solid rgba(247, 239, 230, 0.25);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  vertical-align: 0.1em;
+}
+.brain-track-chip {
+  color: #3f474b;
+  border-color: #d6dbde;
+}
+.atlanta-version-changed {
+  color: var(--paper);
+  opacity: 0.85;
+}
+.atlanta-show-all {
+  margin-top: 0.7rem;
+}

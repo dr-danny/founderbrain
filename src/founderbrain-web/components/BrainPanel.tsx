@@ -3,7 +3,7 @@
  * Server versions are authoritative; App wires the API callbacks.
  */
 import type { BrainState, HistoryItem } from "../types";
-import { stamp } from "../mission-copy";
+import { sectionFounderNames, stamp } from "../mission-copy";
 import { BrainDiff } from "./BrainDiff";
 
 export function BrainPanel({
@@ -60,9 +60,22 @@ export function BrainPanel({
               {history.map((item) => (
                 <li key={item.version}>
                   <div>
-                    <b>v{item.version}</b>
+                    <b>
+                      Version {item.version}
+                      {item.track ? (
+                        <span className="atlanta-track-chip brain-track-chip">
+                          {item.track === "b2c" ? "Sells to people (B2C)" : "Sells to businesses (B2B)"}
+                          {item.hybrid ? " · also B2B" : ""}
+                        </span>
+                      ) : null}
+                    </b>
+                    <small>{stamp(item.at)}</small>
                     <small>
-                      {stamp(item.at)} · {item.sha.slice(0, 8)}
+                      {item.changed === undefined
+                        ? null
+                        : item.changed.length === 5 || item.changed.length === 0
+                          ? "First version"
+                          : `Changed: ${item.changed.map((key) => sectionFounderNames[key as keyof typeof sectionFounderNames]).join(", ")}`}
                     </small>
                   </div>
                   <button className="quiet" onClick={() => onCompare(item.version)}>

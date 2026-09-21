@@ -31,6 +31,31 @@ import { assertSafeRole } from "./migrations.ts";
 const BRAIN_PATH = "brain.json";
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
+/** Sections summarized per version in /api/history (mission sections of the Brain). */
+const SUMMARY_SECTIONS = ["identity", "customer", "offer", "voice", "context"] as const;
+type SummarySection = (typeof SUMMARY_SECTIONS)[number];
+
+export interface HistoryRow {
+  version: number;
+  sha: string;
+  at: string;
+  /** What the workspace was when this version was saved. */
+  venture: string;
+  track: "b2b" | "b2c";
+  hybrid: boolean;
+  approved: SummarySection[];
+  /** Sections that differ from the version before it; all sections for the first save. */
+  changed: SummarySection[];
+}
+
+function brainChangedSections(brain: Brain, previous: Brain | null): SummarySection[] {
+  if (!previous) return [...SUMMARY_SECTIONS];
+  return SUMMARY_SECTIONS.filter(
+    (section) => JSON.stringify(brain[section]) !== JSON.stringify(previous[section]),
+  );
+}
+
+
 type FounderRow = {
   version: number | string | bigint;
   wrapped_key: Uint8Array;
@@ -435,7 +460,7 @@ export class PgBrainStore {
     }
   }
 
-  async history(workspaceId: string): Promise<Array<{ version: number; sha: string; at: string }>> {
+  async history(workspaceId: string): Promise<HistoryRow[]> {
     await this.ready();
     validOpaque(workspaceId, "workspace id", 64);
     try {
@@ -455,16 +480,30 @@ export class PgBrainStore {
            order by v.version desc
         `;
         const key = unwrapDataKey(workspaceId, founder.wrapped_key);
-        return rows.map((row) => {
-          // Parsing still validates the blob; the hash is the persisted sha.
+        // Rows come newest-first. Every blob is parsed anyway for validation, so
+        // the founder-facing summary (what this version is, what changed in it)
+        // costs no extra decryption.
+        const brains = rows.map((row) =>
           checkedBrain(
             JSON.parse(
               openBlob(workspaceId, key, row.blob_sha, row.ciphertext, row.nonce).toString("utf8"),
             ) as Brain,
-          );
+          ),
+        );
+        return brains.map((brain, index) => {
+          const row = rows[index]!;
           const at = iso(row.at);
           if (!at) throw fail(503, "storage_unavailable", "Saved workspace history is invalid.");
-          return { version: asVersion(row.version), sha: row.blob_sha, at };
+          return {
+            version: asVersion(row.version),
+            sha: row.blob_sha,
+            at,
+            venture: brain.identity.venture,
+            track: brain.identity.track,
+            hybrid: brain.identity.hybrid,
+            approved: SUMMARY_SECTIONS.filter((section) => brain[section].approved),
+            changed: brainChangedSections(brain, index + 1 < brains.length ? brains[index + 1]! : null),
+          };
         });
       });
     } catch (error) {
