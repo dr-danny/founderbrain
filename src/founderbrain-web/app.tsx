@@ -282,6 +282,44 @@ export function App() {
     );
   }
 
+  // Files and downloads: the same immersive glass stage, wired to the chip modal.
+  if (view === "brain") {
+    return inTypeform(
+      <>
+        {accountChip}
+        {notice ? (
+          <p className="mission-toast notice" role="status">
+            {notice}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="mission-toast error" role="alert">
+            {error}
+            {sessionExpired ? (
+              <>
+                {" "}
+                <a href={window.location.pathname} target="_blank" rel="noopener">
+                  Open a new tab to sign in
+                </a>
+                , then come back here and retry.
+              </>
+            ) : null}
+          </p>
+        ) : null}
+        <BrainPanel
+          state={state}
+          history={history}
+          comparison={comparison}
+          onCompare={(v) => void app.compare(v)}
+          onRestore={(v) => void app.restore(v)}
+          onDownload={app.download}
+          onHome={() => setView("atlanta")}
+          onPrivacy={() => setView("privacy")}
+        />
+      </>
+    );
+  }
+
   // Atlanta hub: the same immersive glass stage as the typeform screens, now
   // the control room with versions and the jump-off points (Danny, 2026-09-21).
   if (view === "atlanta") {
@@ -388,22 +426,6 @@ export function App() {
                 </>
               )}
             </p>
-          )}
-          {view === "brain" && (
-            <BrainPanel
-              state={state}
-              history={history}
-              comparison={comparison}
-              deleteOpen={deleteOpen}
-              deleteText={deleteText}
-              onDeleteOpen={() => setDeleteOpen(true)}
-              onDeleteText={setDeleteText}
-              onDelete={() => void app.deleteWorkspace()}
-              onCompare={(v) => void app.compare(v)}
-              onRestore={(v) => void app.restore(v)}
-              onDownload={app.download}
-              onPrivacy={() => setView("privacy")}
-            />
           )}
           {view === "privacy" && <PrivacyDisclosure onBack={() => setView("brain")} />}
         </section>

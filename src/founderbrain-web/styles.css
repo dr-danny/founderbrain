@@ -2626,3 +2626,40 @@ button:not(.link-button) {
   outline: 2px solid #ff8a7a;
   outline-offset: 3px;
 }
+
+/* Files-and-downloads stage (Danny, 2026-09-21): the Brain panel on the glass
+   stage needs dark overrides for its compare table. */
+.brain-stage .muted,
+.brain-stage .brain-diff-toolbar .muted {
+  color: var(--paper-muted);
+}
+.brain-stage .brain-diff-toggle {
+  color: var(--paper-muted);
+}
+.brain-stage .brain-diff-table {
+  background: transparent;
+  color: var(--paper-muted);
+}
+.brain-stage .brain-diff-table th,
+.brain-stage .brain-diff-table td {
+  border-color: rgba(247, 239, 230, 0.14);
+}
+.brain-stage .brain-diff-table th {
+  background: rgba(247, 239, 230, 0.06);
+  color: var(--paper);
+}
+.brain-stage .brain-diff-table tr.changed td {
+  background: rgba(224, 137, 74, 0.12);
+}
+.brain-stage .brain-diff-table .diff-value.left {
+  color: var(--paper);
+}
+.brain-stage .brain-diff-table .diff-value.right {
+  color: var(--ember);
+}
+.brain-stage .brain-diff-raw pre,
+.brain-stage .compare pre {
+  background: rgba(18, 12, 20, 0.55);
+  border: 1px solid rgba(247, 239, 230, 0.14);
+  color: var(--paper);
+}
