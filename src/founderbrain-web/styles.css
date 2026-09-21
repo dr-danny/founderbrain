@@ -2502,3 +2502,24 @@ button:not(.link-button) {
   border-radius: 50%;
   background: currentColor;
 }
+
+/* Chip footer: maker line + Tip Jar on one row (Danny, 2026-09-21). */
+.account-chip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-top: 0.15rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(247, 239, 230, 0.14);
+}
+.account-chip-maker {
+  font-size: 0.68rem;
+  color: var(--paper-muted);
+  white-space: nowrap;
+}
+.maker-heart {
+  color: #e05c5c;
+  font-size: 0.78rem;
+  vertical-align: -0.05em;
+}

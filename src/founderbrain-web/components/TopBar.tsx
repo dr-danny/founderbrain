@@ -29,16 +29,21 @@ export function AccountChip({
           Sign out
         </button>
       </div>
-      <a
-        className="account-chip-tipjar"
-        href="https://venmo.com/Danny-Mehditash"
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Tip the builder on Venmo"
-      >
-        <span className="tipjar-coin" aria-hidden="true" />
-        Tip Jar
-      </a>
+      <div className="account-chip-footer">
+        <span className="account-chip-maker">
+          Made with <span className="maker-heart" aria-label="love">&hearts;</span> by Danny
+        </span>
+        <a
+          className="account-chip-tipjar"
+          href="https://venmo.com/Danny-Mehditash"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Tip the builder on Venmo"
+        >
+          <span className="tipjar-coin" aria-hidden="true" />
+          Tip Jar
+        </a>
+      </div>
     </div>
   );
 }
