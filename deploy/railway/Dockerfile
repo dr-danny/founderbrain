@@ -1,5 +1,7 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
+# Trivy flags npm's bundled tar/pacote/sigstore in node:22; pull current npm first (#45).
+RUN npm install -g npm@latest
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
@@ -9,6 +11,7 @@ RUN npm run fb:build
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production TZ=UTC PORT=8080
+RUN npm install -g npm@latest
 COPY deploy/railway/package.json deploy/railway/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist/founderbrain-server ./

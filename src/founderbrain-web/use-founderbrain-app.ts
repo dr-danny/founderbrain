@@ -244,14 +244,16 @@ export function useFounderBrainApp() {
     setError("");
     try {
       const saved = await api.saveOrientation(patch);
-      if (epoch !== sessionEpoch.current) return saved;
+      // Always apply the server response: it is fresher than any local state,
+      // even when the session epoch moved mid-request (token refresh). The old
+      // guard dropped this update and left the client stale (#69).
       setOrientation(saved);
       return saved;
     } catch (err) {
       if (epoch === sessionEpoch.current) setError(friendlyError(err));
       throw err;
     } finally {
-      if (epoch === sessionEpoch.current) setOrientationSaving(false);
+      setOrientationSaving(false);
     }
   }
 

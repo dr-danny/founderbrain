@@ -1399,10 +1399,6 @@ button:not(.link-button) {
   font-size: 1.15rem;
   padding: 1.1rem 1.75rem;
 }
-.typeform-body.wait {
-  opacity: 0;
-  pointer-events: none;
-}
 .typeform-body.in {
   opacity: 1;
   animation: entry-rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;

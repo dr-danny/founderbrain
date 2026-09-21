@@ -101,29 +101,34 @@ export function TypeformShell({
         <h1 id="typeform-title" className="entry-title">
           <TypedText text={title} onDone={() => setTitleDone(true)} />
         </h1>
-        <div className={titleDone ? "typeform-body in" : "typeform-body wait"}>
-          {children}
-          {hideContinue && !showBack ? null : (
-            <div className="typeform-actions">
-              {showBack ? (
-                <button className="typeform-back" type="button" onClick={onBack} disabled={saving}>
-                  Back
-                </button>
-              ) : null}
-              {hideContinue ? null : (
-                <button
-                  ref={continueRef}
-                  className="entry-cta"
-                  type="button"
-                  onClick={onContinue}
-                  disabled={continueDisabled || saving}
-                >
-                  {saving ? "Saving…" : continueLabel}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Render-gate on titleDone: controls were opacity:0 + pointer-events:none
+            while the title typed, which made them invisible to sighted keyboard
+            users and dropped them from the accessibility tree (#28). */}
+        {titleDone ? (
+          <div className="typeform-body in">
+            {children}
+            {hideContinue && !showBack ? null : (
+              <div className="typeform-actions">
+                {showBack ? (
+                  <button className="typeform-back" type="button" onClick={onBack} disabled={saving}>
+                    Back
+                  </button>
+                ) : null}
+                {hideContinue ? null : (
+                  <button
+                    ref={continueRef}
+                    className="entry-cta"
+                    type="button"
+                    onClick={onContinue}
+                    disabled={continueDisabled || saving}
+                  >
+                    {saving ? "Saving…" : continueLabel}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
     </main>
   );
