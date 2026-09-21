@@ -8,7 +8,6 @@ import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
 import {
   GUIDE_STEPS,
-  guideIsComplete,
   nextGuideStep,
   readStepValue,
   type GuideStep,
@@ -166,7 +165,6 @@ export function OrientationFlow({
       moveTo(emptyIdx);
     }
     // Run once on mount: brain and cursor are read before first paint.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function moveTo(next: number) {

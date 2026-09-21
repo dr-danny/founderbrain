@@ -32,7 +32,6 @@ import { DomainError } from "./domain.ts";
 import { canonicalize, type Brain, type BrainState } from "../founderbrain-shared/domain.ts";
 import { checkCopy } from "./copy-rules.ts";
 import { openRouterProvider } from "./provider.ts";
-import { loadOpenRouterApiKey } from "./openrouter-keys.ts";
 import { recordUsageEvent, ceilMicro } from "./usage.ts";
 import type { Config } from "./config.ts";
 import type { PgBrainStore } from "./store.ts";
@@ -442,7 +441,6 @@ export async function sweepOnce(store: PgBrainStore, config: Config, limit = 4):
       select founder_id, timezone, monday_plan, content_top_up, readiness_digest
       from fb_routine_state where timezone <> ''
     `;
-    const now = new Date();
     let generated = 0;
     let scanned = 0;
     for (const state of states) {

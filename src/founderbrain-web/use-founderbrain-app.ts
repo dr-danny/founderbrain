@@ -67,7 +67,9 @@ export function useFounderBrainApp() {
   const [error, setError] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
-  const [routineSettings, setRoutineSettings] = useState<RoutineSettings | null>(null);
+  // Settings are written by the routines toggle flow; the value is not rendered
+  // anywhere while the feature stays draft-only (ROUTINES_ENABLED off).
+  const [, setRoutineSettings] = useState<RoutineSettings | null>(null);
   const routineLoaded = useRef(false);
   const [comparison, setComparison] = useState<BrainState | null>(null);
   const [conflict, setConflict] = useState<BrainState | null>(null);
