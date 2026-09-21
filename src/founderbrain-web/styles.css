@@ -360,15 +360,21 @@ select:focus-visible {
   right: 0.9rem;
   z-index: 1100;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 14px;
   border: 1px solid rgba(247, 239, 230, 0.18);
   background: rgba(18, 12, 20, 0.72);
   backdrop-filter: blur(6px);
   font-size: 0.78rem;
   color: var(--paper-muted);
+}
+.account-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 .account-chip .quiet {
   color: var(--paper);
@@ -378,23 +384,15 @@ select:focus-visible {
   color: var(--ember);
 }
 .account-chip-usage {
-  color: var(--paper);
-  font-weight: 600;
+  color: var(--ember);
+  font-weight: 700;
   white-space: nowrap;
   cursor: help;
-}
-.account-chip-usage::after {
-  content: "";
-  align-self: stretch;
-  width: 1px;
-  background: rgba(247, 239, 230, 0.22);
+  line-height: 1.2;
 }
 @media (max-width: 40rem) {
   .account-chip-email {
     display: none;
-  }
-  .account-chip-usage {
-    white-space: normal;
   }
 }
 .mission-heading {

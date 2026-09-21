@@ -20,18 +20,20 @@ export function AccountChip({
     <div className="account-chip">
       {usage ? (
         <span className="account-chip-usage" title={tooltip}>
-          {compactTokens(tokens!)} tokens used · {compactUsd(usage.totalMicroUsd)} so far
+          {compactTokens(tokens!)} tokens used
         </span>
       ) : null}
-      <span className="account-chip-email">{email}</span>
-      <button className="quiet" onClick={onSignOut}>
-        Sign out
-      </button>
+      <div className="account-chip-row">
+        <span className="account-chip-email">{email}</span>
+        <button className="quiet" onClick={onSignOut}>
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }
 import type { BrainState, Config } from "../types";
-import { compactTokens, compactUsd, stamp } from "../mission-copy";
+import { compactTokens, stamp } from "../mission-copy";
 import { BrandMark } from "./BrandMark";
 
 /**
