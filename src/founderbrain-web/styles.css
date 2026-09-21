@@ -2355,3 +2355,13 @@ button:not(.link-button) {
 .atlanta-show-all {
   margin-top: 0.7rem;
 }
+
+/* Flicker fix (Danny, 2026-09-21): the hub glass panel is huge, so the 18s
+   photo drift under backdrop-filter forced the blur to be recomputed every
+   frame for 18 seconds after every mount, which read as on-screen shimmer.
+   The hub photo is static; the typeform stages keep the drift but promote the
+   photo to its own compositor layer so the blur samples a stable texture. */
+.typeform-stage .entry-photo {
+  animation: none;
+  transform: none;
+}
