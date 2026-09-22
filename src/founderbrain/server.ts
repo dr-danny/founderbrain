@@ -164,7 +164,7 @@ export async function buildApi(
           identity.email,
           options.openRouterManagement,
         );
-      } catch (error) {
+      } catch {
         // Soft-fail provisioning so Brain edit/export still work if OpenRouter is down.
         // A revoked key stays blocked for AI actions (keyIsUsable at spend time),
         // but it must not brick the whole app: the preHandler used to rethrow

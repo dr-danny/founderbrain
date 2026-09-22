@@ -44,8 +44,6 @@ export function App() {
     conflict,
     deleteOpen,
     setDeleteOpen,
-    deleteText,
-    setDeleteText,
     saveOperation,
     closeConflict,
     hexclave,
