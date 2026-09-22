@@ -16,6 +16,14 @@
  *   readiness      - daily (>= 08:00, idempotent per day): deterministic
  *                    gate-by-gate gaps from the readiness model and Brain
  *                    flags. No AI. When nothing is missing, writes nothing.
+ *   sequence_health- weekdays (>= 09:00, idempotent per day), B2B only: the
+ *                    figures Apollo returned for the founder's sequences.
+ *                    Read only, no AI, nothing sent or stopped. Skips
+ *                    silently when Apollo is not connected or figures have
+ *                    not changed since the last draft.
+ *   what_worked    - Friday (>= 16:00, idempotent per ISO week): published
+ *                    GoHighLevel Social Planner posts from the last 7 days
+ *                    with the figures GoHighLevel returned. Read only, no AI.
  *
  * Rules carried from the template, all binding on generation:
  *   Draft only. Nothing is published, sent, or marked approved here.
@@ -32,11 +40,18 @@ import { DomainError } from "./domain.ts";
 import { canonicalize, type Brain, type BrainState } from "../founderbrain-shared/domain.ts";
 import { checkCopy } from "./copy-rules.ts";
 import { openRouterProvider } from "./provider.ts";
+import { readApolloKey, readCampaigns, type CampaignFigures } from "./apollo.ts";
+import { listRecentPublishedPosts } from "./ghl-maintenance.ts";
 import { recordUsageEvent, ceilMicro } from "./usage.ts";
 import type { Config } from "./config.ts";
 import type { PgBrainStore } from "./store.ts";
 
-export type RoutineKind = "monday_plan" | "content_top_up" | "readiness";
+export type RoutineKind =
+  | "monday_plan"
+  | "content_top_up"
+  | "readiness"
+  | "sequence_health"
+  | "what_worked";
 
 export type RoutineDraft = {
   id: string;
@@ -53,6 +68,8 @@ export type RoutineSettings = {
   mondayPlan: boolean;
   contentTopUp: boolean;
   readinessDigest: boolean;
+  sequenceHealth: boolean;
+  whatWorked: boolean;
 };
 
 export async function migrateRoutines(url: string): Promise<void> {
@@ -139,7 +156,10 @@ export type DueKind = { kind: RoutineKind; periodKey: string };
 /**
  * Which routine kinds are due for this founder at `now`. Late is fine: the
  * Monday plan and content top-up fire the first sweep after their Monday
- * hour within the same ISO week. The readiness digest is daily.
+ * hour within the same ISO week. The readiness digest is daily. Sequence
+ * health fires weekdays from 09:00 founder-local; what worked fires Friday
+ * 16:00 onward within its ISO week. Track gating happens in the sweep, which
+ * reads the Brain before calling buildDraft.
  */
 export function dueKinds(settings: RoutineSettings, now: Date): DueKind[] {
   const local = localNow(settings.timezone, now);
@@ -152,6 +172,10 @@ export function dueKinds(settings: RoutineSettings, now: Date): DueKind[] {
     out.push({ kind: "content_top_up", periodKey: week });
   if (settings.readinessDigest && local.hour >= 8)
     out.push({ kind: "readiness", periodKey: local.dateKey });
+  if (settings.sequenceHealth && local.weekday >= 1 && local.weekday <= 5 && local.hour >= 9)
+    out.push({ kind: "sequence_health", periodKey: local.dateKey });
+  if (settings.whatWorked && local.weekday >= 5 && local.hour >= 16)
+    out.push({ kind: "what_worked", periodKey: week });
   return out;
 }
 
@@ -313,13 +337,116 @@ async function generateContentTopUp(
 }
 
 // ---------------------------------------------------------------------------
+// Maintenance reads (no AI): the figures vendors returned, nothing estimated.
+// ---------------------------------------------------------------------------
+
+/** The most recent draft of a kind, for change detection: when the figures
+ *  have not moved since the last draft, nothing is owed and nothing is written. */
+async function lastDraftMeta(
+  store: PgBrainStore,
+  workspace: string,
+  kind: RoutineKind,
+): Promise<Record<string, unknown> | null> {
+  const rows = await store.scoped(workspace, async (tx) =>
+    tx<{ meta: Record<string, unknown> }[]>`
+      select meta from fb_routine_draft
+      where founder_id = ${workspace} and kind = ${kind}
+      order by created_at desc
+      limit 1
+    `,
+  );
+  return rows[0]?.meta ?? null;
+}
+
+const figureLine = (label: string, v: number | null): string =>
+  v === null ? `${label}: not returned` : `${label}: ${v}`;
+
+/** Testable body builder (no store, no network). Figures only, no estimates. */
+export function campaignsBody(campaigns: readonly CampaignFigures[]): string {
+  const lines = campaigns.map((c) => {
+    const name = c.name && c.name.trim().length > 0 ? c.name : "Untitled sequence";
+    const state = c.active === false ? "paused" : c.active === true ? "active" : "state not returned";
+    return (
+      `- ${name} (${state}): ` +
+      [
+        figureLine("delivered", c.uniqueDelivered),
+        figureLine("bounced", c.uniqueBounced),
+        figureLine("opened", c.uniqueOpened),
+        figureLine("replied", c.uniqueReplied),
+      ].join(", ")
+    );
+  });
+  return (
+    "Figures Apollo returned for your sequences (cumulative, not since last time):\n" +
+    lines.join("\n") +
+    "\n\nNothing was sent, started or stopped. Stopping anyone is your call in Apollo."
+  );
+}
+
+async function generateSequenceHealth(
+  store: PgBrainStore,
+  workspace: string,
+): Promise<{ title: string; body: string; meta: Record<string, unknown> } | null> {
+  const key = await readApolloKey(store, workspace);
+  if (!key) return null; // Not connected: stop without writing anything.
+  const read = await readCampaigns(key);
+  if (read.kind !== "ok") return null; // Vendor trouble: a held draft would be noise.
+  const campaigns = read.campaigns;
+  if (campaigns.length === 0) return null; // Nothing to report.
+  const previous = await lastDraftMeta(store, workspace, "sequence_health");
+  if (previous && JSON.stringify(previous.campaigns ?? null) === JSON.stringify(campaigns)) return null;
+  return {
+    title: `Sequence health: ${campaigns.length} ${campaigns.length === 1 ? "sequence" : "sequences"}`,
+    body: campaignsBody(campaigns),
+    meta: { campaigns },
+  };
+}
+
+async function generateWhatWorked(
+  config: Config,
+  store: PgBrainStore,
+  workspace: string,
+): Promise<{ title: string; body: string; meta: Record<string, unknown> } | null> {
+  const read = await listRecentPublishedPosts(config, store, workspace);
+  if (read.kind !== "ok") return null; // Not connected or vendor trouble: stop without writing.
+  if (read.posts.length === 0) return null; // Nothing posted in the last 7 days.
+  const signature = read.posts.map((p) => ({ id: p.id, figures: p.figures }));
+  const previous = await lastDraftMeta(store, workspace, "what_worked");
+  if (previous && JSON.stringify(previous.posts ?? null) === JSON.stringify(signature)) return null;
+  const lines = read.posts.map((p) => {
+    const figs = Object.keys(p.figures).length
+      ? Object.entries(p.figures)
+          .slice(0, 6)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ")
+      : "no figures returned";
+    return `- ${p.firstLine ?? "(no text returned)"} · ${p.platform ?? "platform not returned"} · ${figs}`;
+  });
+  return {
+    title: `What worked: ${read.posts.length} ${read.posts.length === 1 ? "post" : "posts"} this week`,
+    body:
+      "Published in the last 7 days, with the figures GoHighLevel returned:\n" +
+      lines.join("\n") +
+      "\n\nNothing here is estimated or compared to a benchmark. Only figures a tool returned.",
+    meta: { posts: signature },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Founder-facing API
 // ---------------------------------------------------------------------------
 
 export async function getRoutineSettings(store: PgBrainStore, workspace: string): Promise<RoutineSettings> {
   const rows = await store.scoped(workspace, async (tx) =>
-    tx<{ timezone: string; monday_plan: boolean; content_top_up: boolean; readiness_digest: boolean }[]>`
-      select timezone, monday_plan, content_top_up, readiness_digest from fb_routine_state
+    tx<{
+      timezone: string;
+      monday_plan: boolean;
+      content_top_up: boolean;
+      readiness_digest: boolean;
+      sequence_health: boolean;
+      what_worked: boolean;
+    }[]>`
+      select timezone, monday_plan, content_top_up, readiness_digest, sequence_health, what_worked from fb_routine_state
       where founder_id = ${workspace}
     `,
   );
@@ -329,6 +456,8 @@ export async function getRoutineSettings(store: PgBrainStore, workspace: string)
     mondayPlan: row?.monday_plan ?? true,
     contentTopUp: row?.content_top_up ?? true,
     readinessDigest: row?.readiness_digest ?? true,
+    sequenceHealth: row?.sequence_health ?? true,
+    whatWorked: row?.what_worked ?? true,
   };
 }
 
@@ -344,19 +473,28 @@ function validTimezone(tz: string): boolean {
 export async function updateRoutineSettings(
   store: PgBrainStore,
   workspace: string,
-  patch: { timezone?: string; mondayPlan?: boolean; contentTopUp?: boolean; readinessDigest?: boolean },
+  patch: {
+    timezone?: string;
+    mondayPlan?: boolean;
+    contentTopUp?: boolean;
+    readinessDigest?: boolean;
+    sequenceHealth?: boolean;
+    whatWorked?: boolean;
+  },
 ): Promise<RoutineSettings> {
   if (patch.timezone !== undefined && patch.timezone !== "" && !validTimezone(patch.timezone))
     throw new DomainError(422, "invalid_timezone", "That timezone is not valid.");
   await store.scoped(workspace, async (tx) => {
     await tx`
-      insert into fb_routine_state (founder_id, timezone, monday_plan, content_top_up, readiness_digest)
-      values (${workspace}, ${patch.timezone ?? ""}, ${patch.mondayPlan ?? true}, ${patch.contentTopUp ?? true}, ${patch.readinessDigest ?? true})
+      insert into fb_routine_state (founder_id, timezone, monday_plan, content_top_up, readiness_digest, sequence_health, what_worked)
+      values (${workspace}, ${patch.timezone ?? ""}, ${patch.mondayPlan ?? true}, ${patch.contentTopUp ?? true}, ${patch.readinessDigest ?? true}, ${patch.sequenceHealth ?? true}, ${patch.whatWorked ?? true})
       on conflict (founder_id) do update set
         timezone = coalesce(nullif(excluded.timezone, ''), fb_routine_state.timezone),
         monday_plan = coalesce(excluded.monday_plan, fb_routine_state.monday_plan),
         content_top_up = coalesce(excluded.content_top_up, fb_routine_state.content_top_up),
         readiness_digest = coalesce(excluded.readiness_digest, fb_routine_state.readiness_digest),
+        sequence_health = coalesce(excluded.sequence_health, fb_routine_state.sequence_health),
+        what_worked = coalesce(excluded.what_worked, fb_routine_state.what_worked),
         updated_at = now()
     `;
   });
@@ -412,7 +550,7 @@ export async function buildDraft(
   workspace: string,
   kind: RoutineKind,
   state: BrainState,
-): Promise<{ title: string; body: string; meta: Record<string, string | number> } | null> {
+): Promise<{ title: string; body: string; meta: Record<string, unknown> } | null> {
   if (kind === "readiness") {
     const gaps = readinessGaps(state);
     if (gaps.length === 0) return null;
@@ -428,6 +566,14 @@ export async function buildDraft(
     const draft = await generateMondayPlan(config, store, workspace, brain, mondayOf(new Date()));
     return { ...draft, meta: { monday: mondayOf(new Date()) } };
   }
+  if (kind === "sequence_health") {
+    // B2B only, from the Brain's own track. A B2C founder never sees Apollo material.
+    if (brain.identity.track && brain.identity.track !== "b2b") return null;
+    return generateSequenceHealth(store, workspace);
+  }
+  if (kind === "what_worked") {
+    return generateWhatWorked(config, store, workspace);
+  }
   const draft = await generateContentTopUp(config, store, workspace, brain);
   return { ...draft, meta: { monday: mondayOf(new Date()) } };
 }
@@ -436,9 +582,17 @@ export async function sweepOnce(store: PgBrainStore, config: Config, limit = 4):
   const dispatcher = postgres(config.DATABASE_URL, { max: 1, onnotice: () => {} });
   try {
     const states = await dispatcher<
-      { founder_id: string; timezone: string; monday_plan: boolean; content_top_up: boolean; readiness_digest: boolean }[]
+      {
+        founder_id: string;
+        timezone: string;
+        monday_plan: boolean;
+        content_top_up: boolean;
+        readiness_digest: boolean;
+        sequence_health: boolean;
+        what_worked: boolean;
+      }[]
     >`
-      select founder_id, timezone, monday_plan, content_top_up, readiness_digest
+      select founder_id, timezone, monday_plan, content_top_up, readiness_digest, sequence_health, what_worked
       from fb_routine_state where timezone <> ''
     `;
     let generated = 0;
@@ -451,6 +605,8 @@ export async function sweepOnce(store: PgBrainStore, config: Config, limit = 4):
         mondayPlan: state.monday_plan,
         contentTopUp: state.content_top_up,
         readinessDigest: state.readiness_digest,
+        sequenceHealth: state.sequence_health,
+        whatWorked: state.what_worked,
       };
       for (const due of dueKinds(settings, new Date())) {
         if (generated >= limit) break;

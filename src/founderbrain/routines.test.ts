@@ -61,6 +61,8 @@ test("dueKinds honours the local schedule and the toggles", () => {
     mondayPlan: true,
     contentTopUp: true,
     readinessDigest: true,
+    sequenceHealth: false,
+    whatWorked: false,
   };
   // Monday 06:30 LA: nothing due yet.
   assert.deepEqual(dueKinds(base, new Date("2026-09-21T13:30:00Z")), []);

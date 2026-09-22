@@ -9,7 +9,7 @@ import type { Artifact, Brain, BrainState, Config, HistoryItem, Job, Me, UsageRe
 
 export type RoutineDraftRow = {
   id: string;
-  kind: "monday_plan" | "content_top_up" | "readiness";
+  kind: "monday_plan" | "content_top_up" | "readiness" | "sequence_health" | "what_worked";
   periodKey: string;
   title: string;
   body: string;
@@ -143,15 +143,48 @@ export class FounderBrainApi {
     return this.request<{ url: string }>("/oauth/start");
   }
   routines() {
-    return this.request<{ settings: { timezone: string; mondayPlan: boolean; contentTopUp: boolean; readinessDigest: boolean }; drafts: RoutineDraftRow[] }>(
-      "/routines",
+    return this.request<{
+      settings: {
+        timezone: string;
+        mondayPlan: boolean;
+        contentTopUp: boolean;
+        readinessDigest: boolean;
+        sequenceHealth: boolean;
+        whatWorked: boolean;
+      };
+      drafts: RoutineDraftRow[];
+    }>("/routines");
+  }
+  saveRoutineSettings(patch: {
+    timezone?: string;
+    mondayPlan?: boolean;
+    contentTopUp?: boolean;
+    readinessDigest?: boolean;
+    sequenceHealth?: boolean;
+    whatWorked?: boolean;
+  }) {
+    return this.request<{
+      timezone: string;
+      mondayPlan: boolean;
+      contentTopUp: boolean;
+      readinessDigest: boolean;
+      sequenceHealth: boolean;
+      whatWorked: boolean;
+    }>("/routines/settings", { method: "POST", body: JSON.stringify(patch) });
+  }
+  apolloStatus() {
+    return this.request<{ connected: boolean; checkedAt: string | null; sequencesReadable: boolean | null }>(
+      "/apollo/status",
     );
   }
-  saveRoutineSettings(patch: { timezone?: string; mondayPlan?: boolean; contentTopUp?: boolean; readinessDigest?: boolean }) {
-    return this.request<{ timezone: string; mondayPlan: boolean; contentTopUp: boolean; readinessDigest: boolean }>(
-      "/routines/settings",
-      { method: "POST", body: JSON.stringify(patch) },
+  connectApollo(key: string) {
+    return this.request<{ connected: boolean; checkedAt: string | null; sequencesReadable: boolean | null }>(
+      "/apollo/connect",
+      { method: "POST", body: JSON.stringify({ key }) },
     );
+  }
+  disconnectApollo() {
+    return this.request<{ connected: boolean }>("/apollo", { method: "DELETE" });
   }
   setRoutineDraftStatus(id: string, status: "read" | "dismissed") {
     return this.request<{ ok: boolean }>("/routines/drafts/status", {

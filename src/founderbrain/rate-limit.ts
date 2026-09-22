@@ -74,6 +74,7 @@ export const MUTATION_PATHS = new Set([
   "DELETE /api/workspace",
   "POST /api/oauth/complete",
   "POST /api/site-import",
+  "POST /api/apollo/connect",
 ]);
 
 export function mutationKey(method: string, path: string): string {

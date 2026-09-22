@@ -12,6 +12,7 @@ import {
   type Brain,
   type BrainState,
   type Config,
+  type ApolloStatus,
   type HistoryItem,
   type Job,
   type MissionSection,
@@ -69,6 +70,8 @@ export function useFounderBrainApp() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
+  const [apollo, setApollo] = useState<ApolloStatus | null>(null);
+  const [apolloBusy, setApolloBusy] = useState(false);
   // Settings are written by the routines toggle flow; the value is not rendered
   // anywhere while the feature stays draft-only (ROUTINES_ENABLED off).
   const [, setRoutineSettings] = useState<RoutineSettings | null>(null);
@@ -237,6 +240,13 @@ export function useFounderBrainApp() {
       setArtifact(output.artifact ?? nextState.artifact ?? null);
       setArtifactText((output.artifact ?? nextState.artifact)?.text ?? "");
       setArtifactStale(output.stale);
+      // Apollo status is an enhancement (B2B maintenance reads); never block
+      // the workspace on it.
+      try {
+        setApollo(await api.apolloStatus());
+      } catch {
+        /* keep the previous status; the connect card fetches again on demand */
+      }
       const pendingJob = window.sessionStorage.getItem(jobStorage);
       if (pendingJob) void pollJob(pendingJob, epoch);
     } catch (err) {
@@ -358,6 +368,29 @@ export function useFounderBrainApp() {
   async function ghlPush(pack?: string) {
     if (!api) throw new Error("api_unavailable");
     return api.ghlPush(pack);
+  }
+
+  async function connectApolloKey(key: string) {
+    if (!api) throw new Error("api_unavailable");
+    setApolloBusy(true);
+    try {
+      const status = await api.connectApollo(key);
+      setApollo(status);
+      return status;
+    } finally {
+      setApolloBusy(false);
+    }
+  }
+
+  async function disconnectApollo() {
+    if (!api) return;
+    setApolloBusy(true);
+    try {
+      await api.disconnectApollo();
+      setApollo({ connected: false, checkedAt: null, sequencesReadable: null });
+    } finally {
+      setApolloBusy(false);
+    }
   }
   async function transcribeVoice(blob: Blob, seconds: number) {
     if (!api) throw new Error("api_unavailable");
@@ -892,6 +925,10 @@ export function useFounderBrainApp() {
     routineDrafts,
     setDraftStatus,
     ghlPush,
+    apollo,
+    apolloBusy,
+    connectApolloKey,
+    disconnectApollo,
     connecting,
     startConnect,
   };

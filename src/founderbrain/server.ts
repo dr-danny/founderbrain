@@ -41,6 +41,7 @@ import {
   signOauthState,
 } from "./crm-oauth.ts";
 import { importSite } from "./site-import.ts";
+import { apolloStatus, connectApollo, disconnectApollo } from "./apollo.ts";
 import { transcribeVoice } from "./voice.ts";
 import { addVoiceSample, deleteVoiceSample, listVoiceSamples, MIN_VOICE_SAMPLES } from "./voice-samples.ts";
 import { brainReadyForPush, defaultFirstPack, loadValueCatalog, pushGhlValues } from "./ghl-push.ts";
@@ -325,11 +326,26 @@ export async function buildApi(
           mondayPlan: z.boolean().optional(),
           contentTopUp: z.boolean().optional(),
           readinessDigest: z.boolean().optional(),
+          sequenceHealth: z.boolean().optional(),
+          whatWorked: z.boolean().optional(),
         })
         .strict(),
       req.body ?? {},
     );
     return updateRoutineSettings(store, context(req).workspace, body);
+  });
+  app.get("/api/apollo/status", async (req) => apolloStatus(store, context(req).workspace));
+  app.post("/api/apollo/connect", async (req) => {
+    const body = parse(
+      // Apollo API keys are alphanumeric with dashes/underscores.
+      z.object({ key: z.string().min(8).max(120).regex(/^[a-zA-Z0-9_-]+$/) }).strict(),
+      req.body,
+    );
+    return connectApollo(store, context(req).workspace, body.key);
+  });
+  app.delete("/api/apollo", async (req) => {
+    await disconnectApollo(store, context(req).workspace);
+    return { connected: false };
   });
   app.post("/api/routines/drafts/status", async (req) => {
     const body = parse(

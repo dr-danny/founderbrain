@@ -147,6 +147,8 @@ export default tseslint.config(
       "src/founderbrain/provider.ts",
       "src/founderbrain/openrouter-management.ts",
       "src/founderbrain/crm-oauth.ts",
+      "src/founderbrain/apollo.ts",
+      "src/founderbrain/ghl-maintenance.ts",
     ],
     rules: {
       "no-restricted-globals": [
