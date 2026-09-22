@@ -392,13 +392,24 @@ export function GhlChapter({
   onConnect,
   loadUsage,
   onGhlPush,
+  apolloConnected = false,
+  apolloSequencesReadable = null,
+  apolloBusy = false,
+  onApolloConnect,
+  onApolloDisconnect,
 }: ChapterProps & {
   connectEnabled?: boolean;
   connecting?: boolean;
   onGhlPush?: () => Promise<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] }>;
   onConnect?: () => void | Promise<void>;
   loadUsage?: () => Promise<UsageResponse>;
+  apolloConnected?: boolean;
+  apolloSequencesReadable?: boolean | null;
+  apolloBusy?: boolean;
+  onApolloConnect?: (key: string) => Promise<unknown>;
+  onApolloDisconnect?: () => Promise<unknown>;
 }) {
+  const isB2b = orientation.track === "b2b";
   const screens = useMemo(
     () => ghlScreens(orientation.ghlAnswers.hasAccount),
     [orientation.ghlAnswers.hasAccount],
@@ -413,6 +424,9 @@ export function GhlChapter({
   const [pushed, setPushed] = useState(false);
   const [pushResult, setPushResult] = useState<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] } | null>(null);
   const [pushError, setPushError] = useState("");
+  const [apolloKey, setApolloKey] = useState("");
+  const [apolloError, setApolloError] = useState("");
+  const [apolloNotice, setApolloNotice] = useState("");
 
   async function persist(patch: OrientationPatch) {
     setLocalError("");
@@ -460,6 +474,25 @@ export function GhlChapter({
       await persist({ ghlScreen: screen - 1 });
     } catch {
       /* localError set */
+    }
+  }
+
+  async function connectApolloNow() {
+    setApolloError("");
+    setApolloNotice("");
+    if (!onApolloConnect) return;
+    try {
+      await onApolloConnect(apolloKey.trim());
+      setApolloKey("");
+      setApolloNotice(
+        "Apollo connected. The sequence health draft reads your campaign figures. It never sends, enriches or stops anything.",
+      );
+    } catch (e: unknown) {
+      setApolloError(
+        e instanceof ApiError
+          ? String(e.message).slice(0, 200)
+          : "Could not reach Apollo. Try again.",
+      );
     }
   }
 
@@ -549,6 +582,68 @@ export function GhlChapter({
         <p className="entry-error" role="alert">
           {pushError}
         </p>
+      ) : null}
+      {isConnect && isB2b ? (
+        <div className="mission-save-row">
+          <p className="entry-lede typeform-lede">
+            Apollo, for the B2B track. Paste your own API key. The app checks it, seals it, and the weekly sequence
+            health draft reads your campaign figures. It never sends, enriches or stops anything.
+          </p>
+          {apolloConnected ? (
+            <>
+              <p className="entry-lede typeform-lede">
+                Connected. Sequence figures readable:{" "}
+                {apolloSequencesReadable === true
+                  ? "yes"
+                  : apolloSequencesReadable === false
+                    ? "no, the key cannot open that endpoint"
+                    : "not checked yet"}
+                .
+              </p>
+              <button
+                type="button"
+                className="typeform-external"
+                disabled={apolloBusy}
+                onClick={() => {
+                  void onApolloDisconnect?.().catch(() => undefined);
+                }}
+              >
+                {apolloBusy ? "Working..." : "Disconnect Apollo"}
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                className="mission-look-url"
+                type="password"
+                value={apolloKey}
+                maxLength={120}
+                placeholder="Paste your Apollo API key"
+                disabled={apolloBusy}
+                onChange={(e) => setApolloKey(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && apolloKey.trim().length >= 8) void connectApolloNow();
+                }}
+              />
+              <button
+                type="button"
+                className="typeform-external"
+                disabled={apolloBusy || apolloKey.trim().length < 8}
+                onClick={() => {
+                  void connectApolloNow();
+                }}
+              >
+                {apolloBusy ? "Checking with Apollo..." : "Connect Apollo"}
+              </button>
+            </>
+          )}
+          {apolloNotice ? <p className="entry-lede typeform-lede">{apolloNotice}</p> : null}
+          {apolloError ? (
+            <p className="entry-error" role="alert">
+              {apolloError}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       {current.choices ? (
         <div className="typeform-choices">

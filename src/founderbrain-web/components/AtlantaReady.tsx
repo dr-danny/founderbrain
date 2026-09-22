@@ -14,6 +14,8 @@ const draftKindCopy: Record<RoutineDraft["kind"], string> = {
   monday_plan: "Weekly plan",
   content_top_up: "Content refill",
   readiness: "Readiness",
+  sequence_health: "Sequence health",
+  what_worked: "What worked",
 };
 
 const dayCopy = {

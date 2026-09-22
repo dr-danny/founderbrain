@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS fb_routine_draft (
   id text PRIMARY KEY,
   founder_id text NOT NULL REFERENCES founder(id) ON DELETE CASCADE,
-  kind text NOT NULL CHECK (kind IN ('monday_plan','content_top_up','readiness')),
+  kind text NOT NULL CHECK (kind IN ('monday_plan','content_top_up','readiness','sequence_health','what_worked')),
   period_key text NOT NULL,
   title text NOT NULL,
   body text NOT NULL,
@@ -41,3 +41,14 @@ DROP POLICY IF EXISTS fb_routine_state_tenant ON fb_routine_state;
 CREATE POLICY fb_routine_state_tenant ON fb_routine_state
   USING (founder_id = current_setting('app.founder_id', true) OR current_user = 'fb_worker')
   WITH CHECK (founder_id = current_setting('app.founder_id', true) OR current_user = 'fb_worker');
+
+-- Maintenance reads (2026-09): sequence health (B2B, Apollo) and what worked
+-- (both tracks, GoHighLevel Social Planner). Both draft-only like the others.
+-- Columns are added idempotently so existing workspaces migrate in place.
+ALTER TABLE fb_routine_state ADD COLUMN IF NOT EXISTS sequence_health boolean NOT NULL DEFAULT true;
+ALTER TABLE fb_routine_state ADD COLUMN IF NOT EXISTS what_worked boolean NOT NULL DEFAULT true;
+-- Widen the draft kind check: fresh installs get the five-kind constraint from
+-- the CREATE above; existing databases drop the three-kind one and re-add.
+ALTER TABLE fb_routine_draft DROP CONSTRAINT IF EXISTS fb_routine_draft_kind_check;
+ALTER TABLE fb_routine_draft ADD CONSTRAINT fb_routine_draft_kind_check
+  CHECK (kind IN ('monday_plan','content_top_up','readiness','sequence_health','what_worked'));

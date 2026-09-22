@@ -41,7 +41,7 @@ export interface Config {
 }
 export interface RoutineDraft {
   id: string;
-  kind: "monday_plan" | "content_top_up" | "readiness";
+  kind: "monday_plan" | "content_top_up" | "readiness" | "sequence_health" | "what_worked";
   periodKey: string;
   title: string;
   body: string;
@@ -54,6 +54,14 @@ export interface RoutineSettings {
   mondayPlan: boolean;
   contentTopUp: boolean;
   readinessDigest: boolean;
+  sequenceHealth: boolean;
+  whatWorked: boolean;
+}
+
+export interface ApolloStatus {
+  connected: boolean;
+  checkedAt: string | null;
+  sequencesReadable: boolean | null;
 }
 
 export interface Me {

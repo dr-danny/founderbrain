@@ -15,7 +15,9 @@ The SaaS runs on three vendors: **Cloudflare** (a Worker for the edge, static as
 - API: `railway.json` and `deploy/railway/Dockerfile`
 - Edge: `wrangler.jsonc` (no routes or workers.dev activation by default)
 
-Five guided missions, encrypted versioned Brain storage, per-founder workspace isolation keyed on the Hexclave user id, history/restore/export, and one private invitation-generation job. No publishing, CRM, shell tools or automatic deployments. AI is disabled until configured with approved budgets.
+Five guided missions, encrypted versioned Brain storage, per-founder workspace isolation keyed on the Hexclave user id, history/restore/export, and one private invitation-generation job. AI is disabled until configured with approved budgets.
+
+**Connect and maintenance reads (read only).** The founder's own credentials, never ours: GoHighLevel OAuth writes the Brain into the pre-built snapshot's custom values (`/api/ghl/push`, values proven after writing), and Apollo for B2B is a pasted API key proven against the one documented zero-credit search, sealed, then used only for the sequence-health read. Scheduled maintenance runs are draft-only digests in the founder's workspace: the Monday plan, the content top-up, the readiness digest, plus sequence health (B2B, weekdays 09:00, figures Apollo returned) and what worked (Fridays 16:00, published GoHighLevel Social Planner posts with the figures GoHighLevel returned). Nothing is ever published, sent, enriched, started or stopped by the app, and no figure is estimated: a value the vendor did not return is reported as not returned. No shell tools, no automatic deployments.
 
 **Sign-in** is Hexclave with a one-time code: a founder presses Sign in, types their email on Hexclave's hosted page, gets a code by email, and is in. No passwords. Invite-only is `allowSignUp: false` in `hexclave.config.ts`; the operator creates each pilot user. There is no sign-in form in this app. The browser SDK is confined to one module with analytics and session replays switched off, and the API verifies the Hexclave JWT itself on every request.
 

@@ -44,8 +44,6 @@ export function App() {
     conflict,
     deleteOpen,
     setDeleteOpen,
-    deleteText,
-    setDeleteText,
     saveOperation,
     closeConflict,
     hexclave,
@@ -201,6 +199,11 @@ export function App() {
         onConnect={() => app.startConnect()}
         loadUsage={() => app.getUsage()}
         onGhlPush={() => app.ghlPush()}
+        apolloConnected={app.apollo?.connected ?? false}
+        apolloSequencesReadable={app.apollo?.sequencesReadable ?? null}
+        apolloBusy={app.apolloBusy}
+        onApolloConnect={(key) => app.connectApolloKey(key)}
+        onApolloDisconnect={() => app.disconnectApollo()}
         onPatch={async (patch) => {
           await app.saveOrientation(patch);
         }}
