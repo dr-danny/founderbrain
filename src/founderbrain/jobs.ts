@@ -297,7 +297,7 @@ export class BrainJobs {
       const r = await tx`
         select * from fb_artifact
         where founder_id = ${workspace}
-        order by accepted_at desc nulls last, created_at desc
+        order by created_at desc
         limit 1
       `;
       return r[0] ? this.toArtifact(tx, workspace, r[0] as ArtifactRow) : null;
