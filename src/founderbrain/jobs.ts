@@ -215,7 +215,7 @@ export class BrainJobs {
         );
       }
       const active = await tx`
-        select id, status from fb_ai_job
+        select id, status, reserved, budget_day from fb_ai_job
         where founder_id = ${workspace}
           and status in ('queued', 'running', 'uncertain')
         limit 1
@@ -225,11 +225,13 @@ export class BrainJobs {
         await tx`
           update fb_ai_job
           set status = 'failed',
-              error = 'Replaced after a stuck build. Earlier spend, if any, stays on the ledger.',
+              error = 'Replaced after a stuck build. Its provider spend was not recorded.',
               lease_until = null
           where founder_id = ${workspace} and id = ${blocking.id}
         `;
         await tx`update fb_job_dispatch set status = 'failed', lease_until = null where job_id = ${blocking.id}`;
+        // Release the stuck build's daily hold so the replacement is not refused for budget.
+        await this.settle(tx, workspace, blocking as unknown as JobBudgetRow, 0);
       } else if (blocking) {
         throw new DomainError(409, "job_active", "A generation is already in progress.", {
           jobId: blocking.id,
@@ -316,6 +318,24 @@ export class BrainJobs {
         limit 1
       `;
       return r[0] ? this.toArtifact(tx, workspace, r[0] as ArtifactRow) : null;
+    });
+  }
+
+  async saveLatestText(workspace: string, text: string): Promise<void> {
+    await this.store.scoped(workspace, async (tx: Tx) => {
+      const rows = await tx`
+        select id, accepted_at from fb_artifact
+        where founder_id = ${workspace}
+        order by created_at desc
+        limit 1
+      `;
+      if (!rows[0]) return;
+      const sha = await putPrivate(tx, workspace, text);
+      if (rows[0].accepted_at) {
+        await tx`update fb_artifact set draft_sha = ${sha}, accepted_sha = ${sha} where founder_id = ${workspace} and id = ${rows[0].id}`;
+      } else {
+        await tx`update fb_artifact set draft_sha = ${sha} where founder_id = ${workspace} and id = ${rows[0].id}`;
+      }
     });
   }
 
