@@ -45,6 +45,7 @@ import { importSite } from "./site-import.ts";
 import { transcribeVoice } from "./voice.ts";
 import { addVoiceSample, deleteVoiceSample, listVoiceSamples, MIN_VOICE_SAMPLES } from "./voice-samples.ts";
 import { brainReadyForPush, defaultFirstPack, loadValueCatalog, pushGhlValues } from "./ghl-push.ts";
+import { revisePieces } from "./content-revise.ts";
 
 const key = z
   .string()
@@ -348,6 +349,32 @@ export async function buildApi(
     );
     await setRoutineDraftStatus(store, context(req).workspace, body.id, body.status);
     return { ok: true };
+  });
+  app.post("/api/content/regenerate", async (req) => {
+    const body = parse(
+      z.object({
+        pieces: z.array(
+          z.object({
+            n: z.number().int().min(1).max(30),
+            text: z.string().min(1).max(4000),
+            feedback: z.string().max(1000),
+          }),
+        ).min(1).max(30),
+      }).strict(),
+      req.body,
+    );
+    const workspace = context(req).workspace;
+    const pieces = await revisePieces(config, store, workspace, body.pieces);
+    const current = await jobs.artifact(workspace);
+    if (current) {
+      let next = current.text;
+      for (const piece of pieces) {
+        const pattern = new RegExp(`(^|\\n)${piece.n}\\.\\s[\\s\\S]*?(?=\\n\\d+\\.\\s|$)`);
+        next = next.replace(pattern, `$1${piece.n}. ${piece.text}`);
+      }
+      await jobs.saveLatestText(workspace, next);
+    }
+    return { pieces };
   });
   app.post("/api/ghl/push", { bodyLimit: 1024 * 1024 }, async (req) => {
     const body = parse(
