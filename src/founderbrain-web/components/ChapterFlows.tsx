@@ -223,6 +223,13 @@ export function ContentChapter({
       screen={screen}
       total={contentTotal}
       title={current.title}
+      steps={screens.map((item) => item.title)}
+      onJump={(next) => void persist({ contentScreen: next }).catch(() => undefined)}
+      onSkip={
+        current.confirm && !confirm && screen < contentTotal
+          ? () => void persist({ contentScreen: screen + 1 }).catch(() => undefined)
+          : undefined
+      }
       continueLabel="Continue"
       hideContinue={isChoice}
       continueDisabled={continueDisabled}
@@ -280,6 +287,7 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
   const screen = Math.min(Math.max(orientation.outreachScreen, 1), outreachTotal);
   const current = screens[screen - 1]!;
   const [confirm, setConfirm] = useState(false);
+  const lastOutreach = screen >= outreachTotal;
   const [localError, setLocalError] = useState("");
 
   useEffect(() => {
@@ -337,6 +345,16 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
       screen={screen}
       total={outreachTotal}
       title={current.title}
+      steps={screens.map((item) => item.title)}
+      onJump={(next) => void persist({ outreachScreen: next }).catch(() => undefined)}
+      onSkip={
+        current.confirm && !confirm && !lastOutreach
+          ? () => void persist({ outreachScreen: screen + 1 }).catch(() => undefined)
+          : current.confirm && !confirm && lastOutreach
+            ? () => onFinished()
+            : undefined
+      }
+      skipLabel={lastOutreach ? "Not yet, back to the hub" : "Skip for now"}
       continueLabel={current.continueLabel ?? "Continue"}
       continueDisabled={continueDisabled}
       showBack={screen > 1}
