@@ -147,6 +147,8 @@ export default tseslint.config(
       "src/founderbrain/provider.ts",
       "src/founderbrain/openrouter-management.ts",
       "src/founderbrain/crm-oauth.ts",
+      // Higgsfield (founder's own key) and the private R2 media bucket, host-pinned.
+      "src/founderbrain/media-http.ts",
     ],
     rules: {
       "no-restricted-globals": [
