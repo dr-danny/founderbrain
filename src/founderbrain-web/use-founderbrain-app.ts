@@ -395,6 +395,16 @@ export function useFounderBrainApp() {
     if (!api) throw new Error("api_unavailable");
     return api.deleteVoiceSample(id);
   }
+  async function regeneratePieces(pieces: Array<{ n: number; text: string; feedback: string }>) {
+    if (!api) throw new Error("api_unavailable");
+    const result = await api.regeneratePieces(pieces);
+    const fresh = await api.artifact();
+    if (fresh.artifact) {
+      setArtifact(fresh.artifact);
+      setArtifactText(fresh.artifact.text);
+    }
+    return result.pieces;
+  }
   async function ghlPush(pack?: string) {
     if (!api) throw new Error("api_unavailable");
     return api.ghlPush(pack);
@@ -725,8 +735,14 @@ export function useFounderBrainApp() {
       await pollJob(start.id, epoch);
     } catch (err) {
       if (epoch !== sessionEpoch.current) return;
-      if (err instanceof ApiError && err.code === "job_active" && typeof err.details.jobId === "string") {
-        if (err.details.status === "uncertain") {
+      // The API sends { error, message, details: { jobId, status } }; ApiError keeps
+      // the whole body in `details`, so the job id sits one level down.
+      const activeJob =
+        err instanceof ApiError
+          ? ((err.details as { details?: { jobId?: unknown; status?: unknown } }).details ?? {})
+          : {};
+      if (err instanceof ApiError && err.code === "job_active" && typeof activeJob.jobId === "string") {
+        if (activeJob.status === "uncertain") {
           jobOperation.current = {
             expectedVersion: state.version,
             key: crypto.randomUUID(),
@@ -744,9 +760,9 @@ export function useFounderBrainApp() {
             return;
           }
         }
-        window.sessionStorage.setItem(jobStorage, err.details.jobId);
+        window.sessionStorage.setItem(jobStorage, activeJob.jobId);
         setNotice("A build is already running. Staying with it.");
-        await pollJob(err.details.jobId, epoch);
+        await pollJob(activeJob.jobId, epoch);
         return;
       }
       if (err instanceof ApiError && err.code === "version_conflict") {
@@ -977,28 +993,6 @@ export function useFounderBrainApp() {
     setDraftStatus,
     ghlPush,
     regeneratePieces,
-    connecting,
-    startConnect,
-  };
-}
-put,
-    acceptOutput,
-    signOut,
-    deleteWorkspace,
-    deleteAccountNow,
-    download,
-    onSignInError,
-    saveOrientation,
-    completeFirstLogin,
-    importSite,
-    getUsage,
-    transcribeVoice,
-    voiceSamples,
-    addVoiceSample,
-    deleteVoiceSample,
-    routineDrafts,
-    setDraftStatus,
-    ghlPush,
     connecting,
     startConnect,
   };
