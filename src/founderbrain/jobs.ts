@@ -215,7 +215,7 @@ export class BrainJobs {
         );
       }
       const active = await tx`
-        select id, status from fb_ai_job
+        select id, status, reserved, budget_day from fb_ai_job
         where founder_id = ${workspace}
           and status in ('queued', 'running', 'uncertain')
         limit 1
@@ -225,11 +225,13 @@ export class BrainJobs {
         await tx`
           update fb_ai_job
           set status = 'failed',
-              error = 'Replaced after a stuck build. Earlier spend, if any, stays on the ledger.',
+              error = 'Replaced after a stuck build. Its provider spend was not recorded.',
               lease_until = null
           where founder_id = ${workspace} and id = ${blocking.id}
         `;
         await tx`update fb_job_dispatch set status = 'failed', lease_until = null where job_id = ${blocking.id}`;
+        // Release the stuck build's daily hold so the replacement is not refused for budget.
+        await this.settle(tx, workspace, blocking as unknown as JobBudgetRow, 0);
       } else if (blocking) {
         throw new DomainError(409, "job_active", "A generation is already in progress.", {
           jobId: blocking.id,
