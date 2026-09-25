@@ -2788,3 +2788,50 @@ button:not(.link-button) {
   font-size: 0.88rem;
   line-height: 1.5;
 }
+
+/* Media for the 30 pieces: upload your own, or make it with Higgsfield. */
+.media-options {
+  margin: 1rem 0 1.25rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: rgba(247, 239, 230, 0.05);
+}
+.media-options h3 { margin: 0 0 0.35rem; }
+.media-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.media-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(247, 239, 230, 0.16);
+}
+.media-choice p, .media-choice small { margin: 0; }
+.media-subhead { margin: 0.9rem 0 0.4rem; font-size: 0.9rem; }
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.media-thumb { margin: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.media-thumb img, .media-thumb video, .media-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 10px;
+  background: rgba(247, 239, 230, 0.08);
+}
+.media-placeholder { display: grid; place-items: center; padding: 0.5rem; text-align: center; font-size: 0.85rem; }
+.media-thumb figcaption { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-size: 0.8rem; }
+.piece-media { margin-top: 0.5rem; }
+.piece-generate { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+.piece-generate textarea { width: 100%; min-height: 5rem; }
+.higgsfield-card h3 { margin: 1rem 0 0.3rem; font-size: 1rem; }
+.higgsfield-card ul, .higgsfield-card ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.3rem; }
+.higgsfield-card input { width: 100%; box-sizing: border-box; margin-bottom: 0.5rem; }

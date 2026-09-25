@@ -5,7 +5,18 @@
  * fresh Hexclave access token (or the local-demo header) and never relies on
  * cookies (`credentials: 'omit'`).
  */
-import type { Artifact, Brain, BrainState, Config, HistoryItem, Job, Me, UsageResponse } from "./types";
+import type {
+  Artifact,
+  Brain,
+  BrainState,
+  Config,
+  HiggsfieldStatus,
+  HistoryItem,
+  Job,
+  Me,
+  MediaItem,
+  UsageResponse,
+} from "./types";
 
 export type RoutineDraftRow = {
   id: string;
@@ -243,6 +254,51 @@ export class FounderBrainApi {
       method: "POST",
       body: JSON.stringify({ version, expectedVersion, idempotencyKey }),
     });
+  }
+  media() {
+    return this.request<{ items: MediaItem[]; higgsfield: HiggsfieldStatus }>("/media");
+  }
+  createUpload(input: { pieceN: number | null; filename: string; contentType: string; size: number }) {
+    return this.request<{ item: MediaItem; uploadUrl: string }>("/media/upload", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  completeUpload(id: string) {
+    return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/complete`, { method: "POST", body: "{}" });
+  }
+  assignMedia(id: string, pieceN: number | null) {
+    return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ pieceN }),
+    });
+  }
+  refreshMedia(id: string) {
+    return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/refresh`, { method: "POST", body: "{}" }, 55_000);
+  }
+  deleteMedia(id: string) {
+    return this.request<{ ok: true }>(`/media/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+  higgsfieldConnect(keyId: string, keySecret: string) {
+    return this.request<HiggsfieldStatus>("/higgsfield/connect", {
+      method: "POST",
+      body: JSON.stringify({ keyId, keySecret }),
+    }, 55_000);
+  }
+  higgsfieldDisconnect() {
+    return this.request<HiggsfieldStatus>("/higgsfield", { method: "DELETE" });
+  }
+  higgsfieldEstimate(kind: "image" | "video", prompt: string, pieceN: number | null) {
+    return this.request<{ usd: number; model: string; remainingUsd: number }>("/higgsfield/estimate", {
+      method: "POST",
+      body: JSON.stringify({ kind, prompt, pieceN }),
+    }, 55_000);
+  }
+  higgsfieldGenerate(kind: "image" | "video", prompt: string, pieceN: number | null) {
+    return this.request<{ item: MediaItem }>("/higgsfield/generate", {
+      method: "POST",
+      body: JSON.stringify({ kind, prompt, pieceN }),
+    }, 55_000);
   }
   regeneratePieces(pieces: Array<{ n: number; text: string; feedback: string }>) {
     return this.request<{ pieces: Array<{ n: number; text: string }> }>("/content/regenerate", {

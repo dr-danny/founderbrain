@@ -920,6 +920,7 @@ export function useFounderBrainApp() {
   }
 
   return {
+    api,
     config,
     session,
     email,

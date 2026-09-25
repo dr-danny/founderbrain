@@ -38,6 +38,7 @@ export interface Config {
   crmConnectEnabled?: boolean;
   siteImportEnabled?: boolean;
   routinesEnabled?: boolean;
+  mediaEnabled?: boolean;
 }
 export interface RoutineDraft {
   id: string;
@@ -97,3 +98,25 @@ export interface UsageResponse {
   };
   totalMicroUsd: number;
 }
+
+export type MediaItem = {
+  id: string;
+  pieceN: number | null;
+  kind: "image" | "video";
+  source: "upload" | "higgsfield";
+  status: "pending" | "ready" | "failed";
+  contentType: string | null;
+  sizeBytes: number | null;
+  url: string | null;
+  prompt: string | null;
+  costUsd: number;
+  error: string | null;
+  createdAt: string;
+};
+
+export type HiggsfieldStatus = {
+  connected: boolean;
+  hint: string | null;
+  spentUsd: number;
+  capUsd: number;
+};
