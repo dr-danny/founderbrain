@@ -33,7 +33,7 @@ export function parsePieces(content: string): ContentPiece[] {
   for (const chunk of chunks) {
     const match = chunk.match(/^(\d+)\.\s*([\s\S]*)$/);
     if (!match) continue;
-    pieces.push({ n: Number(match[1]), text: match[2].trim() });
+    pieces.push({ n: Number(match[1]), text: (match[2] ?? "").trim() });
   }
   return pieces.sort((a, b) => a.n - b.n);
 }
