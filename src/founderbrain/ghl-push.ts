@@ -114,6 +114,7 @@ async function generateCopy(
   workspace: string,
   brain: Brain,
   wanted: { gname: string; guidance: string; key: string }[],
+  acceptedPack = "",
 ): Promise<{ copy: Map<string, string>; held: Array<{ name: string; code: string; reason: string }> }> {
   const catalogText = wanted.map((w) => `- ${w.gname} (key: ${w.key}): ${w.guidance}`).join("\n");
   const { loadOpenRouterApiKey, recordOpenRouterSpend } = await import("./openrouter-keys.ts");
@@ -131,7 +132,15 @@ async function generateCopy(
         "Never write Instagram DM automation into the copy: no bots, blasts, or automated cold DMs. Automated sending is only for replying to people who wrote first. " +
         "Never write the other track's material: B2C copy never mentions Apollo, ICPs, cold email, DKIM or DMARC; B2B copy never mentions hook banks, DM openers or inbound scripts. " +
         "Never write PLACEHOLDER or merge-field code. Match the track. Respect the voice boundaries.",
-      messages: [{ role: "user", content: `BRAIN:\n${JSON.stringify(brain)}\n\nREQUESTED VALUES:\n${catalogText}` }],
+      messages: [{
+        role: "user",
+        content:
+          `BRAIN:\n${JSON.stringify(brain)}\n\n` +
+          (acceptedPack
+            ? `ACCEPTED PACK (use this wording; do not contradict it):\n${acceptedPack}\n\n`
+            : "") +
+          `REQUESTED VALUES:\n${catalogText}`,
+      }],
     },
     loaded.apiKey,
   );
@@ -213,6 +222,7 @@ export async function pushGhlValues(
   workspace: string,
   brain: Brain,
   firstPack: string,
+  acceptedPack = "",
 ): Promise<{ snapshot: SnapshotName; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[]; held: Array<{ name: string; code: string; reason: string }> }> {
   const connection = await (await import("./crm-oauth.ts")).readConnection(store, workspace, config);
   if (!connection)
@@ -222,7 +232,7 @@ export async function pushGhlValues(
   // writes a link: it would invent one.
   const linkKeys = wanted.filter((w) => /_link$/.test(w.key)).map((w) => w.gname);
   const copyWanted = wanted.filter((w) => !/_link$/.test(w.key));
-  const { copy, held } = await generateCopy(config, store, workspace, brain, copyWanted);
+  const { copy, held } = await generateCopy(config, store, workspace, brain, copyWanted, acceptedPack);
 
   const listResponse = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`);
   if (!listResponse.ok)

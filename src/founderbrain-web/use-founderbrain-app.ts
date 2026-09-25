@@ -753,15 +753,18 @@ export function useFounderBrainApp() {
     }
   }
 
-  async function acceptOutput() {
+  async function acceptOutput(textOverride?: string) {
     if (!api || !state || !artifact || artifactStale || artifact.acceptedAt || accepting) return;
     const epoch = sessionEpoch.current;
+    const text = textOverride ?? artifactText;
+    if (textOverride) setArtifactText(textOverride);
     const operation = acceptOperation.current ?? {
       id: artifact.id,
-      text: artifactText,
+      text,
       expectedVersion: state.version,
       key: crypto.randomUUID(),
     };
+    if (textOverride) operation.text = textOverride;
     acceptOperation.current = operation;
     setAccepting(true);
     setAcceptRetry(false);

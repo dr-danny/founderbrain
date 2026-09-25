@@ -392,9 +392,15 @@ export function GhlChapter({
   onConnect,
   loadUsage,
   onGhlPush,
+  packAccepted = false,
+  packReady = false,
+  onReviewPack,
 }: ChapterProps & {
   connectEnabled?: boolean;
   connecting?: boolean;
+  packAccepted?: boolean;
+  packReady?: boolean;
+  onReviewPack?: () => void;
   onGhlPush?: () => Promise<{ snapshot: string; firstPack: string; pushed: string[]; skipped: string[]; proven: boolean; clinicPaste: string[] }>;
   onConnect?: () => void | Promise<void>;
   loadUsage?: () => Promise<UsageResponse>;
@@ -505,7 +511,21 @@ export function GhlChapter({
       {isConnect && connected ? (
         <p className="entry-lede typeform-lede">Connected. You can leave this chapter.</p>
       ) : null}
-      {isConnect && connected && !pushed ? (
+      {isConnect && connected && !pushed && !packAccepted ? (
+        <div className="mission-save-row">
+          <p className="entry-lede typeform-lede">
+            Review and accept the content, outreach, and 90 day plan before anything is written to GoHighLevel.
+          </p>
+          {packReady ? (
+            <button type="button" className="typeform-external" onClick={onReviewPack}>
+              Review the pack
+            </button>
+          ) : (
+            <p className="entry-lede typeform-lede">Use Update to V2 first. That writes the pack you review here.</p>
+          )}
+        </div>
+      ) : null}
+      {isConnect && connected && !pushed && packAccepted ? (
         <div className="mission-save-row">
           <button
             type="button"
