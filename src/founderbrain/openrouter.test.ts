@@ -200,7 +200,7 @@ describe("invitation orchestration", () => {
     const calls: string[] = [];
     const provider: Provider = async (body) => {
       calls.push(body.system.slice(0, 24));
-      if (body.system.includes("plan one short")) {
+      if (body.system.includes("plan one short") || body.system.includes("Aggregate the Founder Brain")) {
         return {
           text: "- angle: workflow\n- tone: warm",
           inputTokens: 10,
@@ -258,7 +258,7 @@ describe("invitation orchestration", () => {
     let verifyCount = 0;
     let runnerCount = 0;
     const provider: Provider = async (body) => {
-      if (body.system.includes("plan one short")) {
+      if (body.system.includes("plan one short") || body.system.includes("Aggregate the Founder Brain")) {
         return { text: "notes", inputTokens: 5, outputTokens: 2, requestId: "t" };
       }
       if (body.system.includes("Verify")) {
