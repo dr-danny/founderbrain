@@ -54,6 +54,7 @@ export function App() {
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
+  const [revising, setRevising] = useState(false);
   const [buildStartedAt, setBuildStartedAt] = useState(() => Date.now());
   const v2Key = email ? `fb-v2-clicked:${email}` : "";
   const [v2Clicked, setV2Clicked] = useState(false);
@@ -241,6 +242,22 @@ export function App() {
           orientation={orientation}
           saving={orientationSaving}
           error={error}
+          artifactText={app.artifactText}
+          generating={app.generating}
+          revising={revising}
+          onGenerate={() => {
+            setBuildStartedAt(Date.now());
+            setBuildOpen(true);
+            void app.generate();
+          }}
+          onRevise={async (pieces) => {
+            setRevising(true);
+            try {
+              return await app.regeneratePieces(pieces);
+            } finally {
+              setRevising(false);
+            }
+          }}
           onPatch={async (patch) => {
             await app.saveOrientation(patch);
           }}
