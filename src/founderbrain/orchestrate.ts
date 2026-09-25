@@ -9,6 +9,7 @@
  * hard budget + fallback, without inventing free-form agent graphs.
  */
 import { DomainError } from "./domain.ts";
+import { checkCopy } from "./copy-rules.ts";
 import type { Provider, ProviderCall, ProviderResult } from "./provider.ts";
 import {
   type OrchestrationRole,
@@ -275,6 +276,27 @@ export async function orchestrateInvitation(
         .replace(/\*\*([^*\n]+)\*\*/g, "$1")
         .trim();
     contentText = ["## Content", tidy(first), tidy(second), tidy(third)].join("\n\n");
+    // Content-engine rule: every number that says something happened is one the
+    // founder gave. Hold pieces the ported rules engine flags, plus any number the
+    // Brain does not contain, and rewrite only those pieces once.
+    const flagged = unsupportedPieces(contentText, plan.userContent);
+    if (flagged.length) {
+      const rewritten = await section(
+        contentRules +
+          " Rewrite only the pieces listed below. Keep each piece's number, header line, format, platform, " +
+          "and Media line. Remove every number or claim listed as not in the Brain. Write what the founder sees, " +
+          "does, or believes instead. Output only the rewritten pieces, in the same shape.\n\n" +
+          flagged.map((f) => `Piece ${f.n}. Not in the Brain: ${f.reasons.join("; ")}\n${f.text}`).join("\n\n"),
+        "",
+      );
+      contentText = replacePieces(contentText, tidy(rewritten));
+      for (const still of unsupportedPieces(contentText, plan.userContent)) {
+        contentText = replacePieces(
+          contentText,
+          `${still.n}. ${still.text.replace(/\n(Media:[^\n]*)$/, `\nCheck before posting: ${still.reasons.join("; ")} is not in your Brain.\n$1`)}`,
+        );
+      }
+    }
     outreachText = await section(
       "Write the private outreach for this Brain only. Start with the heading ## Outreach. " +
       "Read the track. B2B: list criteria (tight, medium, broad), then four or five touches under 120 words, " +
@@ -453,4 +475,67 @@ export function buildOrchestrationFromConfig(input: {
   verifier?: string;
 }): Record<OrchestrationRole, RoleModels> {
   return resolveOrchestration(input);
+}
+
+const PIECE_SPLIT = /\n(?=\d{1,2}\.\s[^\n]*\u00b7)/;
+
+function piecesOf(content: string): Array<{ n: number; text: string }> {
+  return ("\n" + content)
+    .split(PIECE_SPLIT)
+    .map((chunk) => chunk.trim().match(/^(\d{1,2})\.\s*([\s\S]*)$/))
+    .filter((m): m is RegExpMatchArray => Boolean(m))
+    .map((m) => ({ n: Number(m[1]), text: (m[2] ?? "").trim() }));
+}
+
+/** Swap in rewritten pieces by number; anything not rewritten stays as it was. */
+export function replacePieces(content: string, rewritten: string): string {
+  const next = new Map(piecesOf(rewritten).map((p) => [p.n, p.text]));
+  if (!next.size) return content;
+  return ("\n" + content)
+    .split(PIECE_SPLIT)
+    .map((chunk) => {
+      const m = chunk.trim().match(/^(\d{1,2})\.\s*[\s\S]*$/);
+      const n = m ? Number(m[1]) : NaN;
+      return next.has(n) ? `${n}. ${next.get(n)}` : chunk.trim();
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function numbersIn(text: string): string[] {
+  return (text.match(/\d[\d,.]*\d|\d/g) ?? []).map((n) => n.replace(/,/g, "").replace(/\.$/, ""));
+}
+
+/** Pieces whose post body holds a claim the rules engine flags or a number the Brain lacks. */
+export function unsupportedPieces(
+  content: string,
+  brainJson: string,
+): Array<{ n: number; text: string; reasons: string[] }> {
+  let track: "b2b" | "b2c" = "b2b";
+  try {
+    const parsed = JSON.parse(brainJson) as { identity?: { track?: string } };
+    if (parsed.identity?.track === "b2c") track = "b2c";
+  } catch {
+    // Brain context is canonical JSON; fall back to b2b wording rules if not.
+  }
+  const known = new Set(numbersIn(brainJson));
+  const out: Array<{ n: number; text: string; reasons: string[] }> = [];
+  for (const piece of piecesOf(content)) {
+    const body = piece.text
+      .split("\n")
+      .slice(1)
+      .filter((line) => !/^(Media|Check before posting):/i.test(line.trim()))
+      .join("\n");
+    const reasons = new Set<string>();
+    for (const finding of checkCopy(body, { track, brainJson })) {
+      if (finding.kind === "HOLD") {
+        const nums = numbersIn(finding.quote).filter((n) => !known.has(n));
+        if (nums.length) for (const n of nums) reasons.add(n);
+        else reasons.add(finding.reason);
+      }
+    }
+    for (const n of numbersIn(body)) if (!known.has(n)) reasons.add(n);
+    if (reasons.size) out.push({ n: piece.n, text: piece.text, reasons: [...reasons] });
+  }
+  return out;
 }
