@@ -2835,3 +2835,12 @@ button:not(.link-button) {
 .higgsfield-card h3 { margin: 1rem 0 0.3rem; font-size: 1rem; }
 .higgsfield-card ul, .higgsfield-card ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.3rem; }
 .higgsfield-card input { width: 100%; box-sizing: border-box; margin-bottom: 0.5rem; }
+
+/* Pack review: one box per piece. */
+.pack-pieces { display: grid; gap: 0.6rem; max-height: min(28rem, 55vh); overflow: auto; padding-right: 0.25rem; }
+.pack-piece { display: grid; gap: 0.25rem; }
+.pack-piece span { font-size: 0.8rem; opacity: 0.8; }
+.pack-piece textarea { width: 100%; box-sizing: border-box; }
+.pack-rebuild { margin: 0.5rem 0 0.75rem; padding: 0.75rem; border-radius: 12px; border: 1px solid #e0a090; }
+.pack-rebuild p { margin: 0 0 0.5rem; }
+.piece p { white-space: pre-wrap; }

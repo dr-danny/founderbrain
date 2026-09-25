@@ -55,6 +55,8 @@ export function App() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
   const [buildDismissed, setBuildDismissed] = useState(false);
+  // Artifact id a Rebuild started from; null when no rebuild is running.
+  const [rebuildFrom, setRebuildFrom] = useState<string | null>(null);
   const [revising, setRevising] = useState(false);
   const [buildStartedAt, setBuildStartedAt] = useState(() => Date.now());
   const v2Key = email ? `fb-v2-clicked:${email}` : "";
@@ -88,14 +90,21 @@ export function App() {
     !app.generating;
   // Once Update to V2 is clicked the banner is gone for good. Until the pack
   // exists, the build modal is the one place to watch it or try again.
+  const rebuilding = rebuildFrom !== null;
   const showBuild =
     Boolean(email) &&
     Boolean(config?.aiEnabled) &&
-    !hasV2Plan &&
-    !packDraft &&
     !buildDismissed &&
-    (buildOpen || v2Clicked || app.generating);
-  const buildFailed = showBuild && !app.generating;
+    (rebuilding || (!hasV2Plan && !packDraft && (buildOpen || v2Clicked || app.generating)));
+  const buildFailed =
+    showBuild && !app.generating && (!rebuilding || (app.artifact?.id ?? "") === rebuildFrom);
+  useEffect(() => {
+    if (rebuildFrom === null || app.generating) return;
+    if (app.artifact && app.artifact.id !== rebuildFrom) {
+      setRebuildFrom(null);
+      setBuildOpen(false);
+    }
+  }, [rebuildFrom, app.artifact?.id, app.generating]);
 
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
@@ -113,6 +122,19 @@ export function App() {
           onAccept={(joined) => {
             void app.acceptOutput(joined).then(() => setReviewOpen(false));
           }}
+          onRebuild={
+            config?.aiEnabled
+              ? () => {
+                  dismissedPack.current = app.artifact?.id ?? null;
+                  setReviewOpen(false);
+                  setRebuildFrom(app.artifact?.id ?? "");
+                  setBuildDismissed(false);
+                  setBuildStartedAt(Date.now());
+                  setBuildOpen(true);
+                  void app.generate();
+                }
+              : undefined
+          }
         />
       ) : null}
       {showBuild ? (
@@ -129,6 +151,7 @@ export function App() {
           onClose={() => {
             setBuildOpen(false);
             setBuildDismissed(true);
+            setRebuildFrom(null);
           }}
         />
       ) : null}

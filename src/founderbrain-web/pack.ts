@@ -27,15 +27,29 @@ export function splitPack(text: string): PackSections {
 
 export type ContentPiece = { n: number; text: string };
 
-export function parsePieces(content: string): ContentPiece[] {
-  const chunks = content.split(/\n(?=\d+\.\s)/).map((chunk) => chunk.trim()).filter(Boolean);
+/** New packs mark each piece with a header 'N. Pillar · Format · Platform'. */
+const HEADER_SPLIT = /\n(?=\d{1,2}\.\s[^\n]*·)/;
+const PLAIN_SPLIT = /\n(?=\d+\.\s)/;
+
+export function splitContent(content: string): { preamble: string; pieces: ContentPiece[] } {
+  const text = "\n" + content.trim();
+  const splitter = HEADER_SPLIT.test(text) ? HEADER_SPLIT : PLAIN_SPLIT;
+  const chunks = text.split(splitter);
+  const preamble = /^\s*\d+\.\s/.test(chunks[0] ?? "") ? "" : (chunks.shift() ?? "").trim();
   const pieces: ContentPiece[] = [];
   for (const chunk of chunks) {
-    const match = chunk.match(/^(\d+)\.\s*([\s\S]*)$/);
-    if (!match) continue;
-    pieces.push({ n: Number(match[1]), text: (match[2] ?? "").trim() });
+    const match = chunk.trim().match(/^(\d+)\.\s*([\s\S]*)$/);
+    if (match) pieces.push({ n: Number(match[1]), text: (match[2] ?? "").trim() });
   }
-  return pieces.sort((a, b) => a.n - b.n);
+  return { preamble, pieces: pieces.sort((a, b) => a.n - b.n) };
+}
+
+export function joinContent(preamble: string, pieces: ContentPiece[]): string {
+  return [preamble.trim(), piecesToMarkdown(pieces)].filter(Boolean).join("\n\n");
+}
+
+export function parsePieces(content: string): ContentPiece[] {
+  return splitContent(content).pieces;
 }
 
 export function piecesToMarkdown(pieces: ContentPiece[]): string {
