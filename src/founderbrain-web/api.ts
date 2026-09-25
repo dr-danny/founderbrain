@@ -212,10 +212,14 @@ export class FounderBrainApi {
     );
   }
   completeOauth(body: { code: string; state: string }) {
-    return this.request<{ connected: boolean; locationId: string | null }>("/oauth/complete", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    return this.request<{ connected: boolean; locationId: string | null; orientation?: OrientationState }>(
+      "/oauth/complete",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      30_000,
+    );
   }
   brain(version?: number) {
     return this.request<BrainState>(

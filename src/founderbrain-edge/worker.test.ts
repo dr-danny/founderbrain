@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createFounderBrainWorker, type FounderBrainEdgeEnv } from "./worker.js";
+import { createFounderBrainWorker, SLOW_API_PATHS, type FounderBrainEdgeEnv } from "./worker.js";
 
 const baseEnv = (): FounderBrainEdgeEnv => ({
   API_ORIGIN: "https://founderbrain-api.up.railway.app",
@@ -216,6 +216,12 @@ test("permits local HTTP only through an explicit injected test option", async (
   const result = await worker.fetch(request, { ...baseEnv(), API_ORIGIN: "http://127.0.0.1:8787" });
   assert.equal(result.status, 200);
 });
+test("oauth complete stays on the slow proxy list so a 15s token exchange is not cut at 10s", () => {
+  assert.equal(SLOW_API_PATHS.has("/api/oauth/complete"), true);
+  assert.equal(SLOW_API_PATHS.has("/api/voice"), true);
+  assert.equal(SLOW_API_PATHS.has("/api/ghl/push"), true);
+});
+
 test("serves SPA fallback through assets and does not proxy non-api paths", async () => {
   const assets: string[] = [];
   const worker = createFounderBrainWorker(async () => {

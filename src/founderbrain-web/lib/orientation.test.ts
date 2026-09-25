@@ -74,6 +74,22 @@ test("orientation patch completes once and resumes mid-flow", () => {
   assert.equal(again.firstLoginCompletedAt, "2026-09-18T12:02:00.000Z");
 });
 
+test("connecting GoHighLevel merges the flag and does not drop the account answer", () => {
+  const start = applyOrientationPatch(emptyOrientationState(new Date("2026-09-25T12:00:00.000Z")), {
+    ghlScreen: 3,
+    ghlAnswers: { hasAccount: true },
+  });
+  const connected = applyOrientationPatch(
+    start,
+    { ghlScreen: 5, ghlComplete: true, ghlAnswers: { connected: true } },
+    new Date("2026-09-25T12:05:00.000Z"),
+  );
+  assert.equal(connected.ghlAnswers.hasAccount, true);
+  assert.equal(connected.ghlAnswers.connected, true);
+  assert.equal(connected.ghlCompletedAt, "2026-09-25T12:05:00.000Z");
+  assert.equal(connected.ghlScreen, 5);
+});
+
 test("atlanta ready map is green only when all artifacts are ready", () => {
   const orientation = applyOrientationPatch(emptyOrientationState(), {
     firstLoginComplete: true,

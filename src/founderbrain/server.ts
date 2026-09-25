@@ -31,6 +31,7 @@ import { getRoutineSettings, listRoutineDrafts, setRoutineDraftStatus, updateRou
 import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { usageResponse, usageTotals } from "./usage.ts";
 import { readOrientation, writeOrientation } from "./orientation.ts";
+import { GHL_CHAPTER_SCREENS } from "../founderbrain-shared/orientation.ts";
 import {
   authorizeUrl,
   connectionStatus,
@@ -163,7 +164,7 @@ export async function buildApi(
           identity.email,
           options.openRouterManagement,
         );
-      } catch (error) {
+      } catch {
         // Soft-fail provisioning so Brain edit/export still work if OpenRouter is down.
         // A revoked key stays blocked for AI actions (keyIsUsable at spend time),
         // but it must not brick the whole app: the preHandler used to rethrow
@@ -273,7 +274,16 @@ export async function buildApi(
       throw new DomainError(403, "oauth_state_mismatch", "Connect belonged to a different session.");
     const tokens = await exchangeCode(config, body.code);
     await saveConnection(store, c.workspace, tokens);
-    return connectionStatus(store, c.workspace);
+    // The CRM row is the source of truth. Write the chapter flag in the same
+    // request so a later client save, or a refresh that loses the callback,
+    // cannot leave the founder on "Connect" forever.
+    const orientation = await writeOrientation(store, c.workspace, {
+      ghlScreen: GHL_CHAPTER_SCREENS,
+      ghlComplete: true,
+      ghlAnswers: { connected: true },
+    });
+    const status = await connectionStatus(store, c.workspace);
+    return { ...status, orientation };
   });
   app.post("/api/voice", { bodyLimit: 16 * 1024 * 1024 }, async (req) => {
     const body = parse(

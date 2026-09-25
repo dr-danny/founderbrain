@@ -18,11 +18,17 @@ export function AccountChip({
   const tooltip = usage
     ? `${usage.ai.events} AI actions · ${usage.firecrawl.scrapes} site reads (${usage.firecrawl.credits} credits)`
     : undefined;
+  const usageLine =
+    tokens === null
+      ? null
+      : tokens === 0 && usage && usage.ai.events > 0
+        ? "AI ran, token count missing"
+        : `${compactTokens(tokens)} tokens used`;
   return (
     <div className="account-chip">
-      {usage ? (
+      {usageLine ? (
         <span className="account-chip-usage" title={tooltip}>
-          {compactTokens(tokens!)} tokens used
+          {usageLine}
         </span>
       ) : null}
       <div className="account-chip-row">

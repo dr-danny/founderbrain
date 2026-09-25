@@ -87,6 +87,9 @@ export function useFounderBrainApp() {
   const latestDraft = useRef(draft);
   const sessionEpoch = useRef(0);
   const oauthHandled = useRef(false);
+  // Bumped around Connect writes so an in-flight workspace GET cannot put the
+  // old "not connected" orientation back on screen after OAuth succeeds.
+  const orientationEpoch = useRef(0);
   const saveOperation = useRef<{ brain: Brain; expectedVersion: number; key: string } | null>(null);
   const jobOperation = useRef<{ expectedVersion: number; key: string } | null>(null);
   const acceptOperation = useRef<{
@@ -218,6 +221,7 @@ export function useFounderBrainApp() {
   async function loadWorkspace() {
     if (!api) return;
     const epoch = sessionEpoch.current;
+    const epochOrientation = orientationEpoch.current;
     setError("");
     try {
       const [nextState, output] = await Promise.all([api.brain(), api.artifact()]);
@@ -230,7 +234,7 @@ export function useFounderBrainApp() {
       }
       if (epoch !== sessionEpoch.current) return;
       setState(nextState);
-      setOrientation(nextOrientation);
+      if (orientationEpoch.current === epochOrientation) setOrientation(nextOrientation);
       latestDraft.current = nextState.brain;
       setDraft(nextState.brain);
       setChanged(false);
@@ -239,6 +243,7 @@ export function useFounderBrainApp() {
       setArtifactStale(output.stale);
       const pendingJob = window.sessionStorage.getItem(jobStorage);
       if (pendingJob) void pollJob(pendingJob, epoch);
+      if (nextOrientation.ghlAnswers.connected !== true) void healGhlConnection();
     } catch (err) {
       if (epoch === sessionEpoch.current) setError(friendlyError(err));
     }
@@ -247,6 +252,8 @@ export function useFounderBrainApp() {
   async function saveOrientation(patch: OrientationPatch): Promise<OrientationState> {
     if (!api) throw new Error("api_unavailable");
     const epoch = sessionEpoch.current;
+    orientationEpoch.current += 1;
+    const writeEpoch = orientationEpoch.current;
     setOrientationSaving(true);
     setError("");
     try {
@@ -254,13 +261,31 @@ export function useFounderBrainApp() {
       // Always apply the server response: it is fresher than any local state,
       // even when the session epoch moved mid-request (token refresh). The old
       // guard dropped this update and left the client stale (#69).
-      setOrientation(saved);
+      // A newer orientation write that started after this one still wins.
+      if (writeEpoch === orientationEpoch.current) setOrientation(saved);
       return saved;
     } catch (err) {
       if (epoch === sessionEpoch.current) setError(friendlyError(err));
       throw err;
     } finally {
       setOrientationSaving(false);
+    }
+  }
+
+  /** CRM row exists but the chapter flag does not. Heal it instead of sending them through OAuth again. */
+  async function healGhlConnection() {
+    if (!api) return;
+    try {
+      const status = await api.oauthStatus();
+      if (!status.connected) return;
+      await saveOrientation({
+        ghlScreen: GHL_CHAPTER_SCREENS,
+        ghlComplete: true,
+        ghlAnswers: { connected: true },
+      });
+      setNotice("GoHighLevel is already connected.");
+    } catch {
+      // A failed status check must not block the hub. Connect can retry.
     }
   }
 
@@ -278,16 +303,20 @@ export function useFounderBrainApp() {
       setError("GoHighLevel Connect did not finish. Try Connect again.");
       return;
     }
+    orientationEpoch.current += 1;
     setConnecting(true);
     void (async () => {
       try {
-        await api.completeOauth({ code, state: oauthState });
-        const saved = await api.saveOrientation({
-          ghlScreen: GHL_CHAPTER_SCREENS,
-          ghlComplete: true,
-          ghlAnswers: { connected: true },
-        });
-        setOrientation(saved);
+        const completed = await api.completeOauth({ code, state: oauthState });
+        orientationEpoch.current += 1;
+        if (completed.orientation) setOrientation(completed.orientation);
+        else {
+          await saveOrientation({
+            ghlScreen: GHL_CHAPTER_SCREENS,
+            ghlComplete: true,
+            ghlAnswers: { connected: true },
+          });
+        }
         setNotice("GoHighLevel connected.");
       } catch (err) {
         setError(friendlyError(err));
@@ -302,6 +331,17 @@ export function useFounderBrainApp() {
     setConnecting(true);
     setError("");
     try {
+      const status = await api.oauthStatus();
+      if (status.connected) {
+        await saveOrientation({
+          ghlScreen: GHL_CHAPTER_SCREENS,
+          ghlComplete: true,
+          ghlAnswers: { connected: true },
+        });
+        setNotice("GoHighLevel is already connected.");
+        setConnecting(false);
+        return;
+      }
       const started = await api.startOauth();
       window.location.assign(started.url);
     } catch (err) {
