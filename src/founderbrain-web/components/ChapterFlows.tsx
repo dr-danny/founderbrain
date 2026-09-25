@@ -24,6 +24,8 @@ import {
 } from "../orientation-copy";
 import { TypeformShell } from "./TypeformShell";
 import { ThirtyPieces } from "./ThirtyPieces";
+import { MediaProvider } from "./Media";
+import type { FounderBrainApi } from "../api";
 import { splitPack } from "../pack";
 
 type ChapterProps = {
@@ -101,7 +103,9 @@ export function ContentChapter({
   revising = false,
   onGenerate,
   onRevise,
+  mediaApi = null,
 }: ChapterProps & {
+  mediaApi?: FounderBrainApi | null;
   artifactText?: string;
   generating?: boolean;
   revising?: boolean;
@@ -203,6 +207,16 @@ export function ContentChapter({
     }
   }
 
+  const thirty = (
+    <ThirtyPieces
+      content={splitPack(artifactText).content}
+      generating={generating}
+      revising={revising}
+      onGenerate={() => onGenerate?.()}
+      onRevise={async (pieces) => (await onRevise?.(pieces)) ?? []}
+    />
+  );
+
   return (
     <TypeformShell
       kicker="Atlanta prep · Content chapter"
@@ -218,13 +232,13 @@ export function ContentChapter({
       saving={saving}
     >
       {isThirty ? (
-        <ThirtyPieces
-          content={splitPack(artifactText).content}
-          generating={generating}
-          revising={revising}
-          onGenerate={() => onGenerate?.()}
-          onRevise={async (pieces) => (await onRevise?.(pieces)) ?? []}
-        />
+        mediaApi ? (
+          <MediaProvider api={mediaApi}>
+            {thirty}
+          </MediaProvider>
+        ) : (
+          thirty
+        )
       ) : (
         <ScreenBody
           screen={current}

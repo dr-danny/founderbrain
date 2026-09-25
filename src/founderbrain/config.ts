@@ -63,6 +63,11 @@ const envSchema = z.object({
   /** Groq key for server-side voice transcription, the fallback when a browser's
    *  Web Speech service is unavailable. ASR only: the audio goes nowhere else. */
   GROQ_API_KEY: z.string().min(16).optional(),
+  /** Private R2 bucket for founder media (uploads and Higgsfield output). All four or none. */
+  R2_ENDPOINT: z.string().url().optional(),
+  R2_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(16).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(32).optional(),
   /** What the transcription provider charges per minute. Defaults to Groq
    *  whisper-large-v3 at $0.02/hour. */
   VOICE_USD_PER_MINUTE: z.coerce.number().positive().optional(),

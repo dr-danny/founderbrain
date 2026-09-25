@@ -19,7 +19,9 @@
     "API_ORIGIN":"https://founderbrain-production-1368.up.railway.app",
     // Only used to allow the browser SDK in the Content-Security-Policy. Must match the API's
     // HEXCLAVE_API_URL. Not a secret.
-    "HEXCLAVE_API_URL":"https://api.hexclave.com"
+    "HEXCLAVE_API_URL":"https://api.hexclave.com",
+    // Private R2 media bucket endpoint. Presigned URLs only; the bucket is not public.
+    "MEDIA_ORIGIN":"https://8786eae8cde6419e0efa80799a8a7878.r2.cloudflarestorage.com"
   }
   // ORIGIN_SECRET is a Worker secret (`wrangler secret put ORIGIN_SECRET`), never a var.
 }

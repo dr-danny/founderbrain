@@ -258,6 +258,7 @@ export function App() {
           orientation={orientation}
           saving={orientationSaving}
           error={error}
+          mediaApi={config.mediaEnabled ? app.api : null}
           artifactText={app.artifactText}
           generating={app.generating}
           revising={revising}
