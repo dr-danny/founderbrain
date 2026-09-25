@@ -54,6 +54,7 @@ export function App() {
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
+  const [buildDismissed, setBuildDismissed] = useState(false);
   const [buildStartedAt, setBuildStartedAt] = useState(() => Date.now());
   const v2Key = email ? `fb-v2-clicked:${email}` : "";
   const [v2Clicked, setV2Clicked] = useState(false);
@@ -84,6 +85,16 @@ export function App() {
     !v2Clicked &&
     !buildOpen &&
     !app.generating;
+  // Once Update to V2 is clicked the banner is gone for good. Until the pack
+  // exists, the build modal is the one place to watch it or try again.
+  const showBuild =
+    Boolean(email) &&
+    Boolean(config?.aiEnabled) &&
+    !hasV2Plan &&
+    !packDraft &&
+    !buildDismissed &&
+    (buildOpen || v2Clicked || app.generating);
+  const buildFailed = showBuild && !app.generating;
 
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
@@ -103,15 +114,20 @@ export function App() {
           }}
         />
       ) : null}
-      {(buildOpen || (v2Clicked && app.generating)) && !packDraft ? (
+      {showBuild ? (
         <BuildPackModal
           startedAt={buildStartedAt}
-          done={!app.generating && !app.error && packDraft}
-          error={app.generating ? "" : app.error}
+          done={false}
+          failed={buildFailed}
+          message={app.error}
           onRetry={() => {
             setBuildStartedAt(Date.now());
             setBuildOpen(true);
             void app.generate();
+          }}
+          onClose={() => {
+            setBuildOpen(false);
+            setBuildDismissed(true);
           }}
         />
       ) : null}
