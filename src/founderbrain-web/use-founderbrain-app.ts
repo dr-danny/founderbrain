@@ -724,12 +724,53 @@ export function useFounderBrainApp() {
       window.sessionStorage.setItem(jobStorage, start.id);
       await pollJob(start.id, epoch);
     } catch (err) {
-      if (epoch === sessionEpoch.current) {
-        setError(friendlyError(err));
-        setGenerationRetry(true);
-        setNotice("Generation start is unresolved. Retry uses the same request key.");
-        setGenerating(false);
+      if (epoch !== sessionEpoch.current) return;
+      if (err instanceof ApiError && err.code === "job_active" && typeof err.details.jobId === "string") {
+        if (err.details.status === "uncertain") {
+          jobOperation.current = {
+            expectedVersion: state.version,
+            key: crypto.randomUUID(),
+          };
+          try {
+            const again = await api.startJob(state.version, jobOperation.current.key, true);
+            jobOperation.current = null;
+            window.sessionStorage.setItem(jobStorage, again.id);
+            await pollJob(again.id, epoch);
+            return;
+          } catch (retryErr) {
+            setError(friendlyError(retryErr));
+            setGenerationRetry(true);
+            setGenerating(false);
+            return;
+          }
+        }
+        window.sessionStorage.setItem(jobStorage, err.details.jobId);
+        setNotice("A build is already running. Staying with it.");
+        await pollJob(err.details.jobId, epoch);
+        return;
       }
+      if (err instanceof ApiError && err.code === "version_conflict") {
+        try {
+          const fresh = await api.brain();
+          if (epoch !== sessionEpoch.current) return;
+          setState(fresh);
+          jobOperation.current = { expectedVersion: fresh.version, key: crypto.randomUUID() };
+          const start = await api.startJob(fresh.version, jobOperation.current.key);
+          jobOperation.current = null;
+          window.sessionStorage.setItem(jobStorage, start.id);
+          await pollJob(start.id, epoch);
+          return;
+        } catch (retryErr) {
+          setError(friendlyError(retryErr));
+          setGenerationRetry(true);
+          setGenerating(false);
+          return;
+        }
+      }
+      setError(friendlyError(err));
+      setGenerationRetry(true);
+      setNotice("Generation start is unresolved. Retry uses the same request key.");
+      setGenerating(false);
     }
   }
 
