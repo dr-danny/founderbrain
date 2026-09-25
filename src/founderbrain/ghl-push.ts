@@ -17,6 +17,7 @@ import { DomainError } from "./domain.ts";
 import { checkCopy } from "./copy-rules.ts";
 import { canonicalize } from "../founderbrain-shared/domain.ts";
 import { openRouterProvider } from "./provider.ts";
+import { ceilMicro, recordUsageEvent } from "./usage.ts";
 import { present, type Brain } from "../founderbrain-shared/domain.ts";
 import type { Config } from "./config.ts";
 import type { PgBrainStore } from "./store.ts";
@@ -114,8 +115,9 @@ async function generateCopy(
   brain: Brain,
   wanted: { gname: string; guidance: string; key: string }[],
 ): Promise<{ copy: Map<string, string>; held: Array<{ name: string; code: string; reason: string }> }> {
-  const loaded = await (await import("./openrouter-keys.ts")).loadOpenRouterApiKey(store, workspace);
   const catalogText = wanted.map((w) => `- ${w.gname} (key: ${w.key}): ${w.guidance}`).join("\n");
+  const { loadOpenRouterApiKey, recordOpenRouterSpend } = await import("./openrouter-keys.ts");
+  const loaded = await loadOpenRouterApiKey(store, workspace);
   const result = await openRouterProvider(
     {
       model: config.AI_MODEL_RUNNER ?? config.AI_MODEL ?? "anthropic/claude-haiku-4.5",
@@ -133,6 +135,19 @@ async function generateCopy(
     },
     loaded.apiKey,
   );
+  const inputRate = config.AI_INPUT_USD_PER_MILLION ?? 0;
+  const outputRate = config.AI_OUTPUT_USD_PER_MILLION ?? 0;
+  const costMicroUsd = ceilMicro(result.inputTokens * inputRate + result.outputTokens * outputRate);
+  await recordUsageEvent(store, workspace, config, {
+    kind: "ai_tokens",
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costMicroUsd,
+    meta: { purpose: "ghl_push" },
+  });
+  if (costMicroUsd > 0) {
+    await recordOpenRouterSpend(store, workspace, costMicroUsd, { allowOverLifetime: true });
+  }
   const start = result.text.indexOf("{");
   const end = result.text.lastIndexOf("}");
   if (start < 0 || end <= start)
