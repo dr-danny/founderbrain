@@ -46,6 +46,23 @@ import { transcribeVoice } from "./voice.ts";
 import { addVoiceSample, deleteVoiceSample, listVoiceSamples, MIN_VOICE_SAMPLES } from "./voice-samples.ts";
 import { brainReadyForPush, defaultFirstPack, loadValueCatalog, pushGhlValues } from "./ghl-push.ts";
 import { revisePieces } from "./content-revise.ts";
+import {
+  UPLOAD_TYPES,
+  assignMedia,
+  completeUpload,
+  createUpload,
+  deleteMedia,
+  listMedia,
+  r2FromConfig,
+} from "./media.ts";
+import {
+  connectHiggsfield,
+  disconnectHiggsfield,
+  estimateMedia,
+  generateMedia,
+  higgsfieldStatus,
+  refreshMedia,
+} from "./higgsfield.ts";
 
 const key = z
   .string()
@@ -246,6 +263,7 @@ export async function buildApi(
       crmConnectEnabled: crmOAuthConfigured(config),
       siteImportEnabled: Boolean(config.FIRECRAWL_API_KEY),
       routinesEnabled: config.ROUTINES_ENABLED === "true",
+      mediaEnabled: r2FromConfig(config) !== null,
     };
   });
   app.get("/api/oauth/status", async (req) => connectionStatus(store, context(req).workspace));
@@ -349,6 +367,66 @@ export async function buildApi(
     );
     await setRoutineDraftStatus(store, context(req).workspace, body.id, body.status);
     return { ok: true };
+  });
+  const pieceN = z.number().int().min(1).max(30).nullable().optional();
+  const mediaId = z.object({ id: z.string().uuid() });
+  app.get("/api/media", async (req) => {
+    const workspace = context(req).workspace;
+    const [items, higgsfield] = await Promise.all([
+      listMedia(config, store, workspace),
+      higgsfieldStatus(store, workspace),
+    ]);
+    return { items, higgsfield };
+  });
+  app.post("/api/media/upload", async (req) => {
+    const body = parse(
+      z.object({
+        pieceN,
+        filename: z.string().min(1).max(200),
+        contentType: z.string().refine((t) => t in UPLOAD_TYPES),
+        size: z.number().int().positive(),
+      }).strict(),
+      req.body,
+    );
+    return createUpload(config, store, context(req).workspace, body);
+  });
+  app.post("/api/media/:id/complete", async (req) => {
+    const { id } = parse(mediaId, req.params);
+    return { item: await completeUpload(config, store, context(req).workspace, id) };
+  });
+  app.post("/api/media/:id/assign", async (req) => {
+    const { id } = parse(mediaId, req.params);
+    const body = parse(z.object({ pieceN: z.number().int().min(1).max(30).nullable() }).strict(), req.body);
+    return { item: await assignMedia(config, store, context(req).workspace, id, body.pieceN) };
+  });
+  app.post("/api/media/:id/refresh", async (req) => {
+    const { id } = parse(mediaId, req.params);
+    return { item: await refreshMedia(config, store, context(req).workspace, id) };
+  });
+  app.delete("/api/media/:id", async (req) => {
+    const { id } = parse(mediaId, req.params);
+    return deleteMedia(config, store, context(req).workspace, id);
+  });
+  app.post("/api/higgsfield/connect", async (req) => {
+    const body = parse(
+      z.object({ keyId: z.string().min(8).max(200), keySecret: z.string().min(8).max(400) }).strict(),
+      req.body,
+    );
+    return connectHiggsfield(store, context(req).workspace, body);
+  });
+  app.delete("/api/higgsfield", async (req) => disconnectHiggsfield(store, context(req).workspace));
+  const genBody = z.object({
+    kind: z.enum(["image", "video"]),
+    prompt: z.string().trim().min(3).max(1500),
+    pieceN,
+  }).strict();
+  app.post("/api/higgsfield/estimate", async (req) => {
+    const body = parse(genBody, req.body);
+    return estimateMedia(store, context(req).workspace, body);
+  });
+  app.post("/api/higgsfield/generate", async (req) => {
+    const body = parse(genBody, req.body);
+    return { item: await generateMedia(config, store, context(req).workspace, body) };
   });
   app.post("/api/content/regenerate", async (req) => {
     const body = parse(
