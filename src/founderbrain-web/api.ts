@@ -244,6 +244,12 @@ export class FounderBrainApi {
       body: JSON.stringify({ version, expectedVersion, idempotencyKey }),
     });
   }
+  regeneratePieces(pieces: Array<{ n: number; text: string; feedback: string }>) {
+    return this.request<{ pieces: Array<{ n: number; text: string }> }>("/content/regenerate", {
+      method: "POST",
+      body: JSON.stringify({ pieces }),
+    });
+  }
   startJob(expectedVersion: number, idempotencyKey = makeKey(), replaceStuck = false) {
     return this.request<Pick<Job, "id" | "status">>("/jobs", {
       method: "POST",
