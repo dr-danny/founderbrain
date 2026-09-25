@@ -380,6 +380,46 @@ select:focus-visible {
   flex: none;
 }
 
+.pack-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(8, 6, 10, 0.72);
+}
+.pack-card {
+  width: min(44rem, 100%);
+  max-height: min(40rem, calc(100vh - 2.5rem));
+  overflow: auto;
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: #171217;
+  color: #f7efe6;
+  border: 1px solid rgba(247, 239, 230, 0.2);
+}
+.pack-card h2,
+.pack-card p {
+  margin: 0 0 0.75rem;
+}
+.pack-tabs,
+.pack-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+}
+.pack-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+.pack-card textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .account-chip {
   position: fixed;
   top: 0.9rem;
