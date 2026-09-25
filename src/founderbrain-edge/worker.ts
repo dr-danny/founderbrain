@@ -135,6 +135,9 @@ function gatewayHeaders(request: Request, secret: string, requestId: string): He
   return headers;
 }
 
+/** Paths whose upstream can outlast the 10s default. OAuth token exchange is 15s. */
+export const SLOW_API_PATHS = new Set(["/api/voice", "/api/ghl/push", "/api/oauth/complete"]);
+
 export function createFounderBrainWorker(
   fetchImpl: FetchLike = fetch,
   options: { timeoutMs?: number; allowInsecureApiOrigin?: boolean } = {},
@@ -144,8 +147,7 @@ export function createFounderBrainWorker(
       const inbound = new URL(request.url);
       if (isApi(inbound.pathname)) {
         // Voice transcription waits on Groq; the 10s default would cut it off.
-        const slowPaths = new Set(["/api/voice", "/api/ghl/push"]);
-        const timeoutMs = slowPaths.has(inbound.pathname)
+        const timeoutMs = SLOW_API_PATHS.has(inbound.pathname)
           ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, 50_000)
           : (options.timeoutMs ?? REQUEST_TIMEOUT_MS);
         return proxyApi(
