@@ -23,6 +23,8 @@ import {
   type TypeformScreen,
 } from "../orientation-copy";
 import { TypeformShell } from "./TypeformShell";
+import { ThirtyPieces } from "./ThirtyPieces";
+import { splitPack } from "../pack";
 
 type ChapterProps = {
   orientation: OrientationState;
@@ -88,7 +90,24 @@ function ScreenBody({
   );
 }
 
-export function ContentChapter({ orientation, saving, error, onPatch, onFinished }: ChapterProps) {
+export function ContentChapter({
+  orientation,
+  saving,
+  error,
+  onPatch,
+  onFinished,
+  artifactText = "",
+  generating = false,
+  revising = false,
+  onGenerate,
+  onRevise,
+}: ChapterProps & {
+  artifactText?: string;
+  generating?: boolean;
+  revising?: boolean;
+  onGenerate?: () => void;
+  onRevise?: (pieces: Array<{ n: number; text: string; feedback: string }>) => Promise<Array<{ n: number; text: string }>>;
+}) {
   const screens = useMemo(() => contentScreens(orientation.track), [orientation.track]);
   const screen = Math.min(Math.max(orientation.contentScreen, 1), contentTotal);
   const current = screens[screen - 1]!;
@@ -107,7 +126,11 @@ export function ContentChapter({ orientation, saving, error, onPatch, onFinished
   const needsConfirm = Boolean(current.confirm);
   const needsText = Boolean(current.textField);
   const isChoice = Boolean(current.choices?.length);
-  const continueDisabled = (needsConfirm && !confirm) || (needsText && text.trim().length < 2);
+  const isThirty = current.id === "thirty";
+  const hasPieces = splitPack(artifactText).content.includes("1.");
+  const continueDisabled =
+    (isThirty ? !hasPieces && !generating : needsConfirm && !confirm) ||
+    (needsText && text.trim().length < 2);
 
   async function persist(patch: OrientationPatch) {
     setLocalError("");
@@ -124,7 +147,9 @@ export function ContentChapter({ orientation, saving, error, onPatch, onFinished
       if (isChoice) return;
       const answers: ContentAnswers = { ...orientation.contentAnswers };
       if (current.confirm) {
-        (answers as Record<string, boolean | string | undefined>)[current.confirm.key] = confirm;
+        (answers as Record<string, boolean | string | undefined>)[current.confirm.key] = isThirty
+          ? true
+          : confirm;
       }
       if (current.textField) {
         (answers as Record<string, boolean | string | undefined>)[current.textField.key] =
@@ -192,13 +217,23 @@ export function ContentChapter({ orientation, saving, error, onPatch, onFinished
       onContinue={() => void continueForward()}
       saving={saving}
     >
-      <ScreenBody
-        screen={current}
-        textValue={text}
-        onText={setText}
-        confirmValue={confirm}
-        onConfirm={setConfirm}
-      />
+      {isThirty ? (
+        <ThirtyPieces
+          content={splitPack(artifactText).content}
+          generating={generating}
+          revising={revising}
+          onGenerate={() => onGenerate?.()}
+          onRevise={async (pieces) => (await onRevise?.(pieces)) ?? []}
+        />
+      ) : (
+        <ScreenBody
+          screen={current}
+          textValue={text}
+          onText={setText}
+          confirmValue={confirm}
+          onConfirm={setConfirm}
+        />
+      )}
       {isChoice ? (
         <p className="entry-lede typeform-lede">Choose below.</p>
       ) : null}
