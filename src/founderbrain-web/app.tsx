@@ -2,7 +2,7 @@
  * FounderBrain web shell: auth gates, first-login orientation, and layout wiring.
  * State machine lives in ./use-founderbrain-app; presentation under ./components.
  */
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { missions } from "./mission-copy";
 import { useFounderBrainApp } from "./use-founderbrain-app";
 import { AuthPage } from "./components/AuthPage";
@@ -17,6 +17,8 @@ import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
 import { TypeformExitContext } from "./components/TypeformShell";
 import { DeleteAccountModal } from "./components/DeleteAccountModal";
+import { PackReview } from "./components/PackReview";
+import { isPack } from "./pack";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -49,6 +51,16 @@ export function App() {
     hexclave,
   } = app;
 
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const dismissedPack = useRef<string | null>(null);
+  const packDraft = Boolean(app.artifact && !app.artifact.acceptedAt && isPack(app.artifactText));
+  const packAccepted = Boolean(app.artifact?.acceptedAt && isPack(app.artifactText));
+  useEffect(() => {
+    if (!packDraft || !app.artifact) return;
+    if (dismissedPack.current === app.artifact.id) return;
+    setReviewOpen(true);
+  }, [packDraft, app.artifact?.id]);
+
   const usedApp = (state?.version ?? 0) > 0 || Boolean(orientation.firstLoginCompletedAt);
   const packText = app.artifactText || "";
   const hasV2Plan =
@@ -63,6 +75,19 @@ export function App() {
   const inTypeform = (node: ReactNode) => (
     <TypeformExitContext.Provider value={() => setView("atlanta")}>
       {node}
+      {reviewOpen && packDraft ? (
+        <PackReview
+          text={app.artifactText}
+          accepting={app.accepting}
+          onClose={() => {
+            dismissedPack.current = app.artifact?.id ?? null;
+            setReviewOpen(false);
+          }}
+          onAccept={(joined) => {
+            void app.acceptOutput(joined).then(() => setReviewOpen(false));
+          }}
+        />
+      ) : null}
       {showV2 ? (
         <div className="v2-banner" role="region" aria-label="Update to V2">
           <p>Your saved Brain has not been run through the 90 day plan, content, and outreach yet.</p>
@@ -223,6 +248,9 @@ export function App() {
         connecting={app.connecting}
         onConnect={() => app.startConnect()}
         loadUsage={() => app.getUsage()}
+        packAccepted={packAccepted}
+        packReady={packDraft}
+        onReviewPack={() => setReviewOpen(true)}
         onGhlPush={() => app.ghlPush()}
         onPatch={async (patch) => {
           await app.saveOrientation(patch);
