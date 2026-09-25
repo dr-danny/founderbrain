@@ -30,6 +30,12 @@ export function TypeformShell({
   hideContinue = false,
   /** Founder-facing position text (e.g. "Mission 3 of 6 · step 2 of 5"). Overrides screen/total. */
   progressText,
+  /** Screen titles for the jump strip. With onJump, founders can open any screen directly. */
+  steps,
+  onJump,
+  /** Move on without answering this screen. Nothing is marked done. */
+  onSkip,
+  skipLabel = "Skip for now",
 }: {
   kicker: string;
   screen: number;
@@ -45,6 +51,10 @@ export function TypeformShell({
   immersive?: boolean;
   hideContinue?: boolean;
   progressText?: string;
+  steps?: string[];
+  onJump?: (screen: number) => void;
+  onSkip?: () => void;
+  skipLabel?: string;
 }) {
   const continueRef = useRef<HTMLButtonElement>(null);
   const [titleDone, setTitleDone] = useState(false);
@@ -89,6 +99,22 @@ export function TypeformShell({
       <p className="typeform-sequence-label" aria-live="polite">
         {label}
       </p>
+      {steps && onJump ? (
+        <nav className="typeform-steps" aria-label="Screens in this chapter">
+          {steps.map((step, index) => (
+            <button
+              key={step}
+              type="button"
+              className={index + 1 === screen ? "typeform-step current" : "typeform-step"}
+              aria-current={index + 1 === screen ? "step" : undefined}
+              onClick={() => onJump(index + 1)}
+              disabled={saving || index + 1 === screen}
+            >
+              {index + 1}. {step}
+            </button>
+          ))}
+        </nav>
+      ) : null}
       <div className="entry-media" aria-hidden="true">
         <img
           className="entry-photo"
@@ -128,6 +154,11 @@ export function TypeformShell({
                 {showBack ? (
                   <button className="typeform-back" type="button" onClick={onBack} disabled={saving}>
                     Back
+                  </button>
+                ) : null}
+                {onSkip ? (
+                  <button className="typeform-back" type="button" onClick={onSkip} disabled={saving}>
+                    {skipLabel}
                   </button>
                 ) : null}
                 {hideContinue ? null : (

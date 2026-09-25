@@ -2844,3 +2844,30 @@ button:not(.link-button) {
 .pack-rebuild { margin: 0.5rem 0 0.75rem; padding: 0.75rem; border-radius: 12px; border: 1px solid #e0a090; }
 .pack-rebuild p { margin: 0 0 0.5rem; }
 .piece p { white-space: pre-wrap; }
+
+/* Chapter screen strip: jump to any screen without answering the ones before it. */
+.typeform-steps {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  margin: 0.25rem auto 0;
+  max-width: min(56rem, calc(100% - 2rem));
+}
+.typeform-step {
+  border: 1px solid rgba(247, 239, 230, 0.25);
+  background: rgba(18, 12, 20, 0.55);
+  color: #f7efe6;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.typeform-step.current {
+  background: #f4c7a1;
+  color: #1a1016;
+  border-color: #f4c7a1;
+  cursor: default;
+}
