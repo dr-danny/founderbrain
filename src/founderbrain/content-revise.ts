@@ -47,7 +47,7 @@ export async function revisePieces(
   for (const chunk of result.text.split(/\n(?=\d+\.\s)/)) {
     const match = chunk.trim().match(/^(\d+)\.\s*([\s\S]*)$/);
     if (!match) continue;
-    rewritten.push({ n: Number(match[1]), text: match[2].trim() });
+    rewritten.push({ n: Number(match[1]), text: (match[2] ?? "").trim() });
   }
   if (!rewritten.length) {
     throw new DomainError(422, "copy_failed", "Those pieces could not be rewritten. Try again.");
