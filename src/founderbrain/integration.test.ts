@@ -23,7 +23,11 @@ let app: Awaited<ReturnType<typeof buildApi>>;
 const prefix = "test|" + randomUUID();
 const tracked = new Map<string, string>();
 let provider: Provider = async (body) => {
-  if (body.system.includes("plan one short") || body.system.includes("You plan")) {
+  if (
+    body.system.includes("plan one short") ||
+    body.system.includes("You plan") ||
+    body.system.includes("Aggregate the Founder Brain")
+  ) {
     return { text: "- angle: workflow", inputTokens: 10, outputTokens: 5, requestId: "test-think" };
   }
   if (body.system.includes("Verify")) {
@@ -341,7 +345,11 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
       let captured = "";
       const beforeDeletes = deletedHashes.length;
       provider = async (body) => {
-        if (body.system.includes("plan one short") || body.system.includes("You plan")) {
+        if (
+          body.system.includes("plan one short") ||
+          body.system.includes("You plan") ||
+          body.system.includes("Aggregate the Founder Brain")
+        ) {
           return {
             text: "- angle: appointments",
             inputTokens: 10,
@@ -457,7 +465,11 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
     let calls = 0;
     provider = async (body) => {
       calls += 1;
-      if (body.system.includes("plan one short") || body.system.includes("You plan")) {
+      if (
+        body.system.includes("plan one short") ||
+        body.system.includes("You plan") ||
+        body.system.includes("Aggregate the Founder Brain")
+      ) {
         return { text: "- angle: workflow", inputTokens: 10, outputTokens: 5, requestId: "partial-t" };
       }
       throw new Error("runner ambiguous timeout");
