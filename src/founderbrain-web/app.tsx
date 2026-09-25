@@ -18,6 +18,7 @@ import { ContentChapter, GhlChapter, OutreachChapter } from "./components/Chapte
 import { TypeformExitContext } from "./components/TypeformShell";
 import { DeleteAccountModal } from "./components/DeleteAccountModal";
 import { PackReview } from "./components/PackReview";
+import { BuildPackModal } from "./components/BuildPackModal";
 import { isPack } from "./pack";
 
 export function App() {
@@ -52,6 +53,14 @@ export function App() {
   } = app;
 
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [buildOpen, setBuildOpen] = useState(false);
+  const [buildStartedAt, setBuildStartedAt] = useState(() => Date.now());
+  const v2Key = email ? `fb-v2-clicked:${email}` : "";
+  const [v2Clicked, setV2Clicked] = useState(false);
+  useEffect(() => {
+    if (!v2Key) return;
+    setV2Clicked(window.localStorage.getItem(v2Key) === "1");
+  }, [v2Key]);
   const dismissedPack = useRef<string | null>(null);
   const packDraft = Boolean(app.artifact && !app.artifact.acceptedAt && isPack(app.artifactText));
   const packAccepted = Boolean(app.artifact?.acceptedAt && isPack(app.artifactText));
@@ -68,7 +77,13 @@ export function App() {
     packText.includes("## Content") &&
     packText.includes("## Outreach");
   const showV2 =
-    Boolean(email) && Boolean(config?.aiEnabled) && usedApp && !hasV2Plan;
+    Boolean(email) &&
+    Boolean(config?.aiEnabled) &&
+    usedApp &&
+    !hasV2Plan &&
+    !v2Clicked &&
+    !buildOpen &&
+    !app.generating;
 
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
@@ -88,24 +103,35 @@ export function App() {
           }}
         />
       ) : null}
+      {(buildOpen || (v2Clicked && app.generating)) && !packDraft ? (
+        <BuildPackModal
+          startedAt={buildStartedAt}
+          done={!app.generating && !app.error && packDraft}
+          error={app.generating ? "" : app.error}
+          onRetry={() => {
+            setBuildStartedAt(Date.now());
+            setBuildOpen(true);
+            void app.generate();
+          }}
+        />
+      ) : null}
       {showV2 ? (
         <div className="v2-banner" role="region" aria-label="Update to V2">
-          <p>
-            {app.generating
-              ? "Building your pack. Stay on this page."
-              : "Your saved Brain has not been run through the 90 day plan, content, and outreach yet."}
-          </p>
+          <p>Your saved Brain has not been run through the 90 day plan, content, and outreach yet.</p>
           <button
             className="entry-cta"
             type="button"
-            disabled={app.generating}
             onClick={() => {
+              if (v2Key) window.localStorage.setItem(v2Key, "1");
+              setV2Clicked(true);
+              setBuildStartedAt(Date.now());
+              setBuildOpen(true);
               setMission("output");
               setView("missions");
               void app.generate();
             }}
           >
-            {app.generating ? "Building..." : "Update to V2"}
+            Update to V2
           </button>
         </div>
       ) : null}
