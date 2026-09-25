@@ -357,9 +357,21 @@ export async function buildApi(
     const state = await store.read(context(req).workspace);
     if (!brainReadyForPush(state.brain))
       throw new DomainError(422, "brain_incomplete", "Approve all five missions before pushing to GoHighLevel.");
+    const reviewed = await jobs.artifact(context(req).workspace);
+    const acceptedPack =
+      reviewed?.acceptedAt &&
+      reviewed.text.includes("## Content") &&
+      reviewed.text.includes("## Outreach") &&
+      reviewed.text.includes("90 day plan");
+    if (!acceptedPack)
+      throw new DomainError(
+        422,
+        "pack_unaccepted",
+        "Review and accept the content, outreach, and 90 day plan before writing to GoHighLevel.",
+      );
     const firstPack = body.pack ?? defaultFirstPack(state.brain);
     await loadValueCatalog();
-    return pushGhlValues(config, store, context(req).workspace, state.brain, firstPack);
+    return pushGhlValues(config, store, context(req).workspace, state.brain, firstPack, reviewed.text);
   });
   app.post("/api/site-import", async (req) => {
     const body = parse(
