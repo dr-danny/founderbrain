@@ -51,7 +51,8 @@ interface Pinned {
 }
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-const MAX_OUTPUT = 2400;
+const MAX_OUTPUT = 6000;
+const PACK_LIMIT = 60000;
 /** Per-role lease window. Provider calls time out at 90s; renew between roles. */
 function encodeProviderRequestIds(ids: string[]): string | null {
   const unique = ids.filter((id, i) => id && ids.indexOf(id) === i);
@@ -312,11 +313,11 @@ export class BrainJobs {
     key: string,
   ): Promise<Artifact> {
     const normalized = text.trim();
-    if (!normalized || normalized.length > 12000) {
+    if (!normalized || normalized.length > PACK_LIMIT) {
       throw new DomainError(
         422,
         "invalid_artifact",
-        "The plan must contain between 1 and 12,000 characters.",
+        "The plan pack must contain between 1 and 60,000 characters.",
       );
     }
     const requestHash = hash(canonicalize({ text: normalized, expectedVersion }));
@@ -523,7 +524,7 @@ export class BrainJobs {
         !Number.isSafeInteger(cost) ||
         cost < 0 ||
         !planText.trim() ||
-        planText.length > 12000
+        planText.length > PACK_LIMIT
       ) {
         throw new Error("Invalid provider result");
       }

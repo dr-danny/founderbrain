@@ -466,7 +466,7 @@ export async function buildApi(
     const body = parse(
       z
         .object({
-          text: z.string().min(1).max(12000),
+          text: z.string().min(1).max(60000),
           expectedVersion: version,
           idempotencyKey: key,
         })

@@ -50,7 +50,11 @@ export function App() {
   } = app;
 
   const usedApp = (state?.version ?? 0) > 0 || Boolean(orientation.firstLoginCompletedAt);
-  const hasV2Plan = (app.artifactText || "").includes("90 day plan");
+  const packText = app.artifactText || "";
+  const hasV2Plan =
+    packText.includes("90 day plan") &&
+    packText.includes("## Content") &&
+    packText.includes("## Outreach");
   const showV2 =
     Boolean(email) && Boolean(config?.aiEnabled) && usedApp && !hasV2Plan && !app.generating;
 
@@ -61,7 +65,7 @@ export function App() {
       {node}
       {showV2 ? (
         <div className="v2-banner" role="region" aria-label="Update to V2">
-          <p>Your saved Brain has not been run through the 90 day plan yet.</p>
+          <p>Your saved Brain has not been run through the 90 day plan, content, and outreach yet.</p>
           <button
             className="entry-cta"
             type="button"
