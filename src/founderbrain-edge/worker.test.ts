@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createFounderBrainWorker, SLOW_API_PATHS, type FounderBrainEdgeEnv } from "./worker.js";
+import { createFounderBrainWorker, isSlowApiPath, SLOW_API_PATHS, type FounderBrainEdgeEnv } from "./worker.js";
 
 const baseEnv = (): FounderBrainEdgeEnv => ({
   API_ORIGIN: "https://founderbrain-api.up.railway.app",
@@ -244,4 +244,28 @@ test("serves SPA fallback through assets and does not proxy non-api paths", asyn
   assert.equal(result.status, 200);
   assert.deepEqual(assets, ["/mission/customer", "/index.html"]);
   assert.equal(result.headers.get("x-frame-options"), "DENY");
+});
+
+test("media origin is allowed for uploads and playback only when it is a valid HTTPS origin", async () => {
+  const worker = createFounderBrainWorker(async () => new Response("ok"));
+  const media = "https://acct.r2.cloudflarestorage.com";
+  const ok = await worker.fetch(
+    new Request("https://app.example.test/", { headers: { Accept: "text/html" } }),
+    { ...baseEnv(), MEDIA_ORIGIN: media },
+  );
+  const csp = ok.headers.get("content-security-policy") ?? "";
+  assert.match(csp, /media-src 'self' blob: https:\/\/acct\.r2\.cloudflarestorage\.com;/);
+  assert.match(csp, /connect-src 'self' https:\/\/acct\.r2\.cloudflarestorage\.com https:\/\/api\.hexclave\.com$/);
+  const bad = await worker.fetch(
+    new Request("https://app.example.test/", { headers: { Accept: "text/html" } }),
+    { ...baseEnv(), MEDIA_ORIGIN: "http://acct.r2.cloudflarestorage.com" },
+  );
+  assert.match(bad.headers.get("content-security-policy") ?? "", /media-src 'self' blob:;/);
+});
+
+test("Higgsfield and media refresh calls get the slow edge timeout", () => {
+  assert.equal(SLOW_API_PATHS.has("/api/higgsfield/generate"), true);
+  assert.equal(isSlowApiPath("/api/media/0b8f7d1e-1a2b-4c3d-8e9f-0123456789ab/refresh"), true);
+  assert.equal(isSlowApiPath("/api/media/0b8f7d1e-1a2b-4c3d-8e9f-0123456789ab"), false);
+  assert.equal(isSlowApiPath("/api/brain"), false);
 });

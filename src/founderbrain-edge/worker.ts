@@ -29,6 +29,8 @@ export interface FounderBrainEdgeEnv {
   ORIGIN_SECRET?: string;
   /** Hexclave API origin, e.g. `https://api.hexclave.com`. Allowed in `connect-src` and nothing more. */
   HEXCLAVE_API_URL?: string;
+  /** Private media bucket origin (R2 S3 endpoint). Browsers upload and play media from it through presigned URLs. */
+  MEDIA_ORIGIN?: string;
 }
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 const API_PREFIX = "/api";
@@ -69,7 +71,13 @@ function validOrigin(value: string | undefined, allowInsecure = false): URL | nu
  */
 function connectSources(env: FounderBrainEdgeEnv): string {
   const hexclave = validOrigin(env.HEXCLAVE_API_URL);
-  return hexclave ? `'self' ${hexclave.origin}` : "'self'";
+  const media = validOrigin(env.MEDIA_ORIGIN);
+  return ["'self'", media?.origin, hexclave?.origin].filter(Boolean).join(" ");
+}
+/** Video and audio come from the private media bucket through presigned URLs. */
+function mediaSources(env: FounderBrainEdgeEnv): string {
+  const media = validOrigin(env.MEDIA_ORIGIN);
+  return media ? `'self' blob: ${media.origin}` : "'self' blob:";
 }
 function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
   const result = new Headers(headers);
@@ -90,7 +98,8 @@ function securityHeaders(headers: Headers, env: FounderBrainEdgeEnv): Headers {
       "form-action 'self'",
       "script-src 'self'",
       "style-src 'self'",
-      "img-src 'self' data: https:",
+      "img-src 'self' data: blob: https:",
+      `media-src ${mediaSources(env)}`,
       `connect-src ${connectSources(env)}`,
     ].join("; "),
   );
@@ -136,7 +145,19 @@ function gatewayHeaders(request: Request, secret: string, requestId: string): He
 }
 
 /** Paths whose upstream can outlast the 10s default. OAuth token exchange is 15s. */
-export const SLOW_API_PATHS = new Set(["/api/voice", "/api/ghl/push", "/api/oauth/complete", "/api/content/regenerate"]);
+export const SLOW_API_PATHS = new Set([
+  "/api/voice",
+  "/api/ghl/push",
+  "/api/oauth/complete",
+  "/api/content/regenerate",
+  "/api/higgsfield/connect",
+  "/api/higgsfield/estimate",
+  "/api/higgsfield/generate",
+]);
+/** Copying a finished Higgsfield file into the bucket can take longer than a plain request. */
+export function isSlowApiPath(pathname: string): boolean {
+  return SLOW_API_PATHS.has(pathname) || /^\/api\/media\/[0-9a-f-]{36}\/refresh$/.test(pathname);
+}
 
 export function createFounderBrainWorker(
   fetchImpl: FetchLike = fetch,
@@ -147,7 +168,7 @@ export function createFounderBrainWorker(
       const inbound = new URL(request.url);
       if (isApi(inbound.pathname)) {
         // Voice transcription waits on Groq; the 10s default would cut it off.
-        const timeoutMs = SLOW_API_PATHS.has(inbound.pathname)
+        const timeoutMs = isSlowApiPath(inbound.pathname)
           ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, 50_000)
           : (options.timeoutMs ?? REQUEST_TIMEOUT_MS);
         return proxyApi(
