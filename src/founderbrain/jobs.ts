@@ -220,19 +220,20 @@ export class BrainJobs {
           and status in ('queued', 'running', 'uncertain')
         limit 1
       `;
-      if (active.length && replaceStuck && active[0].status === "uncertain") {
+      const blocking = active[0];
+      if (blocking && replaceStuck && blocking.status === "uncertain") {
         await tx`
           update fb_ai_job
           set status = 'failed',
               error = 'Replaced after a stuck build. Earlier spend, if any, stays on the ledger.',
               lease_until = null
-          where founder_id = ${workspace} and id = ${active[0].id}
+          where founder_id = ${workspace} and id = ${blocking.id}
         `;
-        await tx`update fb_job_dispatch set status = 'failed', lease_until = null where job_id = ${active[0].id}`;
-      } else if (active.length) {
+        await tx`update fb_job_dispatch set status = 'failed', lease_until = null where job_id = ${blocking.id}`;
+      } else if (blocking) {
         throw new DomainError(409, "job_active", "A generation is already in progress.", {
-          jobId: active[0].id,
-          status: active[0].status,
+          jobId: blocking.id,
+          status: blocking.status,
         });
       }
       const day = new Date().toISOString().slice(0, 10);
