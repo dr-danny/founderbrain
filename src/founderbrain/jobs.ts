@@ -319,6 +319,24 @@ export class BrainJobs {
     });
   }
 
+  async saveLatestText(workspace: string, text: string): Promise<void> {
+    await this.store.scoped(workspace, async (tx: Tx) => {
+      const rows = await tx`
+        select id, accepted_at from fb_artifact
+        where founder_id = ${workspace}
+        order by created_at desc
+        limit 1
+      `;
+      if (!rows[0]) return;
+      const sha = await putPrivate(tx, workspace, text);
+      if (rows[0].accepted_at) {
+        await tx`update fb_artifact set draft_sha = ${sha}, accepted_sha = ${sha} where founder_id = ${workspace} and id = ${rows[0].id}`;
+      } else {
+        await tx`update fb_artifact set draft_sha = ${sha} where founder_id = ${workspace} and id = ${rows[0].id}`;
+      }
+    });
+  }
+
   async accept(
     workspace: string,
     id: string,
