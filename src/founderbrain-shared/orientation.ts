@@ -202,7 +202,7 @@ export function atlantaReadyMap(
     },
     {
       key: "firstOutput",
-      label: "Your first AI-written message, reviewed and approved",
+      label: "Your 90 day plan, reviewed and approved",
       day: "friday",
       ready: readiness.output,
     },

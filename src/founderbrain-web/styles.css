@@ -354,6 +354,32 @@ select:focus-visible {
   font-size: 12px;
 }
 /* Signed-in account chip for TopBar-less views (Typeform wizard, chapters). */
+.v2-banner {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  max-width: min(40rem, calc(100% - 2rem));
+  padding: 0.7rem 0.8rem 0.7rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(247, 239, 230, 0.28);
+  background: rgba(18, 12, 20, 0.88);
+  color: #f7efe6;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+.v2-banner p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.v2-banner button {
+  flex: none;
+}
+
 .account-chip {
   position: fixed;
   top: 0.9rem;

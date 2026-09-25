@@ -49,11 +49,32 @@ export function App() {
     hexclave,
   } = app;
 
+  const usedApp = (state?.version ?? 0) > 0 || Boolean(orientation.firstLoginCompletedAt);
+  const hasV2Plan = (app.artifactText || "").includes("90 day plan");
+  const showV2 =
+    Boolean(email) && Boolean(config?.aiEnabled) && usedApp && !hasV2Plan && !app.generating;
+
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
   const inTypeform = (node: ReactNode) => (
     <TypeformExitContext.Provider value={() => setView("atlanta")}>
       {node}
+      {showV2 ? (
+        <div className="v2-banner" role="region" aria-label="Update to V2">
+          <p>Your saved Brain has not been run through the 90 day plan yet.</p>
+          <button
+            className="entry-cta"
+            type="button"
+            onClick={() => {
+              setMission("output");
+              setView("missions");
+              void app.generate();
+            }}
+          >
+            Update to V2
+          </button>
+        </div>
+      ) : null}
       {deleteOpen ? (
         <DeleteAccountModal
           email={email ?? ""}

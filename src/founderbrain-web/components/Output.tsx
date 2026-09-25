@@ -60,10 +60,10 @@ Voice: ${brain.voice.tone || "Not set"}`}</pre>
     return (
       <div className="output-empty">
         <p className="eyebrow">REVIEW ONLY</p>
-        <h2>Generate one founder output.</h2>
+        <h2>Build the 90 day plan.</h2>
         <p>
-          Generation sends your approved context to the configured AI provider. It creates a private
-          draft, not a message to a customer.
+          This reads the Brain you already saved, pressure-tests the number, and writes the 90 day
+          plan. Gaps stay gaps. Nothing is sent.
         </p>
         {jobNeedsReconcile && (
           <button className="button secondary" onClick={onReconcile}>
@@ -75,7 +75,7 @@ Voice: ${brain.voice.tone || "Not set"}`}</pre>
           onClick={generationRetry ? onRetryGenerate : onGenerate}
           disabled={generating}
         >
-          {generating ? "Checking job…" : generationRetry ? "Retry generation" : "Generate output"}
+          {generating ? "Building the plan…" : generationRetry ? "Retry the plan" : "Build the 90 day plan"}
         </button>
       </div>
     );

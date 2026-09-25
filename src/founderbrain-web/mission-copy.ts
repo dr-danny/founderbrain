@@ -34,8 +34,8 @@ export const missionCopy: Record<Mission, { number: string; title: string; note:
   },
   output: {
     number: "06",
-    title: "First output",
-    note: "Create and review one customer-interview invitation. Nothing is sent to customers.",
+    title: "90 day plan",
+    note: "The Brain is aggregated, pressure-tested, and written into a 90 day plan. Nothing is sent.",
   },
 };
 
