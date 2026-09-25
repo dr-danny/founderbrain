@@ -62,8 +62,8 @@ Voice: ${brain.voice.tone || "Not set"}`}</pre>
         <p className="eyebrow">REVIEW ONLY</p>
         <h2>Build the 90 day plan.</h2>
         <p>
-          This reads the Brain you already saved, pressure-tests the number, and writes the 90 day
-          plan. Gaps stay gaps. Nothing is sent.
+          This reads the Brain you already saved, then writes the content, the outreach, and the
+          90 day plan in one pass. Gaps stay gaps. Nothing is sent.
         </p>
         {jobNeedsReconcile && (
           <button className="button secondary" onClick={onReconcile}>
