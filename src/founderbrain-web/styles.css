@@ -451,6 +451,21 @@ select:focus-visible {
 @keyframes build-pulse {
   50% { transform: scale(0.96); }
 }
+.piece-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.piece {
+  padding: 0.8rem;
+  border-radius: 12px;
+  background: rgba(247, 239, 230, 0.06);
+}
+.piece.like { outline: 1px solid #b7d7a8; }
+.piece.dislike { outline: 1px solid #e0a090; }
+.piece-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+.piece textarea { width: 100%; margin-top: 0.45rem; }
 
 .account-chip {
   position: fixed;
