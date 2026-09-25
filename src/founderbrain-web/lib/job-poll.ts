@@ -8,7 +8,7 @@ export type PollOutcome =
   | { kind: "still_running" }
   | { kind: "unresolved" };
 
-export const JOB_POLL_DEADLINE_MS = 150_000;
+export const JOB_POLL_DEADLINE_MS = 480_000;
 export const JOB_POLL_INITIAL_WAIT_MS = 2_000;
 export const JOB_POLL_MAX_WAIT_MS = 5_000;
 
@@ -30,9 +30,7 @@ export function interpretPollTimeout(lastStatus: JobStatus | null): PollOutcome 
 
 export function stillRunningNotice(): string {
   return (
-    "Generation is still running on the server. This view stopped waiting after " +
-    "about two and a half minutes; reopen FounderBrain to keep checking. " +
-    "Do not start another job yet."
+    "The pack is still building. This page will keep checking. Do not start another one."
   );
 }
 
