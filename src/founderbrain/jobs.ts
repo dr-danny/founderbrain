@@ -16,7 +16,6 @@ import {
   DomainError,
   canonicalize,
   generationPayload,
-  readiness,
   type Artifact,
 } from "./domain.ts";
 import type { Config } from "./config.ts";
@@ -52,7 +51,7 @@ interface Pinned {
 }
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-const MAX_OUTPUT = 700;
+const MAX_OUTPUT = 2400;
 /** Per-role lease window. Provider calls time out at 90s; renew between roles. */
 function encodeProviderRequestIds(ids: string[]): string | null {
   const unique = ids.filter((id, i) => id && ids.indexOf(id) === i);
@@ -151,9 +150,15 @@ export class BrainJobs {
       );
     }
     const state = await this.store.read(workspace);
-    const ready = readiness(state.brain);
-    if (!ready.identity || !ready.customer || !ready.offer || !ready.voice || !ready.context) {
-      throw new DomainError(422, "brain_incomplete", "Approve the five input missions first.");
+    const named = Boolean(
+      state.brain.identity.name?.trim() || state.brain.identity.venture?.trim(),
+    );
+    if (!named) {
+      throw new DomainError(
+        422,
+        "brain_incomplete",
+        "Save who you are before building the 90 day plan. Missing pieces are named as gaps, not invented.",
+      );
     }
     const { meta } = await loadOpenRouterApiKey(this.store, workspace);
     keyIsUsable(meta);
@@ -175,7 +180,7 @@ export class BrainJobs {
       throw new DomainError(
         422,
         "input_too_large",
-        "Shorten your Brain before generating an invitation.",
+        "Shorten your Brain before generating the 90 day plan.",
       );
     }
     // UTF-8 byte count plus framing allowance deliberately over-reserves for three roles.
@@ -311,7 +316,7 @@ export class BrainJobs {
       throw new DomainError(
         422,
         "invalid_artifact",
-        "The invitation must contain between 1 and 12,000 characters.",
+        "The plan must contain between 1 and 12,000 characters.",
       );
     }
     const requestHash = hash(canonicalize({ text: normalized, expectedVersion }));
@@ -511,11 +516,14 @@ export class BrainJobs {
         : result.requestId
           ? [result.requestId]
           : partialRequestIds;
+      const planText = result.text.includes("90 day plan")
+        ? result.text
+        : `90 day plan\n\n${result.text}`;
       if (
         !Number.isSafeInteger(cost) ||
         cost < 0 ||
-        !result.text.trim() ||
-        result.text.length > 12000
+        !planText.trim() ||
+        planText.length > 12000
       ) {
         throw new Error("Invalid provider result");
       }
@@ -554,7 +562,7 @@ export class BrainJobs {
             "The lifetime AI budget for this account is spent. Editing and exports remain available.",
           );
         }
-        const sha = await putPrivate(tx, workspace, result.text);
+        const sha = await putPrivate(tx, workspace, planText);
         // Meter actual usage alongside the settle so the pre-connect price
         // screen and any later reconciliation share one ledger.
         const usageEvent: UsageEvent = {
