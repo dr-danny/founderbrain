@@ -142,6 +142,7 @@ export class BrainJobs {
     workspace: string,
     expectedVersion: number,
     key: string,
+    replaceStuck = false,
   ): Promise<{ id: string; status: string }> {
     if (this.config.AI_ENABLED !== "true") {
       throw new DomainError(
@@ -214,13 +215,26 @@ export class BrainJobs {
         );
       }
       const active = await tx`
-        select id from fb_ai_job
+        select id, status from fb_ai_job
         where founder_id = ${workspace}
           and status in ('queued', 'running', 'uncertain')
         limit 1
       `;
-      if (active.length) {
-        throw new DomainError(409, "job_active", "A generation is already in progress.");
+      const blocking = active[0];
+      if (blocking && replaceStuck && blocking.status === "uncertain") {
+        await tx`
+          update fb_ai_job
+          set status = 'failed',
+              error = 'Replaced after a stuck build. Earlier spend, if any, stays on the ledger.',
+              lease_until = null
+          where founder_id = ${workspace} and id = ${blocking.id}
+        `;
+        await tx`update fb_job_dispatch set status = 'failed', lease_until = null where job_id = ${blocking.id}`;
+      } else if (blocking) {
+        throw new DomainError(409, "job_active", "A generation is already in progress.", {
+          jobId: blocking.id,
+          status: blocking.status,
+        });
       }
       const day = new Date().toISOString().slice(0, 10);
       for (const [scope, cap] of [

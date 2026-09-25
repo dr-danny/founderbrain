@@ -68,7 +68,7 @@ export function App() {
     packText.includes("## Content") &&
     packText.includes("## Outreach");
   const showV2 =
-    Boolean(email) && Boolean(config?.aiEnabled) && usedApp && !hasV2Plan && !app.generating;
+    Boolean(email) && Boolean(config?.aiEnabled) && usedApp && !hasV2Plan;
 
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
@@ -90,17 +90,22 @@ export function App() {
       ) : null}
       {showV2 ? (
         <div className="v2-banner" role="region" aria-label="Update to V2">
-          <p>Your saved Brain has not been run through the 90 day plan, content, and outreach yet.</p>
+          <p>
+            {app.generating
+              ? "Building your pack. Stay on this page."
+              : "Your saved Brain has not been run through the 90 day plan, content, and outreach yet."}
+          </p>
           <button
             className="entry-cta"
             type="button"
+            disabled={app.generating}
             onClick={() => {
               setMission("output");
               setView("missions");
               void app.generate();
             }}
           >
-            Update to V2
+            {app.generating ? "Building..." : "Update to V2"}
           </button>
         </div>
       ) : null}

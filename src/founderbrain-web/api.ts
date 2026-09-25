@@ -244,10 +244,14 @@ export class FounderBrainApi {
       body: JSON.stringify({ version, expectedVersion, idempotencyKey }),
     });
   }
-  startJob(expectedVersion: number, idempotencyKey = makeKey()) {
+  startJob(expectedVersion: number, idempotencyKey = makeKey(), replaceStuck = false) {
     return this.request<Pick<Job, "id" | "status">>("/jobs", {
       method: "POST",
-      body: JSON.stringify({ expectedVersion, idempotencyKey }),
+      body: JSON.stringify({
+        expectedVersion,
+        idempotencyKey,
+        ...(replaceStuck ? { replaceStuck: true } : {}),
+      }),
     });
   }
   job(id: string) {

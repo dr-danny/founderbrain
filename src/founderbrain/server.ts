@@ -456,12 +456,23 @@ export async function buildApi(
   });
   app.post("/api/jobs", async (req, reply) => {
     const body = parse(
-      z.object({ expectedVersion: version, idempotencyKey: key }).strict(),
+      z.object({
+        expectedVersion: version,
+        idempotencyKey: key,
+        replaceStuck: z.boolean().optional(),
+      }).strict(),
       req.body,
     );
     return reply
       .code(202)
-      .send(await jobs.enqueue(context(req).workspace, body.expectedVersion, body.idempotencyKey));
+      .send(
+        await jobs.enqueue(
+          context(req).workspace,
+          body.expectedVersion,
+          body.idempotencyKey,
+          body.replaceStuck === true,
+        ),
+      );
   });
   app.get("/api/jobs/:id", async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
