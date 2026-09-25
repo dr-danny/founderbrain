@@ -25,6 +25,23 @@ export function splitPack(text: string): PackSections {
   };
 }
 
+export type ContentPiece = { n: number; text: string };
+
+export function parsePieces(content: string): ContentPiece[] {
+  const chunks = content.split(/\n(?=\d+\.\s)/).map((chunk) => chunk.trim()).filter(Boolean);
+  const pieces: ContentPiece[] = [];
+  for (const chunk of chunks) {
+    const match = chunk.match(/^(\d+)\.\s*([\s\S]*)$/);
+    if (!match) continue;
+    pieces.push({ n: Number(match[1]), text: (match[2] ?? "").trim() });
+  }
+  return pieces.sort((a, b) => a.n - b.n);
+}
+
+export function piecesToMarkdown(pieces: ContentPiece[]): string {
+  return pieces.map((piece) => `${piece.n}. ${piece.text}`).join("\n\n");
+}
+
 export function joinPack(sections: PackSections): string {
   return ["## Content", sections.content.trim(), "## Outreach", sections.outreach.trim(), "90 day plan", sections.plan.trim()]
     .filter((part) => part.length > 0)

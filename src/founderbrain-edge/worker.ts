@@ -136,7 +136,7 @@ function gatewayHeaders(request: Request, secret: string, requestId: string): He
 }
 
 /** Paths whose upstream can outlast the 10s default. OAuth token exchange is 15s. */
-export const SLOW_API_PATHS = new Set(["/api/voice", "/api/ghl/push", "/api/oauth/complete"]);
+export const SLOW_API_PATHS = new Set(["/api/voice", "/api/ghl/push", "/api/oauth/complete", "/api/content/regenerate"]);
 
 export function createFounderBrainWorker(
   fetchImpl: FetchLike = fetch,

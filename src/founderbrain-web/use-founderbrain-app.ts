@@ -395,6 +395,16 @@ export function useFounderBrainApp() {
     if (!api) throw new Error("api_unavailable");
     return api.deleteVoiceSample(id);
   }
+  async function regeneratePieces(pieces: Array<{ n: number; text: string; feedback: string }>) {
+    if (!api) throw new Error("api_unavailable");
+    const result = await api.regeneratePieces(pieces);
+    const fresh = await api.artifact();
+    if (fresh.artifact) {
+      setArtifact(fresh.artifact);
+      setArtifactText(fresh.artifact.text);
+    }
+    return result.pieces;
+  }
   async function ghlPush(pack?: string) {
     if (!api) throw new Error("api_unavailable");
     return api.ghlPush(pack);
@@ -982,6 +992,7 @@ export function useFounderBrainApp() {
     routineDrafts,
     setDraftStatus,
     ghlPush,
+    regeneratePieces,
     connecting,
     startConnect,
   };
