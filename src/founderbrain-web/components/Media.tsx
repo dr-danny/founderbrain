@@ -10,6 +10,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ApiError, type FounderBrainApi } from "../api";
+import { videoLengthError } from "../lib/video-length";
 import type { HiggsfieldStatus, MediaItem } from "../types";
 
 const FOCUSABLE_SELECTOR =
@@ -81,6 +82,33 @@ function statusOf(item: MediaItem): { label: string; tone: Tone } {
   const age = Date.now() - new Date(item.createdAt).getTime();
   if (age > STALE_MS) return { label: "Not confirmed", tone: "stuck" };
   return { label: "Still uploading", tone: "uploading" };
+}
+
+function readVideoDuration(file: File): Promise<number> {
+  const url = URL.createObjectURL(file);
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const finish = (result: number | Error) => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      video.load();
+      if (result instanceof Error) reject(result);
+      else resolve(result);
+    };
+    video.preload = "metadata";
+    video.onloadedmetadata = () => finish(video.duration);
+    video.onerror = () => finish(new Error("unreadable"));
+    video.src = url;
+  });
+}
+
+async function rejectLongVideo(file: File): Promise<string | null> {
+  if (!file.type.startsWith("video/")) return null;
+  try {
+    return videoLengthError(file.name, await readVideoDuration(file));
+  } catch {
+    return `${file.name}: Could not read the length of this video. Trim it to 6 seconds or less and try again.`;
+  }
 }
 
 function putFile(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
@@ -188,18 +216,27 @@ export function MediaProvider({ api, children }: { api: FounderBrainApi; childre
         const batch = Array.from(files);
         if (!batch.length) return Promise.resolve();
         setError("");
-        const created = batch.map((file) => ({
-          key: crypto.randomUUID(),
-          name: file.name,
-          size: file.size,
-          pct: 0,
-          phase: "waiting" as const,
-          pieceN,
-        }));
-        setJobs((current) => [...created, ...current]);
         const run = chain.current.then(async () => {
-          for (let i = 0; i < batch.length; i++) {
-            const file = batch[i]!;
+          const accepted: File[] = [];
+          const problems: string[] = [];
+          for (const file of batch) {
+            const problem = await rejectLongVideo(file);
+            if (problem) problems.push(problem);
+            else accepted.push(file);
+          }
+          if (problems.length) setError(problems.join(" "));
+          if (!accepted.length) return;
+          const created = accepted.map((file) => ({
+            key: crypto.randomUUID(),
+            name: file.name,
+            size: file.size,
+            pct: 0,
+            phase: "waiting" as const,
+            pieceN,
+          }));
+          setJobs((current) => [...created, ...current]);
+          for (let i = 0; i < accepted.length; i++) {
+            const file = accepted[i]!;
             const job = created[i]!;
             patchJob(job.key, { phase: "uploading", pct: 0 });
             try {
@@ -295,11 +332,19 @@ export function useMedia(): MediaState | null {
 }
 
 function Preview({ item }: { item: MediaItem }) {
-  if (item.status === "ready" && item.url) {
+  const [show, setShow] = useState(false);
+  if (item.status === "ready" && item.url && show) {
     return item.kind === "video" ? (
-      <video src={item.url} controls preload="metadata" />
+      <video src={item.url} controls autoPlay preload="metadata" />
     ) : (
-      <img src={item.url} alt="" loading="lazy" />
+      <img src={item.url} alt="" />
+    );
+  }
+  if (item.status === "ready" && item.url) {
+    return (
+      <button type="button" className="media-placeholder" onClick={() => setShow(true)}>
+        {item.kind === "video" ? "Play" : "Show"}
+      </button>
     );
   }
   const status = statusOf(item);
@@ -327,13 +372,13 @@ function FileRow({
           {formatSize(item.sizeBytes)}
           {formatSize(item.sizeBytes) ? " · " : ""}
           {item.kind}
-          {post ? ` · Post ${post.n}` : item.pieceN ? ` · Post ${item.pieceN}` : " · Not on a post"}
+          {post ? ` · Piece ${post.n}` : item.pieceN ? ` · Piece ${item.pieceN}` : " · Not on a piece"}
         </p>
         <div className="media-row-actions">
           <span className={`media-pill ${status.tone}`}>{status.label}</span>
           {item.status === "ready" ? (
             <button type="button" className="typeform-external" onClick={() => onAttach(item)}>
-              {item.pieceN ? `On post ${item.pieceN}` : "Attach to a post"}
+              {item.pieceN ? `On piece ${item.pieceN}` : "Not on a piece"}
             </button>
           ) : null}
           {item.source === "upload" && item.status === "pending" ? (
@@ -387,10 +432,12 @@ function AttachDialog({
   item,
   posts,
   onClose,
+  onKept,
 }: {
   item: MediaItem;
   posts: MediaPost[];
   onClose: () => void;
+  onKept?: () => void;
 }) {
   const media = useMedia()!;
   const [query, setQuery] = useState("");
@@ -402,6 +449,16 @@ function AttachDialog({
   });
 
   async function choose(pieceN: number | null) {
+    if (pieceN === null) {
+      if (onKept) {
+        onKept();
+        return;
+      }
+      if (item.pieceN === null) {
+        onClose();
+        return;
+      }
+    }
     setSaving(true);
     try {
       await media.assign(item.id, pieceN);
@@ -412,27 +469,27 @@ function AttachDialog({
   }
 
   return createPortal(
-    <div className="pack-modal" role="dialog" aria-modal="true" aria-label="Attach to a post" onMouseDown={(event) => {
+    <div className="pack-modal" role="dialog" aria-modal="true" aria-label="Choose a piece" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !saving) onClose();
     }}>
       <div className="pack-card">
         <p className="eyebrow">SAVED FILE</p>
-        <h2>Attach to a post</h2>
+        <h2>Choose a piece</h2>
         <p>{fileLabel(item, media.names)}</p>
         <input
           className="typeform-input media-search"
           value={query}
-          placeholder="Search posts"
-          aria-label="Search posts"
+          placeholder="Search pieces"
+          aria-label="Search pieces"
           onChange={(event) => setQuery(event.target.value)}
           autoFocus
         />
         <div className="media-post-list">
           <button type="button" className={item.pieceN ? "media-post-pick" : "media-post-pick current"} disabled={saving} onClick={() => void choose(null)}>
-            Not on a post
-            <small>Keep it in the library until you pick a post.</small>
+            Not on a piece
+            <small>{onKept ? "Keep this file off a piece and show the next one." : "Leave it off a piece."}</small>
           </button>
-          {shown.map((post) => (
+          {posts.length ? shown.map((post) => (
             <button
               key={post.n}
               type="button"
@@ -440,10 +497,12 @@ function AttachDialog({
               disabled={saving}
               onClick={() => void choose(post.n)}
             >
-              Post {post.n}
+              Piece {post.n}
               <small>{snippet(post.text) || "No text yet"}</small>
             </button>
-          ))}
+          )) : (
+            <p className="media-row-meta">No pieces yet. Keep this file off a piece, or generate the 30 first.</p>
+          )}
         </div>
         <div className="pack-actions">
           <button type="button" className="typeform-external" onClick={onClose} disabled={saving}>
@@ -508,14 +567,72 @@ function PickSavedDialog({
   );
 }
 
-type Filter = "all" | "uploading" | "saved" | "loose";
+function LooseStepper({ posts }: { posts: MediaPost[] }) {
+  const media = useMedia()!;
+  const loose = media.items.filter((item) => item.status === "ready" && item.pieceN === null);
+  const [cursor, setCursor] = useState(0);
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [attach, setAttach] = useState<MediaItem | null>(null);
+  const [note, setNote] = useState("");
+  const queue = loose.filter((item) => !skipped.includes(item.id));
+  const place = queue.length ? Math.min(cursor, queue.length - 1) : 0;
+  const item = queue[place];
+
+  if (!loose.length) {
+    return <p className="media-row-meta">No files waiting. Upload a photo, or a clip of 6 seconds or less.</p>;
+  }
+  if (!item) {
+    return <p className="media-row-meta">Those files stay off a piece. Upload another, or move through the pieces below.</p>;
+  }
+
+  return (
+    <div className="media-step">
+      <p className="media-subhead">File {place + 1} of {queue.length}. One file at a time, so the page does not load every clip.</p>
+      {note ? <p className="entry-lede" role="status">{note}</p> : null}
+      <article className="media-row">
+        <Preview item={item} />
+        <div className="media-row-body">
+          <p className="media-row-title">{fileLabel(item, media.names)}</p>
+          <p className="media-row-meta">{[formatSize(item.sizeBytes), item.kind, "Not on a piece"].filter(Boolean).join(" · ")}</p>
+          <div className="media-row-actions">
+            <button type="button" className="entry-cta" onClick={() => setAttach(item)}>
+              Not on a piece
+            </button>
+            <button type="button" className="quiet" onClick={() => void media.remove(item.id)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      </article>
+      <div className="piece-actions">
+        <button type="button" className="typeform-external" disabled={place === 0} onClick={() => { setNote(""); setCursor(place - 1); }}>
+          Previous file
+        </button>
+        <button type="button" className="typeform-external" disabled={place >= queue.length - 1} onClick={() => { setNote(""); setCursor(place + 1); }}>
+          Next file
+        </button>
+      </div>
+      {attach ? (
+        <AttachDialog
+          item={attach}
+          posts={posts}
+          onClose={() => setAttach(null)}
+          onKept={() => {
+            const id = attach.id;
+            setSkipped((current) => (current.includes(id) ? current : [...current, id]));
+            setNote("Kept off a piece.");
+            setAttach(null);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 export function MediaOptions({ posts }: { posts: MediaPost[] }) {
   const media = useMedia();
   const input = useRef<HTMLInputElement | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
   const [over, setOver] = useState(false);
-  const [attach, setAttach] = useState<MediaItem | null>(null);
   if (!media) return null;
 
   const activeIds = new Set(media.jobs.filter((job) => job.phase !== "failed").map((job) => job.itemId).filter(Boolean));
@@ -523,8 +640,6 @@ export function MediaOptions({ posts }: { posts: MediaPost[] }) {
   const uploading = visible.filter((item) => item.status !== "ready");
   const saved = visible.filter((item) => item.status === "ready");
   const loose = saved.filter((item) => item.pieceN === null);
-  const filtered =
-    filter === "uploading" ? uploading : filter === "saved" ? saved : filter === "loose" ? loose : visible;
 
   return (
     <section className="media-options" aria-label="Photos and clips for your posts">
@@ -533,7 +648,7 @@ export function MediaOptions({ posts }: { posts: MediaPost[] }) {
       <div className="media-counts" aria-live="polite">
         <span className="media-count"><strong>{saved.length}</strong> saved</span>
         <span className="media-count"><strong>{media.jobs.length + uploading.length}</strong> still uploading</span>
-        <span className="media-count"><strong>{loose.length}</strong> not on a post</span>
+        <span className="media-count"><strong>{loose.length}</strong> not on a piece</span>
       </div>
       <div className="media-choice-grid">
         <div className="media-choice">
@@ -553,7 +668,7 @@ export function MediaOptions({ posts }: { posts: MediaPost[] }) {
           <button type="button" className="entry-cta" onClick={() => input.current?.click()}>
             Choose files
           </button>
-          <small>JPG, PNG, WebP, GIF, MP4, MOV, or WebM. Up to 500 MB each.</small>
+          <small>JPG, PNG, WebP, GIF, MP4, MOV, or WebM. Videos can be up to 6 seconds. Up to 500 MB each.</small>
         </div>
         <div className="media-choice">
           <strong>Make them with Higgsfield</strong>
@@ -590,33 +705,17 @@ export function MediaOptions({ posts }: { posts: MediaPost[] }) {
           if (event.dataTransfer.files.length) void media.upload(event.dataTransfer.files, null);
         }}
       >
-        Drop files here. They upload one at a time and each one is saved on its own.
+        Drop one photo, or a clip of 6 seconds or less. Each file is saved on its own.
       </div>
       {media.error ? <p className="entry-error" role="alert">{media.error}</p> : null}
-      <div className="media-filters" role="tablist" aria-label="Filter files">
-        {(
-          [
-            ["all", "All"],
-            ["uploading", "Uploading"],
-            ["saved", "Saved"],
-            ["loose", "Not on a post"],
-          ] as const
-        ).map(([id, label]) => (
-          <button key={id} type="button" className="typeform-external" aria-pressed={filter === id} onClick={() => setFilter(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="media-library">
-        {filter !== "saved" && filter !== "loose"
-          ? media.jobs.map((job) => <JobRow key={job.key} job={job} />)
-          : null}
-        {filtered.map((item) => (
-          <FileRow key={item.id} item={item} posts={posts} onAttach={setAttach} />
-        ))}
-        {!media.jobs.length && !filtered.length ? <p className="media-row-meta">Nothing in this view yet.</p> : null}
-      </div>
-      {attach ? <AttachDialog item={attach} posts={posts} onClose={() => setAttach(null)} /> : null}
+      {media.jobs.length ? (
+        <div className="media-library">
+          {media.jobs.map((job) => (
+            <JobRow key={job.key} job={job} />
+          ))}
+        </div>
+      ) : null}
+      <LooseStepper posts={posts} />
     </section>
   );
 }
