@@ -486,6 +486,9 @@ export function useFounderBrainApp() {
 
   function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean | number) {
     if (saving) return;
+    // Background synchronization and repeated choices are not edits.
+    const prior = (latestDraft.current[section] as unknown as Record<string, unknown>)[field];
+    if (Object.is(prior, value)) return;
     setDraft((current) => {
       const next = patchBrain(current, section, field, value);
       latestDraft.current = next;
