@@ -63,7 +63,10 @@ function fieldValue(answers: object, key: string | undefined): string {
 
 function textReady(key: string, value: string, track: "b2b" | "b2c" | null): string | null {
   if (key === "instagramHandle") {
-    return instagramHandleOk(value) ? null : "Enter an Instagram handle before continuing.";
+    if (!value.trim()) return null;
+    return instagramHandleOk(value)
+      ? null
+      : "That handle is not usable. Leave it blank or fix it.";
   }
   if (key === "emailDomain") {
     return emailDomainOk(value) ? null : "Enter a real email domain before continuing.";
