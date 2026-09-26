@@ -2,7 +2,7 @@
  * Later Typeform chapters: content (30 pieces / bottleneck / workflow) and outreach.
  * Maps onto existing missions without a second product surface.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   ContentAnswers,
   FounderTrack,
@@ -27,6 +27,23 @@ import { ThirtyPieces } from "./ThirtyPieces";
 import { MediaProvider } from "./Media";
 import type { FounderBrainApi } from "../api";
 import { splitPack } from "../pack";
+import {
+  accountLines,
+  contentFieldBlock,
+  contentPackBlock,
+  contentSection,
+  copyOk,
+  emailDomainOk,
+  instagramHandleOk,
+  MIN_ACCOUNTS,
+  MIN_PROSPECTS,
+  missingPieceNumbers,
+  outreachFieldBlock,
+  parseContentPieces,
+  piecesMissingMedia,
+  prospectLines,
+} from "../../founderbrain-shared/saturday-work.ts";
+import { useMedia } from "./Media";
 
 type ChapterProps = {
   orientation: OrientationState;
@@ -35,6 +52,60 @@ type ChapterProps = {
   onPatch: (patch: OrientationPatch) => Promise<void>;
   onFinished: () => void;
 };
+
+type PieceGate = { missingPieces: number[]; missingMedia: number[]; loaded: boolean };
+
+function fieldValue(answers: object, key: string | undefined): string {
+  if (!key) return "";
+  const value = (answers as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : "";
+}
+
+function textReady(key: string, value: string, track: "b2b" | "b2c" | null): string | null {
+  if (key === "instagramHandle") {
+    return instagramHandleOk(value) ? null : "Enter an Instagram handle before continuing.";
+  }
+  if (key === "emailDomain") {
+    return emailDomainOk(value) ? null : "Enter a real email domain before continuing.";
+  }
+  if (key === "copy") {
+    return copyOk(value) ? null : "Write the outreach copy before continuing.";
+  }
+  if (key === "accounts") {
+    const count = accountLines(value).length;
+    return count >= MIN_ACCOUNTS ? null : `Enter ${MIN_ACCOUNTS} accounts. ${count} so far.`;
+  }
+  if (key === "prospects") {
+    const count = prospectLines(value).length;
+    return count >= MIN_PROSPECTS
+      ? null
+      : `Enter at least ${MIN_PROSPECTS} prospects with a name and an email. ${count} so far.`;
+  }
+  if (key === "bottleneck" && value.trim().length < 2) return "Name the bottleneck before continuing.";
+  return track ? null : null;
+}
+
+function ThirtyGate({
+  content,
+  onReport,
+}: {
+  content: string;
+  onReport: (gate: PieceGate) => void;
+}) {
+  const media = useMedia();
+  useEffect(() => {
+    const pieces = parseContentPieces(contentSection(content));
+    const ready = (media?.items ?? [])
+      .filter((item) => item.status === "ready" && item.pieceN)
+      .map((item) => item.pieceN as number);
+    onReport({
+      missingPieces: missingPieceNumbers(pieces),
+      missingMedia: piecesMissingMedia(pieces, ready),
+      loaded: Boolean(media?.loaded),
+    });
+  }, [content, media?.items, media?.loaded, onReport]);
+  return null;
+}
 
 function ScreenBody({
   screen,
@@ -67,15 +138,26 @@ function ScreenBody({
         </label>
       ) : null}
       {screen.textField ? (
-        <label className="typeform-field">
+        <label className={screen.textField.multiline ? "typeform-field wide" : "typeform-field"}>
           <span>{screen.textField.label}</span>
-          <input
-            type="text"
-            value={textValue}
-            placeholder={screen.textField.placeholder}
-            onChange={(event) => onText(event.target.value)}
-            maxLength={500}
-          />
+          {screen.textField.multiline ? (
+            <textarea
+              value={textValue}
+              placeholder={screen.textField.placeholder}
+              onChange={(event) => onText(event.target.value)}
+              maxLength={screen.textField.maxLength ?? 8000}
+              rows={8}
+            />
+          ) : (
+            <input
+              type="text"
+              value={textValue}
+              placeholder={screen.textField.placeholder}
+              onChange={(event) => onText(event.target.value)}
+              maxLength={screen.textField.maxLength ?? 500}
+            />
+          )}
+          {screen.textField.hint ? <small>{screen.textField.hint}</small> : null}
         </label>
       ) : null}
       {screen.externalLink ? (
@@ -115,51 +197,72 @@ export function ContentChapter({
   const screens = useMemo(() => contentScreens(orientation.track), [orientation.track]);
   const screen = Math.min(Math.max(orientation.contentScreen, 1), contentTotal);
   const current = screens[screen - 1]!;
-  const [text, setText] = useState(orientation.contentAnswers.bottleneck ?? "");
+  const textKey = current.textField?.key;
+  const [text, setText] = useState(fieldValue(orientation.contentAnswers, textKey));
   const [confirm, setConfirm] = useState(false);
   const [localError, setLocalError] = useState("");
+  const [pieceGate, setPieceGate] = useState<PieceGate>({
+    missingPieces: [1],
+    missingMedia: [],
+    loaded: false,
+  });
+  const onPieceGate = useCallback((gate: PieceGate) => setPieceGate(gate), []);
 
   useEffect(() => {
-    setText(orientation.contentAnswers.bottleneck ?? "");
+    setText(fieldValue(orientation.contentAnswers, textKey));
     if (current.confirm) {
       const key = current.confirm.key as keyof ContentAnswers;
       setConfirm(Boolean(orientation.contentAnswers[key]));
     } else setConfirm(false);
-  }, [screen, orientation.contentAnswers, current.confirm]);
+  }, [screen, orientation.contentAnswers, current.confirm, textKey]);
 
   const needsConfirm = Boolean(current.confirm);
   const needsText = Boolean(current.textField);
   const isChoice = Boolean(current.choices?.length);
   const isThirty = current.id === "thirty";
-  const hasPieces = splitPack(artifactText).content.includes("1.");
+  const textProblem = textKey ? textReady(textKey, text, orientation.track) : null;
+  const readyNumbers = pieceGate.loaded
+    ? parseContentPieces(contentSection(artifactText))
+        .map((piece) => piece.n)
+        .filter((n) => !pieceGate.missingMedia.includes(n))
+    : [];
+  const packProblem = contentPackBlock(artifactText, readyNumbers);
   const continueDisabled =
-    (isThirty ? !hasPieces && !generating : needsConfirm && !confirm) ||
-    (needsText && text.trim().length < 2);
+    (isThirty && (Boolean(packProblem) || generating || (Boolean(mediaApi) && !pieceGate.loaded))) ||
+    (needsConfirm && !confirm) ||
+    (needsText && Boolean(textProblem));
 
   async function persist(patch: OrientationPatch) {
     setLocalError("");
     try {
       await onPatch(patch);
-    } catch {
-      setLocalError("Could not save progress. Try again.");
-      throw new Error("save_failed");
+    } catch (err) {
+      setLocalError(err instanceof ApiError ? err.message : "Could not save progress. Try again.");
+      throw new Error("save_failed", { cause: err });
     }
   }
 
   async function continueForward() {
     try {
       if (isChoice) return;
+      if (textProblem) {
+        setLocalError(textProblem);
+        return;
+      }
       const answers: ContentAnswers = { ...orientation.contentAnswers };
       if (current.confirm) {
-        (answers as Record<string, boolean | string | undefined>)[current.confirm.key] = isThirty
-          ? true
-          : confirm;
+        (answers as Record<string, boolean | string | undefined>)[current.confirm.key] = confirm;
       }
       if (current.textField) {
         (answers as Record<string, boolean | string | undefined>)[current.textField.key] =
           text.trim();
       }
       if (screen >= contentTotal) {
+        const blocked = contentFieldBlock({ ...orientation, contentAnswers: answers });
+        if (blocked || packProblem) {
+          setLocalError(blocked ?? packProblem ?? "Finish the content work first.");
+          return;
+        }
         await persist({
           contentScreen: contentTotal,
           contentComplete: true,
@@ -181,10 +284,16 @@ export function ContentChapter({
         return;
       }
       if (current.id === "workflow") {
+        const answers = { ...orientation.contentAnswers, workflow: value };
+        const blocked = contentFieldBlock({ ...orientation, contentAnswers: answers });
+        if (blocked || packProblem) {
+          setLocalError(blocked ?? packProblem ?? "Finish the content work first.");
+          return;
+        }
         await persist({
           contentScreen: contentTotal,
           contentComplete: true,
-          contentAnswers: { ...orientation.contentAnswers, workflow: value },
+          contentAnswers: answers,
         });
         onFinished();
         return;
@@ -238,14 +347,15 @@ export function ContentChapter({
       onContinue={() => void continueForward()}
       saving={saving}
     >
+      {mediaApi ? (
+        <MediaProvider api={mediaApi}>
+          <ThirtyGate content={artifactText} onReport={onPieceGate} />
+          {isThirty ? thirty : null}
+        </MediaProvider>
+      ) : null}
+      {isThirty && !mediaApi ? thirty : null}
       {isThirty ? (
-        mediaApi ? (
-          <MediaProvider api={mediaApi}>
-            {thirty}
-          </MediaProvider>
-        ) : (
-          thirty
-        )
+        packProblem ? <p className="entry-lede typeform-lede">{packProblem}</p> : null
       ) : (
         <ScreenBody
           screen={current}
@@ -286,36 +396,52 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
   const screens = useMemo(() => outreachScreens(orientation.track), [orientation.track]);
   const screen = Math.min(Math.max(orientation.outreachScreen, 1), outreachTotal);
   const current = screens[screen - 1]!;
+  const textKey = current.textField?.key;
+  const [text, setText] = useState(fieldValue(orientation.outreachAnswers, textKey));
   const [confirm, setConfirm] = useState(false);
   const lastOutreach = screen >= outreachTotal;
   const [localError, setLocalError] = useState("");
 
   useEffect(() => {
+    setText(fieldValue(orientation.outreachAnswers, textKey));
     if (current.confirm) {
       const key = current.confirm.key as keyof OutreachAnswers;
       setConfirm(Boolean(orientation.outreachAnswers[key]));
     } else setConfirm(false);
-  }, [screen, orientation.outreachAnswers, current.confirm]);
+  }, [screen, orientation.outreachAnswers, current.confirm, textKey]);
 
-  const continueDisabled = Boolean(current.confirm) && !confirm;
+  const textProblem = textKey ? textReady(textKey, text, orientation.track) : null;
+  const continueDisabled = (Boolean(current.confirm) && !confirm) || Boolean(textProblem);
 
   async function persist(patch: OrientationPatch) {
     setLocalError("");
     try {
       await onPatch(patch);
-    } catch {
-      setLocalError("Could not save progress. Try again.");
-      throw new Error("save_failed");
+    } catch (err) {
+      setLocalError(err instanceof ApiError ? err.message : "Could not save progress. Try again.");
+      throw new Error("save_failed", { cause: err });
     }
   }
 
   async function continueForward() {
     try {
+      if (textProblem) {
+        setLocalError(textProblem);
+        return;
+      }
       const answers: OutreachAnswers = { ...orientation.outreachAnswers };
       if (current.confirm) {
-        (answers as Record<string, boolean | undefined>)[current.confirm.key] = confirm;
+        (answers as Record<string, boolean | string | undefined>)[current.confirm.key] = confirm;
+      }
+      if (current.textField) {
+        (answers as Record<string, boolean | string | undefined>)[current.textField.key] = text.trim();
       }
       if (screen >= outreachTotal) {
+        const blocked = outreachFieldBlock({ ...orientation, outreachAnswers: answers });
+        if (blocked) {
+          setLocalError(blocked);
+          return;
+        }
         await persist({
           outreachScreen: outreachTotal,
           outreachComplete: true,
@@ -364,8 +490,8 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
     >
       <ScreenBody
         screen={current}
-        textValue=""
-        onText={() => undefined}
+        textValue={text}
+        onText={setText}
         confirmValue={confirm}
         onConfirm={setConfirm}
       />
