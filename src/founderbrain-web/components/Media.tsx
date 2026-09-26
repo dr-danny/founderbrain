@@ -70,7 +70,7 @@ function snippet(text: string): string {
 }
 
 function fileLabel(item: MediaItem, names: Record<string, string>): string {
-  return item.name || names[item.id] || (item.source === "higgsfield" ? `Higgsfield ${item.kind}` : `Uploaded ${item.kind}`);
+  return item.name || names[item.id] || (item.source === "higgsfield" ? `Higgsfield ${item.kind}` : item.source === "instagram" ? "Instagram photo" : `Uploaded ${item.kind}`);
 }
 
 type Tone = "saved" | "uploading" | "stuck" | "failed" | "making";

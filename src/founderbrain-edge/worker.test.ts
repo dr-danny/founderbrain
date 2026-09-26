@@ -218,6 +218,7 @@ test("permits local HTTP only through an explicit injected test option", async (
 });
 test("oauth complete stays on the slow proxy list so a 15s token exchange is not cut at 10s", () => {
   assert.equal(SLOW_API_PATHS.has("/api/oauth/complete"), true);
+  assert.equal(SLOW_API_PATHS.has("/api/instagram/pull"), true);
   assert.equal(SLOW_API_PATHS.has("/api/voice"), true);
   assert.equal(SLOW_API_PATHS.has("/api/ghl/push"), true);
 });

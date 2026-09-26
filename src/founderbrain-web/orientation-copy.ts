@@ -66,7 +66,7 @@ export function contentScreens(track: FounderTrack | null): TypeformScreen[] {
           title: "Instagram as Business",
           body: [
             "For consumer founders, enter the Instagram handle you will post from.",
-            "Set that account to Business before Atlanta. The handle is what we save.",
+            "Set that account to Business or Creator. Connect can read your own photos. Nothing is posted.",
           ],
           textField: {
             key: "instagramHandle",

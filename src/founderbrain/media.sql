@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS fb_media (
   founder_id text NOT NULL REFERENCES founder(id) ON DELETE CASCADE,
   piece_n integer CHECK (piece_n IS NULL OR (piece_n >= 1 AND piece_n <= 30)),
   kind text NOT NULL CHECK (kind IN ('image', 'video')),
-  source text NOT NULL CHECK (source IN ('upload', 'higgsfield')),
+  source text NOT NULL CHECK (source IN ('upload', 'higgsfield', 'instagram')),
   status text NOT NULL CHECK (status IN ('pending', 'ready', 'failed')),
   object_key text NOT NULL,
   content_type text,

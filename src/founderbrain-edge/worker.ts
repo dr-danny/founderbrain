@@ -149,6 +149,8 @@ export const SLOW_API_PATHS = new Set([
   "/api/voice",
   "/api/ghl/push",
   "/api/oauth/complete",
+  "/api/instagram/complete",
+  "/api/instagram/pull",
   "/api/content/regenerate",
   "/api/higgsfield/connect",
   "/api/higgsfield/estimate",

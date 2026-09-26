@@ -59,6 +59,10 @@ export function useFounderBrainApp() {
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [instagram, setInstagram] = useState<{ connected: boolean; username: string | null }>({
+    connected: false,
+    username: null,
+  });
   const [view, setView] = useState<View>(() => window.location.pathname === "/gmail/callback" ? "gmail" : "atlanta");
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
@@ -87,6 +91,7 @@ export function useFounderBrainApp() {
   const latestDraft = useRef(draft);
   const sessionEpoch = useRef(0);
   const oauthHandled = useRef(false);
+  const instagramHandled = useRef(false);
   // Bumped around Connect writes so an in-flight workspace GET cannot put the
   // old "not connected" orientation back on screen after OAuth succeeds.
   const orientationEpoch = useRef(0);
@@ -235,6 +240,12 @@ export function useFounderBrainApp() {
       if (epoch !== sessionEpoch.current) return;
       setState(nextState);
       if (orientationEpoch.current === epochOrientation) setOrientation(nextOrientation);
+      try {
+        const ig = await api.instagramStatus();
+        if (epoch === sessionEpoch.current) setInstagram({ connected: ig.connected, username: ig.username });
+      } catch {
+        // Connect status must not block the workspace. The button can retry.
+      }
       latestDraft.current = nextState.brain;
       setDraft(nextState.brain);
       setChanged(false);
@@ -325,6 +336,87 @@ export function useFounderBrainApp() {
       }
     })();
   }, [api, email]);
+
+  useEffect(() => {
+    if (!api || !email || instagramHandled.current) return;
+    if (window.location.pathname !== "/instagram/callback") return;
+    instagramHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const oauthState = params.get("state");
+    const denied = params.get("error");
+    window.history.replaceState({}, "", "/");
+    setView("content");
+    if (denied || !code || !oauthState) {
+      setError("Instagram Connect did not finish. Try Connect again.");
+      return;
+    }
+    orientationEpoch.current += 1;
+    setConnecting(true);
+    void (async () => {
+      try {
+        const completed = await api.instagramComplete({ code, state: oauthState });
+        orientationEpoch.current += 1;
+        if (completed.orientation) setOrientation(completed.orientation);
+        setInstagram({ connected: completed.connected, username: completed.username });
+        const pulled = await api.instagramPull();
+        const handleNote =
+          completed.handle === "keep"
+            ? " The handle you already typed was left as it is."
+            : "";
+        setNotice(
+          `Connected as @${pulled.username}. Saved ${pulled.saved} photos. Nothing was posted.${handleNote}`,
+        );
+      } catch (err) {
+        setError(friendlyError(err));
+      } finally {
+        setConnecting(false);
+      }
+    })();
+  }, [api, email]);
+
+  async function startInstagram() {
+    if (!api) throw new Error("api_unavailable");
+    setConnecting(true);
+    setError("");
+    try {
+      const started = await api.instagramStart();
+      window.location.assign(started.url);
+    } catch (err) {
+      setConnecting(false);
+      setError(friendlyError(err));
+    }
+  }
+
+  async function pullInstagram() {
+    if (!api) return;
+    setConnecting(true);
+    setError("");
+    try {
+      const pulled = await api.instagramPull();
+      setInstagram({ connected: true, username: pulled.username });
+      setNotice(`Saved ${pulled.saved} photos from @${pulled.username}. Nothing was posted.`);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function disconnectInstagram() {
+    if (!api) return;
+    setConnecting(true);
+    setError("");
+    try {
+      await api.instagramDisconnect();
+      setInstagram({ connected: false, username: null });
+      setNotice("Instagram disconnected. Copied photos were removed.");
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setConnecting(false);
+    }
+  }
 
   async function startConnect() {
     if (!api) throw new Error("api_unavailable");
@@ -1005,5 +1097,9 @@ export function useFounderBrainApp() {
     regeneratePieces,
     connecting,
     startConnect,
+    instagram,
+    startInstagram,
+    pullInstagram,
+    disconnectInstagram,
   };
 }

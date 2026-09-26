@@ -64,7 +64,7 @@ export type MediaItem = {
   id: string;
   pieceN: number | null;
   kind: "image" | "video";
-  source: "upload" | "higgsfield";
+  source: "upload" | "higgsfield" | "instagram";
   status: "pending" | "ready" | "failed";
   contentType: string | null;
   sizeBytes: number | null;
@@ -80,7 +80,7 @@ export type MediaRow = {
   id: string;
   piece_n: number | null;
   kind: "image" | "video";
-  source: "upload" | "higgsfield";
+  source: "upload" | "higgsfield" | "instagram";
   status: "pending" | "ready" | "failed";
   object_key: string;
   content_type: string | null;

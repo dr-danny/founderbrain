@@ -60,6 +60,9 @@ const envSchema = z.object({
   /** GoHighLevel Marketplace OAuth. Optional until Connect is configured. */
   HIGHLEVEL_CLIENT_ID: z.string().min(8).optional(),
   HIGHLEVEL_CLIENT_SECRET: z.string().min(8).optional(),
+  /** Instagram Login. Read-only until the Meta app is configured. */
+  INSTAGRAM_APP_ID: z.string().min(8).optional(),
+  INSTAGRAM_APP_SECRET: z.string().min(8).optional(),
   HIGHLEVEL_VERSION_ID: z.string().min(8).optional(),
   /** Optional Firecrawl key for website import during first-run Typeform. */
   FIRECRAWL_API_KEY: z.string().min(8).optional(),

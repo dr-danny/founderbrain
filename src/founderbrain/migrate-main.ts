@@ -16,6 +16,7 @@ import { migrateVoiceSamples } from "./voice-samples.ts";
 import { migrateRoutines } from "./routines.ts";
 import { migrateGmail } from "./gmail.ts";
 import { migrateMedia } from "./media.ts";
+import { migrateInstagram } from "./instagram.ts";
 import { applyMigrationDatabaseUrl, loadMigrationEnv } from "./config.ts";
 import postgres from "postgres";
 
@@ -32,6 +33,7 @@ try {
   await migrateVoiceSamples(admin);
   await migrateRoutines(admin);
   await migrateMedia(admin);
+  await migrateInstagram(admin);
   await migrateGmail(admin);
   if (role) {
     if (!/^fb_[a-z0-9_]{1,50}$/.test(role))
