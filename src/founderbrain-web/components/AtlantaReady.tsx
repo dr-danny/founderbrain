@@ -55,6 +55,7 @@ export function AtlantaReady({
   onOpenArtifact,
   onBrain,
   onRestore,
+  onResumeIntake,
 }: {
   state: BrainState;
   orientation: OrientationState;
@@ -68,6 +69,7 @@ export function AtlantaReady({
   onOpenArtifact: (target: string) => void;
   onBrain: () => void;
   onRestore: (version: number) => void;
+  onResumeIntake?: () => void;
 }) {
   const map = atlantaReadyMap(state.readiness, orientation);
   const byDay = (day: keyof typeof dayCopy) => map.artifacts.filter((a) => a.day === day);
@@ -125,10 +127,12 @@ export function AtlantaReady({
           <section className="atlanta-status" aria-label="Where you are">
             <div className="atlanta-status-text">
               <b>
-                {missionsDone} of {missions.length} missions done
+                {onResumeIntake ? "Your setup is saved, but not finished" : `${missionsDone} of ${missions.length} missions done`}
               </b>
               <span>
-                {nextMission ? (
+                {onResumeIntake ? (
+                  "Continue from your saved answers. Nothing has been marked complete."
+                ) : nextMission ? (
                   <>
                     Next up:{" "}
                     <b>
@@ -140,8 +144,8 @@ export function AtlantaReady({
                 )}
               </span>
             </div>
-            <button className="entry-cta" type="button" onClick={onMissions}>
-              {nextMission ? "Keep going" : "Review your work"}
+            <button className="entry-cta" type="button" onClick={onResumeIntake ?? onMissions}>
+              {onResumeIntake ? "Resume setup" : nextMission ? "Keep going" : "Review your work"}
             </button>
           </section>
 
@@ -278,10 +282,12 @@ export function AtlantaReady({
           <section className="atlanta-status atlanta-status-bottom" aria-label="Where you stand">
             <div className="atlanta-status-text">
               <b>
-                {missionsDone} of {missions.length} missions done
+                {onResumeIntake ? "Your setup is saved, but not finished" : `${missionsDone} of ${missions.length} missions done`}
               </b>
               <span>
-                {nextMission ? (
+                {onResumeIntake ? (
+                  "Continue from your saved answers. Nothing has been marked complete."
+                ) : nextMission ? (
                   <>
                     You are here:{" "}
                     <b>
@@ -304,8 +310,8 @@ export function AtlantaReady({
                 customers.
               </span>
             </div>
-            <button className="entry-cta" type="button" onClick={onMissions}>
-              {nextMission ? "Keep going" : "Review your work"}
+            <button className="entry-cta" type="button" onClick={onResumeIntake ?? onMissions}>
+              {onResumeIntake ? "Resume setup" : nextMission ? "Keep going" : "Review your work"}
             </button>
           </section>
 

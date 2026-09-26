@@ -17,7 +17,9 @@ export const brainSchema = z
         name: text,
         venture: text,
         role: text,
-        stage: z.enum(["exploring", "building", "launched", "growing"]),
+        // "" is the unanswered sentinel: distinct from "exploring" (Pre-revenue),
+        // which is a real founder choice on the stage question, not a default.
+        stage: z.enum(["", "exploring", "building", "launched", "growing"]).default(""),
         // Revenue band from the original intake; asked alongside the product stage.
         revenueBand: z.enum(["", "pre", "under10k", "10to50k", "over50k"]).default(""),
         goal: text,
@@ -164,7 +166,7 @@ export function emptyBrain(): Brain {
       name: "",
       venture: "",
       role: "",
-      stage: "exploring",
+      stage: "",
       revenueBand: "",
       goal: "",
       track: "b2b",
