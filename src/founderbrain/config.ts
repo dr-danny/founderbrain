@@ -54,6 +54,9 @@ const envSchema = z.object({
   AI_OUTPUT_USD_PER_MILLION: z.coerce.number().positive().optional(),
   AI_WORKSPACE_DAILY_MICROUSD: positive.optional(),
   AI_GLOBAL_DAILY_MICROUSD: positive.optional(),
+  /** Optional Google OAuth web client for Gmail, separate from GHL and Hexclave. */
+  GMAIL_CLIENT_ID: z.string().min(8).optional(),
+  GMAIL_CLIENT_SECRET: z.string().min(8).optional(),
   /** GoHighLevel Marketplace OAuth. Optional until Connect is configured. */
   HIGHLEVEL_CLIENT_ID: z.string().min(8).optional(),
   HIGHLEVEL_CLIENT_SECRET: z.string().min(8).optional(),
@@ -126,6 +129,8 @@ export function loadConfig(raw: NodeJS.ProcessEnv = process.env): Config {
     );
   }
   const c = parsed.data;
+  if (Boolean(c.GMAIL_CLIENT_ID) !== Boolean(c.GMAIL_CLIENT_SECRET))
+    throw new Error("Gmail OAuth requires both GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET.");
   const local = c.FOUNDERBRAIN_LOCAL_DEMO === "true";
   if (local && c.NODE_ENV === "production")
     throw new Error("Local demo authentication is forbidden in production.");

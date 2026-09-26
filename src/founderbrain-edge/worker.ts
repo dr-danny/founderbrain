@@ -153,10 +153,11 @@ export const SLOW_API_PATHS = new Set([
   "/api/higgsfield/connect",
   "/api/higgsfield/estimate",
   "/api/higgsfield/generate",
+  "/api/gmail/oauth/complete", "/api/gmail/sent", "/api/gmail/voice", "/api/gmail/drafts", "/api/gmail",
 ]);
 /** Copying a finished Higgsfield file into the bucket can take longer than a plain request. */
 export function isSlowApiPath(pathname: string): boolean {
-  return SLOW_API_PATHS.has(pathname) || /^\/api\/media\/[0-9a-f-]{36}\/refresh$/.test(pathname);
+  return SLOW_API_PATHS.has(pathname) || /^\/api\/gmail\/drafts\/[^/]+\/(?:save|send)$/.test(pathname) || /^\/api\/media\/[0-9a-f-]{36}\/refresh$/.test(pathname);
 }
 
 export function createFounderBrainWorker(
@@ -169,7 +170,7 @@ export function createFounderBrainWorker(
       if (isApi(inbound.pathname)) {
         // Voice transcription waits on Groq; the 10s default would cut it off.
         const timeoutMs = isSlowApiPath(inbound.pathname)
-          ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, 50_000)
+          ? Math.max(options.timeoutMs ?? REQUEST_TIMEOUT_MS, inbound.pathname.startsWith("/api/gmail/") ? 90_000 : 50_000)
           : (options.timeoutMs ?? REQUEST_TIMEOUT_MS);
         return proxyApi(
           request,

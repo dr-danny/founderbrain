@@ -1,5 +1,7 @@
 # FounderBrain
 
+Optional [Gmail voice and drafts](docs/founderbrain/GMAIL.md) connects through Google OAuth, analyzes only explicitly selected sent emails with consent, and supports reviewed drafts plus default-off, allowlisted, daily-capped sending. Gmail public rollout is gated by Google verification; test-mode credentials are not public approval.
+
 The SaaS runs on three vendors: **Cloudflare** (a Worker for the edge, static assets), **Railway** (Fastify API, job worker, private Postgres) and **Hexclave** (identity; the platform formerly named Stack Auth). It is separate from the inherited single-owner Launchhouse app below.
 
 - [Deployment and launch gates](docs/founderbrain/RAILWAY-CLOUDFLARE.md)
