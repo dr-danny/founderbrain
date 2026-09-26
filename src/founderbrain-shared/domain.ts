@@ -87,6 +87,7 @@ export const brainSchema = z
       .object({
         channelsActive: text.default(""),
         channelsDormant: text.default(""),
+        contentChannels: text.default(""),
         emailProvider: z.enum(["", "google", "microsoft365", "other"]).default(""),
         domainStatus: z.enum(["", "warm", "fresh"]).default(""),
         igAccountType: z.enum(["", "personal", "business"]).default(""),
@@ -102,6 +103,7 @@ export const brainSchema = z
       .default({
         channelsActive: "",
         channelsDormant: "",
+        contentChannels: "",
         emailProvider: "",
         domainStatus: "",
         igAccountType: "",
@@ -206,6 +208,7 @@ export function emptyBrain(): Brain {
     context: {
       channelsActive: "",
       channelsDormant: "",
+      contentChannels: "",
       emailProvider: "",
       domainStatus: "",
       igAccountType: "",
