@@ -89,6 +89,17 @@ test("MIME extraction keeps an Outlook reply when text/plain is only the quoted 
   assert.equal(__gmailTest.extractMimeText(payload), "Hello Jill, confirming Tuesday works.");
 });
 
+test("MIME extraction accepts padded Gmail base64url bodies", () => {
+  const payload = {
+    mimeType: "text/plain",
+    body: {
+      data: `${Buffer.from("Hello Jill, Tuesday works.\n").toString("base64url")}=`,
+    },
+  };
+  assert.match(payload.body.data, /=/);
+  assert.equal(__gmailTest.extractMimeText(payload), "Hello Jill, Tuesday works.");
+});
+
 test("selected analysis requires SENT and exact connected From address", () => {
   const data = Buffer.from("Hello,\n\nA short note.").toString("base64url");
   const good = {
