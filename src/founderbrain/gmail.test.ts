@@ -64,6 +64,31 @@ test("MIME extraction ignores attachments and strips quoted replies and signatur
   assert.equal(__gmailTest.extractMimeText(payload), "Hi team,\n\nShort update.");
 });
 
+test("MIME extraction keeps an Outlook reply when text/plain is only the quoted thread", () => {
+  const payload = {
+    mimeType: "multipart/alternative",
+    parts: [
+      {
+        mimeType: "text/plain",
+        body: {
+          data: Buffer.from("From: Alice <alice@example.com>\nSent: Friday\n\nOld thread.").toString(
+            "base64url",
+          ),
+        },
+      },
+      {
+        mimeType: "text/html",
+        body: {
+          data: Buffer.from(
+            "<p>Hello Jill, confirming Tuesday works.</p><p>Get Outlook for Mac</p><p>From: Alice</p>",
+          ).toString("base64url"),
+        },
+      },
+    ],
+  };
+  assert.equal(__gmailTest.extractMimeText(payload), "Hello Jill, confirming Tuesday works.");
+});
+
 test("selected analysis requires SENT and exact connected From address", () => {
   const data = Buffer.from("Hello,\n\nA short note.").toString("base64url");
   const good = {
