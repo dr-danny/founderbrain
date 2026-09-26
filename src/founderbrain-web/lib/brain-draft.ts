@@ -4,13 +4,25 @@ export const PENDING_JOB_STORAGE_KEY = "founderbrain.pending-job";
 
 export type SaveOperation = { brain: Brain; expectedVersion: number; key: string };
 
-/** Apply a field patch; clears section approval unless the field is `approved`. */
+/**
+ * Apply a field patch; clears section approval unless the field is `approved`.
+ *
+ * No-op guard (Danny fix, unchanged counts resetting approval): if `value` is
+ * identical to what is already on the section, return `current` unchanged. A
+ * plain re-send of the same value (e.g. the sample-count refresh firing again
+ * with the same number, or a track re-render with the same track) must never
+ * clear approval or reopen the track-fork sections below.
+ */
 export function patchBrain(
   current: Brain,
   section: MissionSection,
   field: string,
   value: string | boolean | number,
 ): Brain {
+  const currentSection = current[section] as Record<string, unknown>;
+  if (currentSection[field] === value) {
+    return current;
+  }
   const next = {
     ...current,
     [section]: {
@@ -20,7 +32,9 @@ export function patchBrain(
     },
   } as Brain;
   // Track fork: changing it reopens everything that forks on the track,
-  // exactly as the original intake re-asks audience and channels.
+  // exactly as the original intake re-asks audience and channels. Only
+  // fires when the track actually changed (see the no-op guard above), so
+  // re-patching with the same track no longer clears customer/context.
   if (section === "identity" && field === "track") {
     next.customer = { ...next.customer, approved: false };
     next.context = { ...next.context, approved: false };

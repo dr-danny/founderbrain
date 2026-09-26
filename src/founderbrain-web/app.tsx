@@ -260,7 +260,11 @@ export function App() {
           await app.applyIntake(proposal);
         }}
         onTrack={async (value) => {
+          // Missions fork on the saved Brain, chapters on orientation. Persist
+          // both before advancing, and return the receipt for review routing.
+          const brain = await app.commitField("identity", "track", value);
           await app.saveOrientation({ track: value });
+          return brain;
         }}
         onImport={(url) => app.importSite(url)}
         onTranscribe={(blob, seconds) =>

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Brain } from "../types";
 import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
+import type { QuestionIndexConfig } from "./QuestionIndexModal";
 import {
   GUIDE_STEPS,
   nextGuideStep,
@@ -13,6 +14,7 @@ import {
   type GuideStep,
 } from "../guide-intake";
 import { guideSequence, resolveInitialCursor } from "../lib/intake-navigation";
+import { guideIndexItems } from "../lib/intake-index";
 
 const NAME_KEY_BASE = "founderbrain.what-to-call-you";
 const YES_KEY_BASE = "founderbrain.welcome-yes";
@@ -119,7 +121,7 @@ export function OrientationFlow({
    *  right after a save never act on a stale closed-over `brain` prop. */
   onFill: (section: "identity" | "customer" | "offer" | "voice", field: string, value: string) => Promise<Brain>;
   onApplyIntake: (proposal: Proposal) => Promise<void>;
-  onTrack: (value: "b2b" | "b2c") => Promise<void>;
+  onTrack: (value: "b2b" | "b2c") => Promise<Brain>;
   onImport: (url: string) => Promise<{ proposal: Proposal; logoUrl?: string }>;
   onTranscribe?: (blob: Blob, seconds: number) => Promise<string>;
 }) {
@@ -136,6 +138,14 @@ export function OrientationFlow({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
+  // Bump to request the question index modal open in missing-only mode
+  // (e.g. from finishOrRoute, a stale-cursor mount check, or the modal's own
+  // trigger). See QuestionIndexConfig.request.
+  const [indexRequest, setIndexRequest] = useState(0);
+  // Set true by a direct question-index jump so the *next* successful save
+  // returns to the final review/missing state instead of replaying every
+  // remaining intake screen in order.
+  const [returnFromIndex, setReturnFromIndex] = useState(false);
   const [cursor, setCursor] = useState(() =>
     resolveInitialCursor({
       storedCursorRaw: readKey(CURSOR_KEY),
@@ -173,8 +183,10 @@ export function OrientationFlow({
   // The stored cursor must never sit on a filled guide step while an earlier
   // guide step is still empty: that state only arises from a stale cursor
   // (workspace deleted, storage reset, or an import failure that shifted the
-  // sequence) and produced a silent intake loop (#66). Snap back to the first
-  // empty step instead of letting Continue write and bounce forever.
+  // sequence). Previously this silently teleported back to the first empty
+  // step, which could itself go stale again and loop (#66). Instead, stay put
+  // and open the missing-only question index so the founder sees exactly
+  // what's left and can jump to any of it directly, rather than being bounced.
   const clampedRef = useRef(false);
   useEffect(() => {
     if (clampedRef.current) return;
@@ -184,7 +196,7 @@ export function OrientationFlow({
     if (empty.id === step.id) return;
     const emptyIdx = seq.indexOf(`g:${empty.id}`);
     if (emptyIdx >= 0 && emptyIdx < safe) {
-      moveTo(emptyIdx);
+      setIndexRequest((n) => n + 1);
     }
     // Run once on mount: brain and cursor are read before first paint.
   }, []);
@@ -201,11 +213,11 @@ export function OrientationFlow({
     moveTo(safe - 1);
   }
 
-  /** Leave the intake when the guide is complete; otherwise go to the first
-   *  empty step instead of silently completing a partial guide (#66). */
-  async function finishOrRoute(latestBrain: Brain = brain) {
-    const empty = nextGuideStep(latestBrain, track);
-    if (!empty) {
+  /** Leave the intake when the guide is complete; otherwise surface exactly
+   *  what's missing instead of silently completing a partial guide (#66). */
+  async function finishOrRoute(latestBrain: Brain = brain, latestTrack: string | null = track) {
+    const empty = nextGuideStep(latestBrain, latestTrack);
+    if (!empty && latestBrain.identity.name.trim()) {
       if (submitting.current) return;
       submitting.current = true;
       setBusy(true);
@@ -214,24 +226,86 @@ export function OrientationFlow({
       finally { submitting.current = false; setBusy(false); }
       return;
     }
-    const emptyIdx = seq.indexOf(`g:${empty.id}`);
-    if (emptyIdx >= 0) {
-      moveTo(emptyIdx);
-      return;
+    // Answers are still missing. Previously this bounced the founder straight
+    // to the first empty step, which could itself loop (#66). Instead stay on
+    // the current (final) screen and open the missing-only question index,
+    // grouped by section, so every gap is visible at once and each is a
+    // direct jump rather than a forced walk.
+    setIndexRequest((n) => n + 1);
+  }
+
+  /** Land at the final review/complete screen after an index-driven edit,
+   *  opening the missing-only index if answers are still outstanding rather
+   *  than replaying the rest of the intake in sequence. */
+  function landAtReview(latestBrain: Brain, latestTrack: string | null = track) {
+    moveTo(seq.length - 1);
+    if (nextGuideStep(latestBrain, latestTrack) || !latestBrain.identity.name.trim()) {
+      setIndexRequest((n) => n + 1);
     }
-    // Unreachable step (should not happen: the sequence holds every guide step).
-    setLocalError("A few answers are still missing. Continue to fill them in.");
   }
 
   // `latestBrain` lets the very last commitStep hand over the just-saved Brain
   // instead of the `brain` prop, which is still the pre-save value until the
   // parent re-renders (#final-step-stale-brain).
-  function goNext(latestBrain: Brain = brain) {
+  function goNext(latestBrain: Brain = brain, latestTrack: string | null = track) {
+    if (returnFromIndex) {
+      setReturnFromIndex(false);
+      landAtReview(latestBrain, latestTrack);
+      return;
+    }
     if (safe >= seq.length - 1) {
-      finishOrRoute(latestBrain);
+      finishOrRoute(latestBrain, latestTrack);
       return;
     }
     moveTo(safe + 1);
+  }
+
+  /** Direct jump from the question index. Persists any typed-but-uncommitted
+   *  draft on the *current* guide step first (onFill/onTrack) so the jump
+   *  never silently discards local input, and only navigates on success. On
+   *  failure the error stays and the founder stays on the current screen --
+   *  the index modal itself already closed immediately on click, so the
+   *  error is visible right where it happened. */
+  async function jumpToQuestion(id: string) {
+    if (locked || submitting.current) return;
+    const key = GUIDE_STEPS.some((item) => item.id === id) ? `g:${id}` : id;
+    const target = seq.indexOf(key);
+    if (target < 0) return;
+    setReturnFromIndex(true);
+    if (target === safe) return;
+    if (current === "name" && name.trim() !== brain.identity.name.trim()) {
+      submitting.current = true;
+      setBusy(true);
+      try {
+        await onFill("identity", "name", name.trim());
+        writeKey(NAME_KEY, name.trim());
+      } catch {
+        setLocalError("Could not save. Try again.");
+        return;
+      } finally {
+        submitting.current = false;
+        setBusy(false);
+      }
+    }
+    if (step && step.kind !== "choices") {
+      const next = draft.trim();
+      if (next !== readStepValue(brain, track, step).trim()) {
+        submitting.current = true;
+        setBusy(true);
+        try {
+          if (step.section === "track") await onTrack(next as "b2b" | "b2c");
+          else await onFill(step.section, step.field, next);
+        } catch {
+          setLocalError("Could not save. Try again.");
+          submitting.current = false;
+          setBusy(false);
+          return;
+        }
+        submitting.current = false;
+        setBusy(false);
+      }
+    }
+    moveTo(target);
   }
 
   async function continueWithName() {
@@ -240,13 +314,20 @@ export function OrientationFlow({
       setLocalError("Tell us what to call you.");
       return;
     }
-    writeKey(NAME_KEY, next);
-    onNamed(next);
+    if (locked || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
     try {
+      const saved = await onFill("identity", "name", next);
+      writeKey(NAME_KEY, next);
+      onNamed(next);
       await onAdvance(2);
-      goNext();
+      goNext(saved);
     } catch {
       setLocalError("Could not save. Try again.");
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
   }
 
@@ -322,10 +403,10 @@ export function OrientationFlow({
       let latestBrain = brain;
       // Empty optional answers must also save, so clearing a prior answer sticks.
       if (next || stepNow.optional) {
-        if (stepNow.section === "track") await onTrack(next as "b2b" | "b2c");
+        if (stepNow.section === "track") latestBrain = await onTrack(next as "b2b" | "b2c");
         else latestBrain = await onFill(stepNow.section, stepNow.field, next);
       }
-      goNext(latestBrain);
+      goNext(latestBrain, stepNow.section === "track" ? next : track);
     } catch {
       setLocalError("Could not save. Try again.");
     } finally {
@@ -334,12 +415,32 @@ export function OrientationFlow({
     }
   }
 
+  const indexItems = guideIndexItems({
+    brain,
+    track,
+    name,
+    readyAnswered: welcomeDone || readKey(YES_KEY) === "1",
+    siteAnswered: readKey(SITE_KEY) !== "",
+  });
+  if (includeUrl) indexItems.push({
+    id: "site-url", title: "Website address", required: false,
+    answered: Boolean(normalizeSiteUrl(siteUrl)), group: "Welcome",
+    detail: "Optional. Read your site or continue with your own answers.",
+  });
+  const questionIndex: QuestionIndexConfig = {
+    title: "Founder Brain questions",
+    items: indexItems,
+    onJump: (id) => void jumpToQuestion(id),
+    request: indexRequest,
+  };
+
   const frame = {
     screen: safe + 1,
     total,
     showBack,
     onBack: goBack,
     saving: locked,
+    questionIndex,
   };
 
   if (current === "name") {
@@ -347,7 +448,7 @@ export function OrientationFlow({
       <TypeformShell
         kicker=""
         title="Welcome... what should we call you?"
-        continueLabel="Continue"
+        continueLabel={returnFromIndex ? "Save and review" : "Continue"}
         continueDisabled={!name.trim()}
         immersive
         onContinue={() => void continueWithName()}
@@ -546,7 +647,7 @@ export function OrientationFlow({
   if (!step) {
     // The explicit final confirmation also handles returning founders whose
     // answers are saved but whose first-login completion flag never persisted.
-    const guideComplete = nextGuideStep(brain, track) === null;
+    const guideComplete = nextGuideStep(brain, track) === null && Boolean(brain.identity.name.trim());
     if (guideComplete && !welcomeDone) {
       return (
         <TypeformShell
@@ -569,8 +670,8 @@ export function OrientationFlow({
     return (
       <TypeformShell
         kicker=""
-        title="Got it."
-        continueLabel="Continue"
+        title="Review your answers."
+        continueLabel={guideComplete ? "Finish review" : "Review missing answers"}
         immersive
         onContinue={() => finishOrRoute()}
         {...frame}
@@ -626,7 +727,7 @@ export function OrientationFlow({
     <TypeformShell
       kicker=""
       title={step.title}
-      continueLabel={step.optional ? "Skip or continue" : "Continue"}
+      continueLabel={returnFromIndex ? "Save and review" : step.optional ? "Skip or continue" : "Continue"}
       continueDisabled={!step.optional && !draft.trim()}
       immersive
       onContinue={() => void commitStep(step, draft)}

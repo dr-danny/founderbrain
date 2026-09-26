@@ -23,6 +23,58 @@ test("patchBrain can set approved explicitly", () => {
   assert.equal(next.identity.approved, true);
 });
 
+test("patchBrain is a no-op when the value is unchanged: same reference, approval untouched", () => {
+  const brain = emptyBrain();
+  brain.identity.approved = true;
+  brain.identity.name = "Ada";
+  const next = patchBrain(brain, "identity", "name", "Ada");
+  assert.equal(next, brain);
+  assert.equal(next.identity.approved, true);
+});
+
+test("patchBrain no-op on the same track does not clear customer/context approval", () => {
+  const brain = emptyBrain();
+  brain.identity.approved = true;
+  brain.customer.approved = true;
+  brain.context.approved = true;
+  // identity.track defaults to "b2b"; re-sending the same track is a no-op.
+  const next = patchBrain(brain, "identity", "track", "b2b");
+  assert.equal(next, brain);
+  assert.equal(next.customer.approved, true);
+  assert.equal(next.context.approved, true);
+});
+
+test("patchBrain on an actual track change reopens customer/context approval", () => {
+  const brain = emptyBrain();
+  brain.identity.approved = true;
+  brain.customer.approved = true;
+  brain.context.approved = true;
+  const next = patchBrain(brain, "identity", "track", "b2c");
+  assert.notEqual(next, brain);
+  assert.equal(next.identity.track, "b2c");
+  assert.equal(next.identity.approved, false);
+  assert.equal(next.customer.approved, false);
+  assert.equal(next.context.approved, false);
+});
+
+test("patchBrain on a real field change still returns a new object and clears approval", () => {
+  const brain = emptyBrain();
+  brain.voice.approved = true;
+  const next = patchBrain(brain, "voice", "sampleCount", 10);
+  assert.notEqual(next, brain);
+  assert.equal(next.voice.sampleCount, 10);
+  assert.equal(next.voice.approved, false);
+});
+
+test("patchBrain no-op when the sample count refresh repeats the same stored count", () => {
+  const brain = emptyBrain();
+  brain.voice.approved = true;
+  brain.voice.sampleCount = 10;
+  const next = patchBrain(brain, "voice", "sampleCount", 10);
+  assert.equal(next, brain);
+  assert.equal(next.voice.approved, true);
+});
+
 test("settleSaveDecision clears changed when draft matches what was sent", () => {
   const brain = emptyBrain();
   brain.identity.name = "Ada";
