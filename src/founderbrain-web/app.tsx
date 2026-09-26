@@ -22,6 +22,7 @@ import { BuildPackModal } from "./components/BuildPackModal";
 import { GmailStudio } from "./components/GmailStudio";
 import { isPack } from "./pack";
 import { guideIsComplete } from "./guide-intake";
+import { profileResumeMission } from "./lib/mission-index";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -516,7 +517,12 @@ export function App() {
             if (target === "chapter-content") return setView("content");
             if (target === "chapter-outreach") return setView("outreach");
             if (target === "chapter-ghl") return setView("ghl");
-            const mission = target.replace("mission-", "") as (typeof missions)[number];
+            // The business-profile card is labeled as one item but covers Identity,
+            // Customer, and Offer. Opening it always at Identity replayed Mission 1
+            // after that mission was already approved.
+            const mission = target === "mission-identity"
+              ? profileResumeMission(state.readiness)
+              : target.replace("mission-", "") as (typeof missions)[number];
             setMission(mission);
             setView("missions");
           }}
