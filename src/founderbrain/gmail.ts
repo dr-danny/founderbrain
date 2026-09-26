@@ -1210,8 +1210,11 @@ function extractMimeText(payload: MimePart, maxBytes = 16_000): string {
     for (const child of part.parts ?? []) walk(child);
   };
   walk(payload);
-  const chosen = plain.join("\n").trim() || htmlToText(html.join("\n"));
-  return stripQuotedAndSignature(chosen).slice(0, maxBytes);
+  // Outlook often puts the quoted thread in text/plain and the new reply in HTML.
+  // Prefer whichever part still has the sender's own text after quote stripping.
+  const plainText = stripQuotedAndSignature(plain.join("\n").trim());
+  const htmlText = stripQuotedAndSignature(htmlToText(html.join("\n")));
+  return (plainText || htmlText).slice(0, maxBytes);
 }
 
 function validateSelectedMessages(
