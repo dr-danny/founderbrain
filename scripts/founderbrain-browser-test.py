@@ -243,6 +243,163 @@ class BrowserAuthTests(unittest.TestCase):
         self.assertNotIn("code", parse_qs(urlparse(self.page.url).query))
         self.assertEqual(self.errors, [])
 
+    def _complete_brain(self):
+        section = {"approved": True}
+        return {
+            "schemaVersion": 1,
+            "identity": {
+                "name": "Ada", "venture": "Fixture Co", "role": "Founder",
+                "stage": "building", "revenueBand": "pre", "goal": "More qualified calls",
+                "track": "b2b", "hybrid": False, "model": "", "modelNearestFit": False,
+                "modelNote": "", "team": "Just me", **section,
+            },
+            "customer": {
+                "segment": "Ops leads at logistics firms", "problem": "Manual scheduling",
+                "outcome": "An hour back a day", "workaround": "Spreadsheets",
+                "evidenceStatus": "supported", "evidence": "12 paying pilots",
+                "buyer": "Ops director", "trigger": "Missed a shipment", "bestFit": "Regional 3PLs",
+                "attention": "", "adjacent": "", **section,
+            },
+            "offer": {
+                "description": "Scheduling software for small fleets", "delivery": "Web app + onboarding call",
+                "outcome": "Fewer missed pickups", "cta": "Book a demo", "price": "$300/mo",
+                "why": "Built by a former dispatcher", "pricingModel": "subscription", "proof": "12 pilots",
+                **section,
+            },
+            "voice": {
+                "tone": "Direct and a little dry", "boundaries": "No hype, no jargon",
+                "sample": "We fix the schedule so you do not have to.", "sampleCount": 10, **section,
+            },
+            "context": {
+                "channelsActive": "", "channelsDormant": "", "emailProvider": "google",
+                "domainStatus": "warm", "igAccountType": "", "customersNow": "12",
+                "avgMonthlyValue": "300", "target90": "40", "sourceMaterial": "", **section,
+            },
+        }
+
+    def _complete_orientation(self):
+        return {
+            "firstLoginScreen": 2, "firstLoginCompletedAt": "2026-09-18T00:00:00.000Z",
+            "track": "b2b",
+            # Screen 4 in contentScreens() is always "thirty": content-intro, track, the
+            # track-setup confirm screen, then thirty. Loading straight there is what the
+            # real founder flow does once the earlier chapter screens are already saved.
+            "contentScreen": 4, "contentCompletedAt": None, "contentAnswers": {},
+            "outreachScreen": 1, "outreachCompletedAt": None, "outreachAnswers": {},
+            "ghlScreen": 1, "ghlCompletedAt": None, "ghlAnswers": {},
+            "updatedAt": "2026-09-18T00:00:00.000Z",
+        }
+
+    def test_higgsfield_connect_modal_portals_under_body_and_escape_closes(self):
+        """Regression for the dark-blank-backdrop bug: the Content chapter's `.entry-panel`
+        keeps a `both`-filled `transform` animation running forever, which makes it the
+        containing block for any `position: fixed` descendant. Before the portal fix this
+        blew up `.pack-modal` to the ancestor's full scroll height. After the fix the dialog
+        must render as a direct child of `document.body`, size to the viewport, close on
+        Escape, and hand focus back to the button that opened it."""
+        brain = {
+            "workspaceId": "ws_fixture", "version": 3, "sha": "0" * 64, "updatedAt": "2026-09-18T00:00:00.000Z",
+            "brain": self._complete_brain(),
+            "readiness": {"identity": True, "customer": True, "offer": True, "voice": True, "context": True, "output": True},
+            "verified": True, "artifact": None,
+        }
+        self.context.route(self.origin + "/api/me", lambda r: r.fulfill(json={"email": "ada@example.test"}))
+        self.context.route(self.origin + "/api/brain", lambda r: r.fulfill(json=brain))
+        self.context.route(self.origin + "/api/artifact", lambda r: r.fulfill(json={"artifact": None, "stale": False}))
+        self.context.route(self.origin + "/api/orientation", lambda r: r.fulfill(json=self._complete_orientation()))
+        self.context.route(self.origin + "/api/history", lambda r: r.fulfill(json={"versions": []}))
+        self.context.route(self.origin + "/api/media", lambda r: r.fulfill(json={
+            "items": [], "higgsfield": {"connected": False, "hint": None, "spentUsd": 0, "capUsd": 50},
+        }))
+        self.context.route(self.origin + "/api/config", lambda r: r.fulfill(json={
+            "authMode": "hexclave", "hexclave": {
+                "projectId": PROJECT, "apiUrl": AUTH_ORIGIN, "publishableClientKey": None,
+            }, "aiEnabled": False, "mediaEnabled": True, "routinesEnabled": False,
+        }))
+
+        self.page.set_viewport_size({"width": 1280, "height": 900})
+        self.page.goto(self.origin)
+        self.page.get_by_role("button", name="Sign in", exact=True).click()
+        expect(self.page.get_by_role("heading", name="Hosted sign-in fixture")).to_be_visible()
+        state = parse_qs(urlparse(self.page.url).query)["hexclave_cross_domain_state"][0]
+        self.page.goto(self.origin + "/?" + urlencode({"code": "fixture-code", "state": state}))
+
+        # Signed-in founder lands on the Atlanta hub; open the Content chapter, which
+        # mounts MediaProvider under the animated .entry-panel typeform ancestor.
+        expect(self.page.get_by_role("button", name="Set up your content plan")).to_be_visible(timeout=20000)
+        self.page.get_by_role("button", name="Set up your content plan").click()
+        expect(self.page.get_by_role("heading", name="Thirty pieces")).to_be_visible(timeout=20000)
+        connect_button = self.page.get_by_role("button", name="Connect Higgsfield", exact=True)
+        expect(connect_button).to_be_visible(timeout=20000)
+
+        # Sanity check on the bug itself: before opening the dialog, the transformed
+        # ancestor really is there, still animating (fill-mode "both" never releases it).
+        ancestor_transformed = self.page.evaluate(
+            """() => {
+                const panel = document.querySelector('.entry-panel');
+                return panel ? getComputedStyle(panel).transform !== 'none' : null;
+            }"""
+        )
+        self.assertTrue(ancestor_transformed, ".entry-panel must still be transformed for this regression to be meaningful")
+
+        # Reproduce the long 30-piece layout without generating content or contacting a provider.
+        self.page.locator(".typeform-body").evaluate("el => el.style.minHeight = '15000px'")
+        connect_button.click()
+        dialog = self.page.get_by_role("dialog", name="Connect Higgsfield")
+        expect(dialog).to_be_visible()
+
+        # The fix: the dialog is a portal child of <body>, not nested under the
+        # transformed .entry-panel, so it is never trapped inside a broken containing block.
+        portal_info = self.page.evaluate(
+            """() => {
+                const modal = document.querySelector('.pack-modal');
+                const rect = modal.getBoundingClientRect();
+                return {
+                    parentIsBody: modal.parentElement === document.body,
+                    underEntryPanel: Boolean(modal.closest('.entry-panel')),
+                    height: rect.height,
+                };
+            }"""
+        )
+        self.assertTrue(portal_info["parentIsBody"], ".pack-modal must be a direct child of document.body")
+        self.assertFalse(portal_info["underEntryPanel"], ".pack-modal must not sit under the transformed .entry-panel")
+        # Before the fix this was reported at ~15340px; it must now match the viewport.
+        self.assertLess(portal_info["height"], 950, ".pack-modal must size to the viewport, not the ancestor's scroll height")
+
+        card = self.page.locator(".higgsfield-card")
+        expect(card).to_be_visible()
+        card_box = card.bounding_box()
+        self.assertIsNotNone(card_box)
+        self.assertGreaterEqual(card_box["y"], 0)
+        self.assertLess(card_box["y"], 900, "the card must be inside the 900px viewport, not scrolled far below it")
+
+        # Initial focus lands inside the dialog, on "Not now" rather than the key fields.
+        initial_focus = self.page.evaluate("() => document.activeElement && document.activeElement.textContent.trim()")
+        self.assertEqual(initial_focus, "Not now")
+
+        # Escape closes it and hands focus back to the button that opened it.
+        self.page.keyboard.press("Escape")
+        expect(self.page.locator(".pack-modal")).to_have_count(0)
+        restored_focus = self.page.evaluate("() => document.activeElement && document.activeElement.textContent.trim()")
+        self.assertEqual(restored_focus, "Connect Higgsfield")
+
+        # The portal must also fit a phone viewport, with keyboard focus contained and
+        # the existing Not now action usable without entering any credentials.
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        connect_button.click()
+        expect(dialog).to_be_visible()
+        mobile_box = self.page.locator(".higgsfield-card").bounding_box()
+        self.assertGreaterEqual(mobile_box["x"], 0)
+        self.assertGreaterEqual(mobile_box["y"], 0)
+        self.assertLessEqual(mobile_box["x"] + mobile_box["width"], 390)
+        self.assertLessEqual(mobile_box["y"] + mobile_box["height"], 844)
+        self.page.keyboard.press("Tab")
+        self.assertTrue(dialog.evaluate("el => el.contains(document.activeElement)"))
+        dialog.get_by_role("button", name="Not now", exact=True).click()
+        expect(dialog).to_have_count(0)
+        expect(connect_button).to_be_focused()
+        self.assertEqual(self.errors, [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
