@@ -7,7 +7,7 @@ import { missions, missionCopy, type Mission } from "../mission-copy";
 import { sectionWouldApprove, type Artifact, type Brain, type Config, type MissionSection } from "../types";
 import { Output } from "./Output";
 import type { QuestionIndexConfig, QuestionIndexItem } from "./QuestionIndexModal";
-import { missionFieldStatus, missingMissionFields } from "../lib/mission-index";
+import { missionFieldStatus, missingMissionFields, resumeQuestion } from "../lib/mission-index";
 import { VoiceSampleGate } from "./VoiceSampleGate";
 import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
@@ -194,6 +194,19 @@ function screenIndexOf(mission: Mission, track: "b2b" | "b2c"): number {
   return found >= 0 ? found : screens.length - 1;
 }
 
+/** Open a mission on its first gap, or its confirm screen when the required answers are already in. */
+function resumeIndex(mission: Mission, track: "b2b" | "b2c", brain: Brain): number {
+  const { screens, fields } = screensFor(track);
+  if (mission === "output") return screenIndexOf(mission, track);
+  const target = resumeQuestion(brain, mission);
+  const found = screens.findIndex((screen) => {
+    if (screen.mission !== mission) return false;
+    if (target === "confirm") return screen.kind === "confirm";
+    return screen.kind === "field" && fields[mission]?.[screen.index]?.field === target;
+  });
+  return found >= 0 ? found : screenIndexOf(mission, track);
+}
+
 function fieldValue(draft: Brain, mission: Exclude<Mission, "output">, field: string): string {
   const section = draft[mission] as unknown as Record<string, unknown>;
   const raw = section[field];
@@ -236,11 +249,13 @@ export function MissionTypeform(props: {
   const draft = props.draft;
   const track = draft.identity.track === "b2c" ? "b2c" : "b2b";
   const { screens, fields: fieldsByMission } = screensFor(track);
-  const [idx, setIdx] = useState(() => screenIndexOf(props.mission, track));
+  const [idx, setIdx] = useState(() => resumeIndex(props.mission, track, draft));
   // Reset only when the entry mission changes. A track flip re-forks later
   // missions but must NOT teleport the walk back to the entry mission.
+  // Resume on the first gap, or the confirm screen when required answers are in,
+  // so an approved Identity is not replayed from question 1.
   useEffect(() => {
-    setIdx(screenIndexOf(props.mission, track));
+    setIdx(resumeIndex(props.mission, track, props.draft));
   }, [props.mission]);
   useEffect(() => {
     setIdx((current) => Math.min(current, screens.length - 1));
