@@ -186,8 +186,22 @@ export function ContentChapter({
   onGenerate,
   onRevise,
   mediaApi = null,
+  instagramConnectEnabled = false,
+  instagramConnected = false,
+  instagramUsername = null,
+  instagramBusy = false,
+  onInstagramConnect,
+  onInstagramPull,
+  onInstagramDisconnect,
 }: ChapterProps & {
   mediaApi?: FounderBrainApi | null;
+  instagramConnectEnabled?: boolean;
+  instagramConnected?: boolean;
+  instagramUsername?: string | null;
+  instagramBusy?: boolean;
+  onInstagramConnect?: () => void;
+  onInstagramPull?: () => void;
+  onInstagramDisconnect?: () => void;
   artifactText?: string;
   generating?: boolean;
   revising?: boolean;
@@ -365,6 +379,34 @@ export function ContentChapter({
           onConfirm={setConfirm}
         />
       )}
+      {current.id === "instagram" ? (
+        <div className="mission-save-row">
+          <p className="entry-lede typeform-lede">
+            {instagramConnected && instagramUsername
+              ? `Connected as @${instagramUsername}. Photos are saved. Nothing is posted.`
+              : "Connect reads your own Business or Creator photos. A personal account cannot connect."}
+          </p>
+          {instagramConnected ? (
+            <>
+              <button className="button secondary" type="button" disabled={instagramBusy} onClick={() => onInstagramPull?.()}>
+                Pull my photos
+              </button>
+              <button className="button secondary" type="button" disabled={instagramBusy} onClick={() => onInstagramDisconnect?.()}>
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <button
+              className="button secondary"
+              type="button"
+              disabled={instagramBusy || !instagramConnectEnabled}
+              onClick={() => onInstagramConnect?.()}
+            >
+              {instagramConnectEnabled ? "Connect Instagram" : "Connect is not configured"}
+            </button>
+          )}
+        </div>
+      ) : null}
       {isChoice ? (
         <p className="entry-lede typeform-lede">Choose below.</p>
       ) : null}

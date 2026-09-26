@@ -45,6 +45,16 @@ export function PrivacyDisclosure({ onBack }: { onBack: () => void }) {
       </section>
 
       <section>
+        <h2>Optional Instagram connection</h2>
+        <ul>
+          <li>Connecting Instagram is separate from signing in. It works only for a Business or Creator account. A personal account cannot connect.</li>
+          <li>The connect asks to read your own profile and photos. It does not ask to publish, message, or read other accounts.</li>
+          <li>The token is encrypted in your workspace. Photos we copy are saved in your media library and are not attached to a piece unless you attach them. Instagram's own links expire, so the copy is what we keep.</li>
+          <li>Disconnect removes the token and the copied Instagram photos from FounderBrain. It also asks Instagram to revoke access. Posts that remain on Instagram are not deleted.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Optional Gmail connection</h2>
         <ul>
           <li>Connecting Gmail is separate from signing into FounderBrain. You choose the Google mailbox and can disconnect it at any time. We request Gmail read and compose permissions, which allow reading messages, creating drafts, and sending mail. Sending is off by default.</li>
