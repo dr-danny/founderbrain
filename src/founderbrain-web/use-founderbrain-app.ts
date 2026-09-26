@@ -59,7 +59,7 @@ export function useFounderBrainApp() {
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [view, setView] = useState<View>("atlanta");
+  const [view, setView] = useState<View>(() => window.location.pathname === "/gmail/callback" ? "gmail" : "atlanta");
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
   const [saving, setSaving] = useState(false);

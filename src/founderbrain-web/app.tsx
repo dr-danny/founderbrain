@@ -19,6 +19,7 @@ import { TypeformExitContext } from "./components/TypeformShell";
 import { DeleteAccountModal } from "./components/DeleteAccountModal";
 import { PackReview } from "./components/PackReview";
 import { BuildPackModal } from "./components/BuildPackModal";
+import { GmailStudio } from "./components/GmailStudio";
 import { isPack } from "./pack";
 
 export function App() {
@@ -188,6 +189,9 @@ export function App() {
     </TypeformExitContext.Provider>
   );
 
+  if (window.location.pathname === "/privacy") {
+    return <main className="public-privacy"><PrivacyDisclosure onBack={() => window.location.assign("/")} /></main>;
+  }
   if (!config) {
     return <AuthPage kind="boot" message={error || "Opening your FounderBrain…"} />;
   }
@@ -220,6 +224,9 @@ export function App() {
 
   // Signed-in views without the full TopBar still get the account chip top right.
   const accountChip = email ? <AccountChip email={email} usage={app.usage} onSignOut={() => void app.signOut()} onDeleteAccount={() => setDeleteOpen(true)} /> : null;
+  if (view === "gmail" && app.api) {
+    return <>{accountChip}<GmailStudio api={app.api} onBack={() => setView("atlanta")} />{deleteOpen ? <DeleteAccountModal email={email ?? ""} onClose={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void app.deleteAccountNow(); }} /> : null}</>;
+  }
   const guidedOpen =
     !draft.identity.venture.trim() ||
     !draft.identity.role.trim() ||
@@ -494,6 +501,7 @@ export function App() {
           onContent={() => setView("content")}
           onOutreach={() => setView("outreach")}
           onGhl={() => setView("ghl")}
+          onGmail={() => setView("gmail")}
           onMissions={() => {
             const first = missions.find((key) => !state.readiness[key]) ?? "output";
             setMission(first);

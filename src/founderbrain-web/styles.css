@@ -2974,3 +2974,5 @@ button:not(.link-button) {
   .pack-review-actions { width: 100%; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
   .pack-review-actions button { padding: 0 6px; height: 44px; font-size: 13px; }
 }
+
+.gmail-hub-card {display:flex;align-items:center;justify-content:space-between;gap:1.5rem;margin:1.5rem 0;padding:1.5rem;border:1px solid #f4c7a155;border-radius:16px;background:#241923;} .gmail-hub-card h2 {margin:.3rem 0 .5rem;} .gmail-hub-card p {margin:.3rem 0;color:#dacbd3;} .gmail-hub-card button {flex-shrink:0;} .public-privacy {max-width:72rem;margin:auto;padding:2rem;} @media(max-width:600px){.gmail-hub-card{flex-direction:column;align-items:stretch;}}

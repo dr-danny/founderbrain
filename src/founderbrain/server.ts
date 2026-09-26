@@ -64,6 +64,12 @@ import {
   refreshMedia,
 } from "./higgsfield.ts";
 
+import {
+  getGmailStatus, startGmailOAuth, completeGmailOAuth, disconnectGmail,
+  listGmailSent, analyzeGmailVoice, createGmailDraft, listGmailDrafts,
+  updateGmailDraft, saveGmailDraft, sendGmailDraft, updateGmailSettings,
+} from "./gmail.ts";
+
 const key = z
   .string()
   .min(8)
@@ -427,6 +433,45 @@ export async function buildApi(
   app.post("/api/higgsfield/generate", async (req) => {
     const body = parse(genBody, req.body);
     return { item: await generateMedia(config, store, context(req).workspace, body) };
+  });
+  app.get("/api/gmail/status", async (req) => getGmailStatus(config, store, context(req).workspace));
+  app.post("/api/gmail/oauth/start", async (req) => startGmailOAuth(config, store, context(req).workspace));
+  app.post("/api/gmail/oauth/complete", async (req) => {
+    const body = parse(z.object({ code: z.string().min(1).max(4096), state: z.string().min(20).max(512) }).strict(), req.body);
+    return completeGmailOAuth(config, store, context(req).workspace, body);
+  });
+  app.delete("/api/gmail", async (req) => disconnectGmail(config, store, context(req).workspace));
+  app.get("/api/gmail/sent", async (req) => {
+    const query = parse(z.object({ pageToken: z.string().min(1).max(1024).optional() }).strict(), req.query);
+    return listGmailSent(config, store, context(req).workspace, query);
+  });
+  app.post("/api/gmail/voice", async (req) => {
+    const body = parse(z.object({ messageIds: z.array(z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/)).min(5).max(20), consent: z.literal(true) }).strict(), req.body);
+    return analyzeGmailVoice(config, store, context(req).workspace, body);
+  });
+  app.get("/api/gmail/drafts", async (req) => listGmailDrafts(config, store, context(req).workspace));
+  app.post("/api/gmail/drafts", async (req) => {
+    const body = parse(z.object({ requestId: z.string().uuid(), recipient: z.string().email().max(254), brief: z.string().trim().min(10).max(6000), subject: z.string().max(200).optional(), autoSend: z.boolean().optional() }).strict(), req.body);
+    return createGmailDraft(config, store, context(req).workspace, body);
+  });
+  const gmailDraftId = z.object({ id: z.string().uuid() }).strict();
+  app.put("/api/gmail/drafts/:id", async (req) => {
+    const { id } = parse(gmailDraftId, req.params);
+    const body = parse(z.object({ subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(20000) }).strict(), req.body);
+    return updateGmailDraft(config, store, context(req).workspace, { id, ...body });
+  });
+  app.post("/api/gmail/drafts/:id/save", async (req) => {
+    const { id } = parse(gmailDraftId, req.params);
+    return saveGmailDraft(config, store, context(req).workspace, { id });
+  });
+  app.post("/api/gmail/drafts/:id/send", async (req) => {
+    const { id } = parse(gmailDraftId, req.params);
+    parse(z.object({ confirmed: z.literal(true) }).strict(), req.body);
+    return sendGmailDraft(config, store, context(req).workspace, { id });
+  });
+  app.put("/api/gmail/settings", async (req) => {
+    const body = parse(z.object({ autoSend: z.boolean(), allowedRecipients: z.array(z.string().email().max(254)).max(20), dailyLimit: z.number().int().min(1).max(20), confirmed: z.boolean() }).strict(), req.body);
+    return updateGmailSettings(config, store, context(req).workspace, body);
   });
   app.post("/api/content/regenerate", async (req) => {
     const body = parse(

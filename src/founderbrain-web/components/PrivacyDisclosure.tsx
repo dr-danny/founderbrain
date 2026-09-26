@@ -3,7 +3,7 @@
  * Linked from sign-in and the workspace delete zone. House style: short sentences, no em dashes.
  * Consent model: consent is given by using the app; this page is the standing notice.
  */
-const EFFECTIVE = "2026-09-19";
+const EFFECTIVE = "2026-09-26";
 
 export function PrivacyDisclosure({ onBack }: { onBack: () => void }) {
   return (
@@ -38,10 +38,23 @@ export function PrivacyDisclosure({ onBack }: { onBack: () => void }) {
         <ul>
           <li><strong>AI training is off.</strong> Every AI call is routed with zero data retention and data collection denied (OpenRouter <code>zdr</code>, <code>data_collection: deny</code>). Your prompts and outputs are not stored by the provider and are never used to train a model.</li>
           <li>Browsing, editing, saving, approving, exporting, and restoring send nothing to any AI provider.</li>
-          <li>A provider (OpenRouter) is called only when you click Generate, using the pinned Brain input for that job. Models are limited to a short allowlist reviewed for zero data retention.</li>
+          <li>A provider (OpenRouter) is called for explicit AI actions, including Generate and the optional Gmail voice analysis described below, using only the relevant inputs for that action. Models are limited to a short allowlist reviewed for zero data retention.</li>
           <li>Optional website import sends the address you submit to Firecrawl to read that page. Nothing is read unless you submit a URL.</li>
           <li>Provider calls are metered: token counts and page credits are recorded to compute the price shown before GoHighLevel connect. Metering records are billing records, not Brain content, and are kept while billing requires.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Optional Gmail connection</h2>
+        <ul>
+          <li>Connecting Gmail is separate from signing into FounderBrain. You choose the Google mailbox and can disconnect it at any time. We request Gmail read and compose permissions, which allow reading messages, creating drafts, and sending mail. Sending is off by default.</li>
+          <li>Voice analysis reads only sent emails you explicitly select, after separate consent to send those selections to our AI provider for style analysis. It does not read attachments. Quoted replies and signatures are filtered where recognizable. Do not select confidential messages or material you are not authorized to share.</li>
+          <li>Raw selected email bodies are used transiently for that analysis and are not retained by FounderBrain. The resulting style profile and generated message bodies are encrypted in your workspace, along with your encrypted Google tokens. Mail identifiers, send status and usage counts support deduplication and limits.</li>
+          <li>Drafts use your writing-style profile and the brief you provide. Saving to Gmail Drafts is a separate action. Manual sending requires a message preview and confirmation. Optional automatic sending applies only to new messages you generate, for an explicit recipient allowlist and daily limit. It is not an unattended inbox auto-replier.</li>
+          <li>Gmail data is not sold, used for advertising, or used to develop, improve, or train generalized AI models. FounderBrain's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.</li>
+          <li>Disconnect removes the local Gmail connection, style profile, and connector drafts, and attempts to revoke Google access. A failed remote revocation is reported so you can remove access in your Google Account. Emails or drafts already saved in Gmail remain in Gmail. Workspace deletion also deletes local connector records. Infrastructure backups expire on the operator's retention schedule.</li>
+        </ul>
+        <p><a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a></p>
       </section>
 
       <section>
