@@ -30,9 +30,15 @@ const MAX_OUTPUT_BYTES = 300 * 1024 * 1024;
 
 export const MODELS = {
   image: {
-    path: "higgsfield-ai/soul/standard",
+    path: "higgsfield-ai/soul/v2/standard",
     label: "Higgsfield Soul image",
-    body: (prompt: string) => ({ prompt, num_images: 1, resolution: "2K", aspect_ratio: "4:5" }),
+    body: (prompt: string) => ({
+      prompt,
+      batch_size: 1,
+      resolution: "1080p",
+      aspect_ratio: "3:4",
+      enhance_prompt: true,
+    }),
   },
   video: {
     path: "minimax/hailuo-2.3/standard/text-to-video",
@@ -136,6 +142,10 @@ function friendly(status: number, fallback: string): DomainError {
       "higgsfield_busy",
       "Higgsfield is rate limiting your key. Wait a minute and try again.",
     );
+  // A rejected model or body is not an outage. Returning 502 makes Cloudflare
+  // replace the explanation with a bare 502.
+  if (status === 404 || status === 422)
+    return new DomainError(422, "higgsfield_request", fallback);
   return new DomainError(502, "higgsfield_failed", fallback);
 }
 
