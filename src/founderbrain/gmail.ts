@@ -1148,10 +1148,11 @@ type MimePart = {
 };
 
 function decodeBase64Url(data: string, remaining: number): string {
-  if (!/^[A-Za-z0-9_-]*$/.test(data) || data.length > Math.ceil((remaining * 4) / 3) + 8) return "";
-  const bytes = Buffer.from(data, "base64url");
-  if (bytes.byteLength > remaining) return "";
-  return bytes.toString("utf8");
+  if (remaining <= 0) return "";
+  const cleaned = data.replace(/\s+/g, "").replace(/=+$/g, "");
+  if (!cleaned || !/^[A-Za-z0-9_-]+$/.test(cleaned)) return "";
+  const bytes = Buffer.from(cleaned, "base64url");
+  return bytes.subarray(0, remaining).toString("utf8");
 }
 
 function htmlToText(html: string): string {
