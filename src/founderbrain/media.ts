@@ -73,6 +73,7 @@ export type MediaItem = {
   costUsd: number;
   error: string | null;
   createdAt: string;
+  name: string;
 };
 
 export type MediaRow = {
@@ -106,6 +107,7 @@ export function toItem(r2: R2Config, row: MediaRow): MediaItem {
     costUsd: Number(row.cost_usd),
     error: row.error,
     createdAt: new Date(row.created_at).toISOString(),
+    name: row.object_key.split("/").pop() || "file",
   };
 }
 
