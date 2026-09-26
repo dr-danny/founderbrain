@@ -238,7 +238,7 @@ export function ContentChapter({
       await onPatch(patch);
     } catch (err) {
       setLocalError(err instanceof ApiError ? err.message : "Could not save progress. Try again.");
-      throw new Error("save_failed");
+      throw new Error("save_failed", { cause: err });
     }
   }
 
@@ -419,7 +419,7 @@ export function OutreachChapter({ orientation, saving, error, onPatch, onFinishe
       await onPatch(patch);
     } catch (err) {
       setLocalError(err instanceof ApiError ? err.message : "Could not save progress. Try again.");
-      throw new Error("save_failed");
+      throw new Error("save_failed", { cause: err });
     }
   }
 
