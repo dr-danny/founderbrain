@@ -21,6 +21,7 @@ import { PackReview } from "./components/PackReview";
 import { BuildPackModal } from "./components/BuildPackModal";
 import { GmailStudio } from "./components/GmailStudio";
 import { isPack } from "./pack";
+import { guideIsComplete } from "./guide-intake";
 
 export function App() {
   const app = useFounderBrainApp();
@@ -53,6 +54,8 @@ export function App() {
     hexclave,
   } = app;
 
+  const [pausedIntakeWorkspace, setPausedIntakeWorkspace] = useState<string | null>(null);
+  useEffect(() => setPausedIntakeWorkspace(null), [email]);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
   const [buildDismissed, setBuildDismissed] = useState(false);
@@ -110,7 +113,10 @@ export function App() {
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
   const inTypeform = (node: ReactNode) => (
-    <TypeformExitContext.Provider value={() => setView("atlanta")}>
+    <TypeformExitContext.Provider value={() => {
+      if (state) setPausedIntakeWorkspace(state.workspaceId);
+      setView("atlanta");
+    }}>
       {node}
       {reviewOpen && packDraft ? (
         <PackReview
@@ -227,19 +233,13 @@ export function App() {
   if (view === "gmail" && app.api) {
     return <>{accountChip}<GmailStudio api={app.api} onBack={() => setView("atlanta")} />{deleteOpen ? <DeleteAccountModal email={email ?? ""} onClose={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void app.deleteAccountNow(); }} /> : null}</>;
   }
-  const guidedOpen =
-    !draft.identity.venture.trim() ||
-    !draft.identity.role.trim() ||
-    !draft.identity.goal.trim() ||
-    !draft.customer.segment.trim() ||
-    !draft.customer.problem.trim() ||
-    !draft.offer.description.trim() ||
-    !draft.voice.tone.trim();
-  if (!firstLoginComplete || guidedOpen) {
+  const needsIntake = !firstLoginComplete || !guideIsComplete(draft, orientation.track);
+  if (needsIntake && pausedIntakeWorkspace !== state.workspaceId) {
     return inTypeform(
       <>
       {accountChip}
       <OrientationFlow
+        workspaceKey={state.workspaceId}
         screen={orientation.firstLoginScreen}
         saving={orientationSaving || app.saving}
         error={error}
@@ -254,7 +254,7 @@ export function App() {
         onComplete={() => app.completeFirstLogin()}
         onDecline={() => void app.signOut()}
         onFill={async (section, field, value) => {
-          await app.commitField(section, field, value);
+          return app.commitField(section, field, value);
         }}
         onApplyIntake={async (proposal) => {
           await app.applyIntake(proposal);
@@ -493,6 +493,7 @@ export function App() {
           </p>
         ) : null}
         <AtlantaReady
+          onResumeIntake={needsIntake ? () => setPausedIntakeWorkspace(null) : undefined}
           state={state}
           orientation={orientation}
           drafts={app.routineDrafts}

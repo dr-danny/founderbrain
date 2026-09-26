@@ -59,7 +59,9 @@ export const GUIDE_STEPS: GuideStep[] = [
       { value: "launched", label: "Under 10k a month" },
       { value: "growing", label: "10k a month or more" },
     ],
-    empty: (b) => b.identity.stage === "exploring",
+    // "" is the unanswered sentinel. "exploring" (Pre-revenue) is a real,
+    // valid answer and must not be treated as still-empty (#stage-default-bug).
+    empty: (b) => b.identity.stage === "",
   },
   {
     id: "price",
@@ -201,8 +203,14 @@ export function readStepValue(brain: Brain, track: string | null, step: GuideSte
   return (bucket[step.field] ?? "").toString();
 }
 
+/**
+ * First step still missing a *required* answer. Optional steps left blank
+ * never block this: they are used to decide routing/completion (finishOrRoute,
+ * mount resume), not step-by-step navigation, and a blank optional answer
+ * (e.g. price, proof, workaround) is a valid final state.
+ */
 export function nextGuideStep(brain: Brain, track: string | null): GuideStep | null {
-  return GUIDE_STEPS.find((step) => step.empty(brain, track)) ?? null;
+  return GUIDE_STEPS.find((step) => !step.optional && step.empty(brain, track)) ?? null;
 }
 
 export function guideIsComplete(brain: Brain, track: string | null): boolean {

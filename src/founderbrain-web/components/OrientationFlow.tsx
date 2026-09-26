@@ -12,12 +12,22 @@ import {
   readStepValue,
   type GuideStep,
 } from "../guide-intake";
+import { guideSequence, resolveInitialCursor } from "../lib/intake-navigation";
 
-const NAME_KEY = "founderbrain.what-to-call-you";
-const YES_KEY = "founderbrain.welcome-yes";
-const SITE_KEY = "founderbrain.website-asked";
-const STAGE_KEY = "founderbrain.identity-stage-asked";
-const CURSOR_KEY = "founderbrain.guide-cursor";
+const NAME_KEY_BASE = "founderbrain.what-to-call-you";
+const YES_KEY_BASE = "founderbrain.welcome-yes";
+const SITE_KEY_BASE = "founderbrain.website-asked";
+const CURSOR_KEY_BASE = "founderbrain.guide-cursor";
+
+/**
+ * Session-storage keys must be scoped per workspace: two workspaces (or two
+ * users sharing a browser profile) previously shared one global cursor/name/
+ * site key, so switching workspace could resume mid-guide with the wrong
+ * answers. `workspaceKey` should be the current `state.workspaceId`.
+ */
+function scopedKey(base: string, workspaceKey: string): string {
+  return workspaceKey ? `${base}::${workspaceKey}` : base;
+}
 
 function readKey(key: string): string {
   try {
@@ -70,12 +80,7 @@ function ReadingSite() {
   );
 }
 
-function sequence(includeUrl: boolean): string[] {
-  const items = ["name", "ready", "site-ask"];
-  if (includeUrl) items.push("site-url");
-  for (const step of GUIDE_STEPS) items.push(`g:${step.id}`);
-  return items;
-}
+const sequence = guideSequence;
 
 export function OrientationFlow({
   screen,
@@ -85,6 +90,7 @@ export function OrientationFlow({
   brain,
   track,
   siteImportEnabled,
+  workspaceKey,
   onNamed,
   onAdvance,
   onComplete,
@@ -102,16 +108,26 @@ export function OrientationFlow({
   brain: Brain;
   track: string | null;
   siteImportEnabled: boolean;
+  /** Scopes sessionStorage keys (name/yes/site/cursor) so switching workspace
+   *  never resumes with another workspace's saved progress. Pass `state.workspaceId`. */
+  workspaceKey: string;
   onNamed: (name: string) => void;
   onAdvance: (nextScreen: number) => void | Promise<void>;
   onComplete: () => void | Promise<void>;
   onDecline: () => void;
-  onFill: (section: "identity" | "customer" | "offer" | "voice", field: string, value: string) => Promise<void>;
+  /** Resolves with the freshly saved Brain (not the pre-save one) so callers
+   *  right after a save never act on a stale closed-over `brain` prop. */
+  onFill: (section: "identity" | "customer" | "offer" | "voice", field: string, value: string) => Promise<Brain>;
   onApplyIntake: (proposal: Proposal) => Promise<void>;
   onTrack: (value: "b2b" | "b2c") => Promise<void>;
   onImport: (url: string) => Promise<{ proposal: Proposal; logoUrl?: string }>;
   onTranscribe?: (blob: Blob, seconds: number) => Promise<string>;
 }) {
+  const NAME_KEY = scopedKey(NAME_KEY_BASE, workspaceKey);
+  const YES_KEY = scopedKey(YES_KEY_BASE, workspaceKey);
+  const SITE_KEY = scopedKey(SITE_KEY_BASE, workspaceKey);
+  const CURSOR_KEY = scopedKey(CURSOR_KEY_BASE, workspaceKey);
+
   const [name, setName] = useState(() => brain.identity.name.trim() || readKey(NAME_KEY));
   const [localError, setLocalError] = useState("");
   const [wantSite, setWantSite] = useState(readKey(SITE_KEY) === "1");
@@ -119,12 +135,18 @@ export function OrientationFlow({
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [cursor, setCursor] = useState(() => {
-    const stored = Number(readKey(CURSOR_KEY));
-    if (Number.isFinite(stored) && stored >= 0) return stored;
-    if (welcomeDone || readKey(YES_KEY) === "1") return 2;
-    return screen <= 1 ? 0 : 1;
-  });
+  const submitting = useRef(false);
+  const [cursor, setCursor] = useState(() =>
+    resolveInitialCursor({
+      storedCursorRaw: readKey(CURSOR_KEY),
+      welcomeDone,
+      yesAccepted: readKey(YES_KEY) === "1",
+      screen,
+      includeUrl: wantSite || readKey(SITE_KEY) === "1",
+      brain,
+      track,
+    }),
+  );
 
   const includeUrl = wantSite || readKey(SITE_KEY) === "1";
   const seq = sequence(includeUrl);
@@ -181,10 +203,15 @@ export function OrientationFlow({
 
   /** Leave the intake when the guide is complete; otherwise go to the first
    *  empty step instead of silently completing a partial guide (#66). */
-  function finishOrRoute() {
-    const empty = nextGuideStep(brain, track);
+  async function finishOrRoute(latestBrain: Brain = brain) {
+    const empty = nextGuideStep(latestBrain, track);
     if (!empty) {
-      void onComplete();
+      if (submitting.current) return;
+      submitting.current = true;
+      setBusy(true);
+      try { await onComplete(); }
+      catch { setLocalError("Could not finish setup. Your answers are saved. Try again."); }
+      finally { submitting.current = false; setBusy(false); }
       return;
     }
     const emptyIdx = seq.indexOf(`g:${empty.id}`);
@@ -196,9 +223,12 @@ export function OrientationFlow({
     setLocalError("A few answers are still missing. Continue to fill them in.");
   }
 
-  function goNext() {
+  // `latestBrain` lets the very last commitStep hand over the just-saved Brain
+  // instead of the `brain` prop, which is still the pre-save value until the
+  // parent re-renders (#final-step-stale-brain).
+  function goNext(latestBrain: Brain = brain) {
     if (safe >= seq.length - 1) {
-      finishOrRoute();
+      finishOrRoute(latestBrain);
       return;
     }
     moveTo(safe + 1);
@@ -267,7 +297,6 @@ export function OrientationFlow({
     try {
       await onApplyIntake(proposal);
       if (proposal.track) await onTrack(proposal.track);
-      if (proposal.identity?.stage) writeKey(STAGE_KEY, "1");
       setProposal(null);
       goNext();
     } catch {
@@ -278,20 +307,30 @@ export function OrientationFlow({
   }
 
   async function commitStep(stepNow: GuideStep, value: string) {
+    if (locked || submitting.current) return;
     const next = value.trim();
     if (!next && !stepNow.optional) {
       setLocalError("Give us something to go on.");
       return;
     }
+    submitting.current = true;
+    setBusy(true);
     try {
-      if (stepNow.id === "stage") writeKey(STAGE_KEY, "1");
-      if (next) {
+      // Track fresh state as we go: onFill resolves with the Brain the server
+      // actually saved, which is the only reliable state to route the very
+      // last step against (the `brain` prop can still be one save behind).
+      let latestBrain = brain;
+      // Empty optional answers must also save, so clearing a prior answer sticks.
+      if (next || stepNow.optional) {
         if (stepNow.section === "track") await onTrack(next as "b2b" | "b2c");
-        else await onFill(stepNow.section, stepNow.field, next);
+        else latestBrain = await onFill(stepNow.section, stepNow.field, next);
       }
-      goNext();
+      goNext(latestBrain);
     } catch {
       setLocalError("Could not save. Try again.");
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
   }
 
@@ -505,6 +544,28 @@ export function OrientationFlow({
   }
 
   if (!step) {
+    // The explicit final confirmation also handles returning founders whose
+    // answers are saved but whose first-login completion flag never persisted.
+    const guideComplete = nextGuideStep(brain, track) === null;
+    if (guideComplete && !welcomeDone) {
+      return (
+        <TypeformShell
+          kicker=""
+          title="Your answers are saved. Continue..."
+          continueLabel="Continue"
+          immersive
+          onContinue={() => void finishOrRoute()}
+          {...frame}
+        >
+          <p className="entry-lede typeform-lede">Nothing else is needed. Continue to finish setting up.</p>
+          {(error || localError) && (
+            <p className="entry-error" role="alert">
+              {error || localError}
+            </p>
+          )}
+        </TypeformShell>
+      );
+    }
     return (
       <TypeformShell
         kicker=""

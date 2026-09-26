@@ -456,7 +456,9 @@ export function useFounderBrainApp() {
     latestDraft.current = next;
     setDraft(next);
     setChanged(true);
-    await save(next);
+    const saved = await save(next);
+    if (!saved) throw new Error("The answer has not been saved yet. Please retry.");
+    return saved.brain;
   }
 
   async function applyIntake(proposal: {
@@ -478,7 +480,8 @@ export function useFounderBrainApp() {
     latestDraft.current = next;
     setDraft(next);
     setChanged(true);
-    await save(next);
+    const saved = await save(next);
+    if (!saved) throw new Error("The imported answers have not been saved yet. Please retry.");
   }
 
   function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean | number) {
@@ -528,6 +531,7 @@ export function useFounderBrainApp() {
     try {
       const saved = await api.save(operation.brain, operation.expectedVersion, operation.key);
       settleSave(saved, operation, epoch);
+      if (epoch === sessionEpoch.current) return saved;
     } catch (err) {
       if (epoch !== sessionEpoch.current) return;
       if (err instanceof ApiError && err.status === 409) {
@@ -551,6 +555,7 @@ export function useFounderBrainApp() {
         try {
           const receipt = await api.brain(err.details.committedVersion);
           settleSave(receipt, operation, epoch, true);
+          if (epoch === sessionEpoch.current) return receipt;
         } catch {
           if (epoch === sessionEpoch.current) {
             setError(
@@ -567,6 +572,7 @@ export function useFounderBrainApp() {
     } finally {
       if (epoch === sessionEpoch.current) setSaving(false);
     }
+    return undefined;
   }
 
   async function retrySave() {
