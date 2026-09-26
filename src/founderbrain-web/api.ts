@@ -131,34 +131,87 @@ export class FounderBrainApi {
     return body as T;
   }
 
-  gmailStatus() { return this.request<GmailStatus>("/gmail/status"); }
-  gmailStart() { return this.request<{url: string}>("/gmail/oauth/start", { method: "POST" }); }
-  gmailComplete(input: {code: string; state: string}) {
-    return this.request<GmailStatus>("/gmail/oauth/complete", {method: "POST", body: JSON.stringify(input)}, 45_000);
+  gmailStatus() {
+    return this.request<GmailStatus>("/gmail/status");
   }
-  gmailDisconnect() { return this.request<{disconnected: boolean; revoked: boolean}>("/gmail", {method: "DELETE"}, 30_000); }
+  gmailStart() {
+    return this.request<{ url: string }>("/gmail/oauth/start", { method: "POST" });
+  }
+  gmailComplete(input: { code: string; state: string }) {
+    return this.request<GmailStatus>(
+      "/gmail/oauth/complete",
+      { method: "POST", body: JSON.stringify(input) },
+      45_000,
+    );
+  }
+  gmailDisconnect() {
+    return this.request<{ disconnected: boolean; revoked: boolean }>(
+      "/gmail",
+      { method: "DELETE" },
+      30_000,
+    );
+  }
   gmailSent(pageToken?: string) {
-    return this.request<{messages: SentMail[]; nextPageToken?: string}>("/gmail/sent" + (pageToken ? "?pageToken=" + encodeURIComponent(pageToken) : ""), {}, 60_000);
+    return this.request<{ messages: SentMail[]; nextPageToken?: string }>(
+      "/gmail/sent" + (pageToken ? "?pageToken=" + encodeURIComponent(pageToken) : ""),
+      {},
+      60_000,
+    );
   }
-  gmailAnalyze(input: {messageIds: string[]; consent: true}) {
-    return this.request<GmailStatus>("/gmail/voice", {method: "POST", body: JSON.stringify(input)}, 90_000);
+  gmailAnalyze(input: { messageIds: string[]; consent: true }) {
+    return this.request<GmailStatus>(
+      "/gmail/voice",
+      { method: "POST", body: JSON.stringify(input) },
+      90_000,
+    );
   }
-  gmailDrafts() { return this.request<{drafts: GmailDraft[]}>("/gmail/drafts"); }
-  gmailCreateDraft(input: {requestId: string; recipient: string; brief: string; subject?: string; autoSend?: boolean}) {
-    return this.request<GmailDraft>("/gmail/drafts", {method: "POST", body: JSON.stringify(input)}, 90_000);
+  gmailDrafts() {
+    return this.request<{ drafts: GmailDraft[] }>("/gmail/drafts");
   }
-  gmailUpdateDraft(input: {id: string; subject: string; body: string}) {
-    const {id, ...body} = input;
-    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(id), {method: "PUT", body: JSON.stringify(body)});
+  gmailCreateDraft(input: {
+    requestId: string;
+    recipient: string;
+    brief: string;
+    subject?: string;
+    autoSend?: boolean;
+  }) {
+    return this.request<GmailDraft>(
+      "/gmail/drafts",
+      { method: "POST", body: JSON.stringify(input) },
+      90_000,
+    );
   }
-  gmailSaveDraft(input: {id: string}) {
-    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(input.id) + "/save", {method: "POST"}, 45_000);
+  gmailUpdateDraft(input: { id: string; subject: string; body: string }) {
+    const { id, ...body } = input;
+    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(id), {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
   }
-  gmailSendDraft(input: {id: string}) {
-    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(input.id) + "/send", {method: "POST", body: JSON.stringify({confirmed: true})}, 45_000);
+  gmailSaveDraft(input: { id: string }) {
+    return this.request<GmailDraft>(
+      "/gmail/drafts/" + encodeURIComponent(input.id) + "/save",
+      { method: "POST" },
+      45_000,
+    );
   }
-  gmailSettings(input: {autoSend: boolean; allowedRecipients: string[]; dailyLimit: number; confirmed: boolean}) {
-    return this.request<GmailStatus>("/gmail/settings", {method: "PUT", body: JSON.stringify(input)});
+  gmailSendDraft(input: { id: string }) {
+    return this.request<GmailDraft>(
+      "/gmail/drafts/" + encodeURIComponent(input.id) + "/send",
+      { method: "POST", body: JSON.stringify({ confirmed: true }) },
+      45_000,
+    );
+  }
+  gmailSettings(input: {
+    autoSend: boolean;
+    allowedRecipients: string[];
+    dailyLimit: number;
+    confirmed: boolean;
+  }) {
+    return this.request<GmailStatus>("/gmail/settings", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
   }
   config() {
     return this.request<Config>("/config", {}, 8_000);
@@ -185,15 +238,28 @@ export class FounderBrainApi {
     return this.request<{ url: string }>("/oauth/start");
   }
   routines() {
-    return this.request<{ settings: { timezone: string; mondayPlan: boolean; contentTopUp: boolean; readinessDigest: boolean }; drafts: RoutineDraftRow[] }>(
-      "/routines",
-    );
+    return this.request<{
+      settings: {
+        timezone: string;
+        mondayPlan: boolean;
+        contentTopUp: boolean;
+        readinessDigest: boolean;
+      };
+      drafts: RoutineDraftRow[];
+    }>("/routines");
   }
-  saveRoutineSettings(patch: { timezone?: string; mondayPlan?: boolean; contentTopUp?: boolean; readinessDigest?: boolean }) {
-    return this.request<{ timezone: string; mondayPlan: boolean; contentTopUp: boolean; readinessDigest: boolean }>(
-      "/routines/settings",
-      { method: "POST", body: JSON.stringify(patch) },
-    );
+  saveRoutineSettings(patch: {
+    timezone?: string;
+    mondayPlan?: boolean;
+    contentTopUp?: boolean;
+    readinessDigest?: boolean;
+  }) {
+    return this.request<{
+      timezone: string;
+      mondayPlan: boolean;
+      contentTopUp: boolean;
+      readinessDigest: boolean;
+    }>("/routines/settings", { method: "POST", body: JSON.stringify(patch) });
   }
   setRoutineDraftStatus(id: string, status: "read" | "dismissed") {
     return this.request<{ ok: boolean }>("/routines/drafts/status", {
@@ -212,11 +278,10 @@ export class FounderBrainApi {
     });
   }
   voiceSamples() {
-    return this.request<{ samples: Array<{ id: string; name: string; chars: number; createdAt: string }>; min: number }>(
-      "/voice-samples",
-      {},
-      15_000,
-    );
+    return this.request<{
+      samples: Array<{ id: string; name: string; chars: number; createdAt: string }>;
+      min: number;
+    }>("/voice-samples", {}, 15_000);
   }
   addVoiceSample(input: { name: string; text: string }) {
     return this.request<{ count: number }>(
@@ -226,11 +291,7 @@ export class FounderBrainApi {
     );
   }
   deleteVoiceSample(id: string) {
-    return this.request<{ count: number }>(
-      `/voice-samples/${id}`,
-      { method: "DELETE" },
-      15_000,
-    );
+    return this.request<{ count: number }>(`/voice-samples/${id}`, { method: "DELETE" }, 15_000);
   }
   ghlPush(pack?: string) {
     return this.request<{
@@ -240,11 +301,7 @@ export class FounderBrainApi {
       skipped: string[];
       proven: boolean;
       clinicPaste: string[];
-    }>(
-      "/ghl/push",
-      { method: "POST", body: JSON.stringify(pack ? { pack } : {}) },
-      60_000,
-    );
+    }>("/ghl/push", { method: "POST", body: JSON.stringify(pack ? { pack } : {}) }, 60_000);
   }
   transcribeVoice(audio: { audioBase64: string; mime: string; seconds: number }) {
     return this.request<{ text: string }>(
@@ -254,7 +311,11 @@ export class FounderBrainApi {
     );
   }
   completeOauth(body: { code: string; state: string }) {
-    return this.request<{ connected: boolean; locationId: string | null; orientation?: OrientationState }>(
+    return this.request<{
+      connected: boolean;
+      locationId: string | null;
+      orientation?: OrientationState;
+    }>(
       "/oauth/complete",
       {
         method: "POST",
@@ -289,14 +350,22 @@ export class FounderBrainApi {
   media() {
     return this.request<{ items: MediaItem[]; higgsfield: HiggsfieldStatus }>("/media");
   }
-  createUpload(input: { pieceN: number | null; filename: string; contentType: string; size: number }) {
+  createUpload(input: {
+    pieceN: number | null;
+    filename: string;
+    contentType: string;
+    size: number;
+  }) {
     return this.request<{ item: MediaItem; uploadUrl: string }>("/media/upload", {
       method: "POST",
       body: JSON.stringify(input),
     });
   }
   completeUpload(id: string) {
-    return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/complete`, { method: "POST", body: "{}" });
+    return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/complete`, {
+      method: "POST",
+      body: "{}",
+    });
   }
   assignMedia(id: string, pieceN: number | null) {
     return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/assign`, {
@@ -305,31 +374,47 @@ export class FounderBrainApi {
     });
   }
   refreshMedia(id: string) {
-    return this.request<{ item: MediaItem }>(`/media/${encodeURIComponent(id)}/refresh`, { method: "POST", body: "{}" }, 55_000);
+    return this.request<{ item: MediaItem }>(
+      `/media/${encodeURIComponent(id)}/refresh`,
+      { method: "POST", body: "{}" },
+      55_000,
+    );
   }
   deleteMedia(id: string) {
     return this.request<{ ok: true }>(`/media/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
-  higgsfieldConnect(keyId: string, keySecret: string) {
-    return this.request<HiggsfieldStatus>("/higgsfield/connect", {
-      method: "POST",
-      body: JSON.stringify({ keyId, keySecret }),
-    }, 55_000);
+  higgsfieldConnect(apiKey: string) {
+    return this.request<HiggsfieldStatus>(
+      "/higgsfield/connect",
+      {
+        method: "POST",
+        body: JSON.stringify({ apiKey }),
+      },
+      55_000,
+    );
   }
   higgsfieldDisconnect() {
     return this.request<HiggsfieldStatus>("/higgsfield", { method: "DELETE" });
   }
   higgsfieldEstimate(kind: "image" | "video", prompt: string, pieceN: number | null) {
-    return this.request<{ usd: number; model: string; remainingUsd: number }>("/higgsfield/estimate", {
-      method: "POST",
-      body: JSON.stringify({ kind, prompt, pieceN }),
-    }, 55_000);
+    return this.request<{ usd: number; model: string; remainingUsd: number }>(
+      "/higgsfield/estimate",
+      {
+        method: "POST",
+        body: JSON.stringify({ kind, prompt, pieceN }),
+      },
+      55_000,
+    );
   }
   higgsfieldGenerate(kind: "image" | "video", prompt: string, pieceN: number | null) {
-    return this.request<{ item: MediaItem }>("/higgsfield/generate", {
-      method: "POST",
-      body: JSON.stringify({ kind, prompt, pieceN }),
-    }, 55_000);
+    return this.request<{ item: MediaItem }>(
+      "/higgsfield/generate",
+      {
+        method: "POST",
+        body: JSON.stringify({ kind, prompt, pieceN }),
+      },
+      55_000,
+    );
   }
   regeneratePieces(pieces: Array<{ n: number; text: string; feedback: string }>) {
     return this.request<{ pieces: Array<{ n: number; text: string }> }>("/content/regenerate", {

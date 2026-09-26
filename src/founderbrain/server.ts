@@ -27,7 +27,12 @@ import {
   mutationKey,
 } from "./rate-limit.ts";
 import { ensureOpenRouterKey, revokeOpenRouterKey } from "./openrouter-keys.ts";
-import { getRoutineSettings, listRoutineDrafts, setRoutineDraftStatus, updateRoutineSettings } from "./routines.ts";
+import {
+  getRoutineSettings,
+  listRoutineDrafts,
+  setRoutineDraftStatus,
+  updateRoutineSettings,
+} from "./routines.ts";
 import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { usageResponse, usageTotals } from "./usage.ts";
 import { readOrientation, writeOrientation } from "./orientation.ts";
@@ -43,8 +48,18 @@ import {
 } from "./crm-oauth.ts";
 import { importSite } from "./site-import.ts";
 import { transcribeVoice } from "./voice.ts";
-import { addVoiceSample, deleteVoiceSample, listVoiceSamples, MIN_VOICE_SAMPLES } from "./voice-samples.ts";
-import { brainReadyForPush, defaultFirstPack, loadValueCatalog, pushGhlValues } from "./ghl-push.ts";
+import {
+  addVoiceSample,
+  deleteVoiceSample,
+  listVoiceSamples,
+  MIN_VOICE_SAMPLES,
+} from "./voice-samples.ts";
+import {
+  brainReadyForPush,
+  defaultFirstPack,
+  loadValueCatalog,
+  pushGhlValues,
+} from "./ghl-push.ts";
 import { revisePieces } from "./content-revise.ts";
 import {
   UPLOAD_TYPES,
@@ -65,9 +80,18 @@ import {
 } from "./higgsfield.ts";
 
 import {
-  getGmailStatus, startGmailOAuth, completeGmailOAuth, disconnectGmail,
-  listGmailSent, analyzeGmailVoice, createGmailDraft, listGmailDrafts,
-  updateGmailDraft, saveGmailDraft, sendGmailDraft, updateGmailSettings,
+  getGmailStatus,
+  startGmailOAuth,
+  completeGmailOAuth,
+  disconnectGmail,
+  listGmailSent,
+  analyzeGmailVoice,
+  createGmailDraft,
+  listGmailDrafts,
+  updateGmailDraft,
+  saveGmailDraft,
+  sendGmailDraft,
+  updateGmailSettings,
 } from "./gmail.ts";
 
 const key = z
@@ -296,7 +320,11 @@ export async function buildApi(
     const c = context(req);
     const claimed = readOauthState(secret, body.state);
     if (claimed.sub !== c.subject)
-      throw new DomainError(403, "oauth_state_mismatch", "Connect belonged to a different session.");
+      throw new DomainError(
+        403,
+        "oauth_state_mismatch",
+        "Connect belonged to a different session.",
+      );
     const tokens = await exchangeCode(config, body.code);
     await saveConnection(store, c.workspace, tokens);
     // The CRM row is the source of truth. Write the chapter flag in the same
@@ -331,7 +359,10 @@ export async function buildApi(
   });
   app.get("/api/voice-samples", async (req) => {
     await loadValueCatalog();
-    return { samples: await listVoiceSamples(store, context(req).workspace), min: MIN_VOICE_SAMPLES };
+    return {
+      samples: await listVoiceSamples(store, context(req).workspace),
+      min: MIN_VOICE_SAMPLES,
+    };
   });
   app.post("/api/voice-samples", async (req) => {
     const body = parse(
@@ -386,12 +417,14 @@ export async function buildApi(
   });
   app.post("/api/media/upload", async (req) => {
     const body = parse(
-      z.object({
-        pieceN,
-        filename: z.string().min(1).max(200),
-        contentType: z.string().refine((t) => t in UPLOAD_TYPES),
-        size: z.number().int().positive(),
-      }).strict(),
+      z
+        .object({
+          pieceN,
+          filename: z.string().min(1).max(200),
+          contentType: z.string().refine((t) => t in UPLOAD_TYPES),
+          size: z.number().int().positive(),
+        })
+        .strict(),
       req.body,
     );
     return createUpload(config, store, context(req).workspace, body);
@@ -402,7 +435,10 @@ export async function buildApi(
   });
   app.post("/api/media/:id/assign", async (req) => {
     const { id } = parse(mediaId, req.params);
-    const body = parse(z.object({ pieceN: z.number().int().min(1).max(30).nullable() }).strict(), req.body);
+    const body = parse(
+      z.object({ pieceN: z.number().int().min(1).max(30).nullable() }).strict(),
+      req.body,
+    );
     return { item: await assignMedia(config, store, context(req).workspace, id, body.pieceN) };
   });
   app.post("/api/media/:id/refresh", async (req) => {
@@ -415,17 +451,24 @@ export async function buildApi(
   });
   app.post("/api/higgsfield/connect", async (req) => {
     const body = parse(
-      z.object({ keyId: z.string().min(8).max(200), keySecret: z.string().min(8).max(400) }).strict(),
+      z.union([
+        z.object({ apiKey: z.string().min(17).max(601) }).strict(),
+        z
+          .object({ keyId: z.string().min(8).max(200), keySecret: z.string().min(8).max(400) })
+          .strict(),
+      ]),
       req.body,
     );
     return connectHiggsfield(store, context(req).workspace, body);
   });
   app.delete("/api/higgsfield", async (req) => disconnectHiggsfield(store, context(req).workspace));
-  const genBody = z.object({
-    kind: z.enum(["image", "video"]),
-    prompt: z.string().trim().min(3).max(1500),
-    pieceN,
-  }).strict();
+  const genBody = z
+    .object({
+      kind: z.enum(["image", "video"]),
+      prompt: z.string().trim().min(3).max(1500),
+      pieceN,
+    })
+    .strict();
   app.post("/api/higgsfield/estimate", async (req) => {
     const body = parse(genBody, req.body);
     return estimateMedia(store, context(req).workspace, body);
@@ -434,30 +477,72 @@ export async function buildApi(
     const body = parse(genBody, req.body);
     return { item: await generateMedia(config, store, context(req).workspace, body) };
   });
-  app.get("/api/gmail/status", async (req) => getGmailStatus(config, store, context(req).workspace));
-  app.post("/api/gmail/oauth/start", async (req) => startGmailOAuth(config, store, context(req).workspace));
+  app.get("/api/gmail/status", async (req) =>
+    getGmailStatus(config, store, context(req).workspace),
+  );
+  app.post("/api/gmail/oauth/start", async (req) =>
+    startGmailOAuth(config, store, context(req).workspace),
+  );
   app.post("/api/gmail/oauth/complete", async (req) => {
-    const body = parse(z.object({ code: z.string().min(1).max(4096), state: z.string().min(20).max(512) }).strict(), req.body);
+    const body = parse(
+      z.object({ code: z.string().min(1).max(4096), state: z.string().min(20).max(512) }).strict(),
+      req.body,
+    );
     return completeGmailOAuth(config, store, context(req).workspace, body);
   });
   app.delete("/api/gmail", async (req) => disconnectGmail(config, store, context(req).workspace));
   app.get("/api/gmail/sent", async (req) => {
-    const query = parse(z.object({ pageToken: z.string().min(1).max(1024).optional() }).strict(), req.query);
+    const query = parse(
+      z.object({ pageToken: z.string().min(1).max(1024).optional() }).strict(),
+      req.query,
+    );
     return listGmailSent(config, store, context(req).workspace, query);
   });
   app.post("/api/gmail/voice", async (req) => {
-    const body = parse(z.object({ messageIds: z.array(z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/)).min(5).max(20), consent: z.literal(true) }).strict(), req.body);
+    const body = parse(
+      z
+        .object({
+          messageIds: z
+            .array(z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/))
+            .min(5)
+            .max(20),
+          consent: z.literal(true),
+        })
+        .strict(),
+      req.body,
+    );
     return analyzeGmailVoice(config, store, context(req).workspace, body);
   });
-  app.get("/api/gmail/drafts", async (req) => listGmailDrafts(config, store, context(req).workspace));
+  app.get("/api/gmail/drafts", async (req) =>
+    listGmailDrafts(config, store, context(req).workspace),
+  );
   app.post("/api/gmail/drafts", async (req) => {
-    const body = parse(z.object({ requestId: z.string().uuid(), recipient: z.string().email().max(254), brief: z.string().trim().min(10).max(6000), subject: z.string().max(200).optional(), autoSend: z.boolean().optional() }).strict(), req.body);
+    const body = parse(
+      z
+        .object({
+          requestId: z.string().uuid(),
+          recipient: z.string().email().max(254),
+          brief: z.string().trim().min(10).max(6000),
+          subject: z.string().max(200).optional(),
+          autoSend: z.boolean().optional(),
+        })
+        .strict(),
+      req.body,
+    );
     return createGmailDraft(config, store, context(req).workspace, body);
   });
   const gmailDraftId = z.object({ id: z.string().uuid() }).strict();
   app.put("/api/gmail/drafts/:id", async (req) => {
     const { id } = parse(gmailDraftId, req.params);
-    const body = parse(z.object({ subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(20000) }).strict(), req.body);
+    const body = parse(
+      z
+        .object({
+          subject: z.string().trim().min(1).max(200),
+          body: z.string().trim().min(1).max(20000),
+        })
+        .strict(),
+      req.body,
+    );
     return updateGmailDraft(config, store, context(req).workspace, { id, ...body });
   });
   app.post("/api/gmail/drafts/:id/save", async (req) => {
@@ -470,20 +555,35 @@ export async function buildApi(
     return sendGmailDraft(config, store, context(req).workspace, { id });
   });
   app.put("/api/gmail/settings", async (req) => {
-    const body = parse(z.object({ autoSend: z.boolean(), allowedRecipients: z.array(z.string().email().max(254)).max(20), dailyLimit: z.number().int().min(1).max(20), confirmed: z.boolean() }).strict(), req.body);
+    const body = parse(
+      z
+        .object({
+          autoSend: z.boolean(),
+          allowedRecipients: z.array(z.string().email().max(254)).max(20),
+          dailyLimit: z.number().int().min(1).max(20),
+          confirmed: z.boolean(),
+        })
+        .strict(),
+      req.body,
+    );
     return updateGmailSettings(config, store, context(req).workspace, body);
   });
   app.post("/api/content/regenerate", async (req) => {
     const body = parse(
-      z.object({
-        pieces: z.array(
-          z.object({
-            n: z.number().int().min(1).max(30),
-            text: z.string().min(1).max(4000),
-            feedback: z.string().max(1000),
-          }),
-        ).min(1).max(30),
-      }).strict(),
+      z
+        .object({
+          pieces: z
+            .array(
+              z.object({
+                n: z.number().int().min(1).max(30),
+                text: z.string().min(1).max(4000),
+                feedback: z.string().max(1000),
+              }),
+            )
+            .min(1)
+            .max(30),
+        })
+        .strict(),
       req.body,
     );
     const workspace = context(req).workspace;
@@ -500,13 +600,14 @@ export async function buildApi(
     return { pieces };
   });
   app.post("/api/ghl/push", { bodyLimit: 1024 * 1024 }, async (req) => {
-    const body = parse(
-      z.object({ pack: z.string().max(40).optional() }).strict(),
-      req.body ?? {},
-    );
+    const body = parse(z.object({ pack: z.string().max(40).optional() }).strict(), req.body ?? {});
     const state = await store.read(context(req).workspace);
     if (!brainReadyForPush(state.brain))
-      throw new DomainError(422, "brain_incomplete", "Approve all five missions before pushing to GoHighLevel.");
+      throw new DomainError(
+        422,
+        "brain_incomplete",
+        "Approve all five missions before pushing to GoHighLevel.",
+      );
     const reviewed = await jobs.artifact(context(req).workspace);
     const acceptedPack =
       reviewed?.acceptedAt &&
@@ -521,13 +622,17 @@ export async function buildApi(
       );
     const firstPack = body.pack ?? defaultFirstPack(state.brain);
     await loadValueCatalog();
-    return pushGhlValues(config, store, context(req).workspace, state.brain, firstPack, reviewed.text);
+    return pushGhlValues(
+      config,
+      store,
+      context(req).workspace,
+      state.brain,
+      firstPack,
+      reviewed.text,
+    );
   });
   app.post("/api/site-import", async (req) => {
-    const body = parse(
-      z.object({ url: z.string().url().max(300) }).strict(),
-      req.body,
-    );
+    const body = parse(z.object({ url: z.string().url().max(300) }).strict(), req.body);
     if (!body.url.startsWith("https://"))
       throw new DomainError(422, "invalid_request", "Use an https website address.");
     return importSite(config, store, context(req).workspace, body.url);
@@ -606,11 +711,13 @@ export async function buildApi(
   });
   app.post("/api/jobs", async (req, reply) => {
     const body = parse(
-      z.object({
-        expectedVersion: version,
-        idempotencyKey: key,
-        replaceStuck: z.boolean().optional(),
-      }).strict(),
+      z
+        .object({
+          expectedVersion: version,
+          idempotencyKey: key,
+          replaceStuck: z.boolean().optional(),
+        })
+        .strict(),
       req.body,
     );
     return reply

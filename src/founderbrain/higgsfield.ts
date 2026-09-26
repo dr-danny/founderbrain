@@ -2,7 +2,7 @@
  * src/founderbrain/higgsfield.ts
  *
  * WHAT THIS IS. Option 2 for the 30 pieces: the founder brings their own
- * Higgsfield API key (key id + secret), and FounderBrain uses it to make an
+ * Higgsfield API key, and FounderBrain uses it to make an
  * image or a short video for a piece. Higgsfield bills the founder directly.
  *
  * - The key is sealed in ge_blob with the founder's data key; only a hint is shown.
@@ -49,12 +49,22 @@ export type HiggsfieldStatus = {
   capUsd: number;
 };
 
-type KeyRow = { key_blob_sha: string; key_hint: string; cap_usd: string | number; spent_usd: string | number };
+type KeyRow = {
+  key_blob_sha: string;
+  key_hint: string;
+  cap_usd: string | number;
+  spent_usd: string | number;
+};
 
 async function sealKey(tx: Tx, workspace: string, plaintext: string): Promise<string> {
-  const rows = await tx`select wrapped_key from founder where id=${workspace} and deleted_at is null`;
+  const rows =
+    await tx`select wrapped_key from founder where id=${workspace} and deleted_at is null`;
   if (!rows[0]) throw new DomainError(404, "workspace_missing", "Workspace not found.");
-  const sealed = sealBlob(workspace, unwrapDataKey(workspace, rows[0].wrapped_key), Buffer.from(plaintext, "utf8"));
+  const sealed = sealBlob(
+    workspace,
+    unwrapDataKey(workspace, rows[0].wrapped_key),
+    Buffer.from(plaintext, "utf8"),
+  );
   await tx`
     insert into ge_blob(founder_id, sha, ciphertext, nonce, size_bytes)
     values (${workspace}, ${sealed.sha}, ${sealed.ciphertext}, ${sealed.nonce}, ${sealed.sizeBytes})
@@ -69,76 +79,146 @@ async function openKey(tx: Tx, workspace: string, sha: string): Promise<string> 
     from ge_blob b join founder f on f.id = b.founder_id
     where b.founder_id = ${workspace} and b.sha = ${sha}
   `;
-  if (!r[0]) throw new DomainError(503, "higgsfield_key_missing", "Your Higgsfield key could not be read. Connect it again.");
-  return openBlob(workspace, unwrapDataKey(workspace, r[0].wrapped_key), sha, r[0].ciphertext, r[0].nonce).toString("utf8");
+  if (!r[0])
+    throw new DomainError(
+      503,
+      "higgsfield_key_missing",
+      "Your Higgsfield key could not be read. Connect it again.",
+    );
+  return openBlob(
+    workspace,
+    unwrapDataKey(workspace, r[0].wrapped_key),
+    sha,
+    r[0].ciphertext,
+    r[0].nonce,
+  ).toString("utf8");
 }
 
-async function loadKey(store: PgBrainStore, workspace: string): Promise<{ auth: string; row: KeyRow }> {
+async function loadKey(
+  store: PgBrainStore,
+  workspace: string,
+): Promise<{ auth: string; row: KeyRow }> {
   return store.scoped(workspace, async (tx) => {
-    const rows = await tx<KeyRow[]>`select key_blob_sha, key_hint, cap_usd, spent_usd from fb_higgsfield_key where founder_id = ${workspace}`;
+    const rows = await tx<
+      KeyRow[]
+    >`select key_blob_sha, key_hint, cap_usd, spent_usd from fb_higgsfield_key where founder_id = ${workspace}`;
     const row = rows[0];
-    if (!row) throw new DomainError(409, "higgsfield_not_connected", "Connect your Higgsfield key first.");
+    if (!row)
+      throw new DomainError(409, "higgsfield_not_connected", "Connect your Higgsfield key first.");
     return { auth: `Key ${await openKey(tx, workspace, row.key_blob_sha)}`, row };
   });
 }
 
-function hf(auth: string, path: string, init: { method: "GET" | "POST"; body?: unknown }): Promise<Response> {
+function hf(
+  auth: string,
+  path: string,
+  init: { method: "GET" | "POST"; body?: unknown },
+): Promise<Response> {
   return higgsfieldFetch(auth, path, init);
 }
 
 function friendly(status: number, fallback: string): DomainError {
   if (status === 401 || status === 403)
-    return new DomainError(422, "higgsfield_key_invalid", "Higgsfield did not accept that key. Check the key id and secret.");
+    return new DomainError(
+      422,
+      "higgsfield_key_invalid",
+      "Higgsfield did not accept that API key. Create a new key and paste the whole value.",
+    );
   if (status === 402)
-    return new DomainError(422, "higgsfield_balance", "Your Higgsfield balance is empty. Top up at open.higgsfield.ai, then try again.");
+    return new DomainError(
+      422,
+      "higgsfield_balance",
+      "Your Higgsfield balance is empty. Top up at open.higgsfield.ai, then try again.",
+    );
   if (status === 429)
-    return new DomainError(429, "higgsfield_busy", "Higgsfield is rate limiting your key. Wait a minute and try again.");
+    return new DomainError(
+      429,
+      "higgsfield_busy",
+      "Higgsfield is rate limiting your key. Wait a minute and try again.",
+    );
   return new DomainError(502, "higgsfield_failed", fallback);
 }
 
 async function estimateWith(auth: string, kind: MediaKind, prompt: string): Promise<number> {
   const model = MODELS[kind];
-  const res = await hf(auth, `estimate/${model.path}`, { method: "POST", body: model.body(prompt) });
+  const res = await hf(auth, `estimate/${model.path}`, {
+    method: "POST",
+    body: model.body(prompt),
+  });
   if (!res.ok) throw friendly(res.status, "Higgsfield could not price that request. Try again.");
   const body = (await res.json().catch(() => ({}))) as { usd?: string | number };
   const usd = Number(body.usd);
-  if (!Number.isFinite(usd) || usd < 0) throw new DomainError(502, "higgsfield_failed", "Higgsfield returned no price for that request.");
+  if (!Number.isFinite(usd) || usd < 0)
+    throw new DomainError(
+      502,
+      "higgsfield_failed",
+      "Higgsfield returned no price for that request.",
+    );
   return Math.round(usd * 10_000) / 10_000;
 }
 
-export async function higgsfieldStatus(store: PgBrainStore, workspace: string): Promise<HiggsfieldStatus> {
+export async function higgsfieldStatus(
+  store: PgBrainStore,
+  workspace: string,
+): Promise<HiggsfieldStatus> {
   return store.scoped(workspace, async (tx) => {
-    const rows = await tx<KeyRow[]>`select key_hint, cap_usd, spent_usd, key_blob_sha from fb_higgsfield_key where founder_id = ${workspace}`;
+    const rows = await tx<
+      KeyRow[]
+    >`select key_hint, cap_usd, spent_usd, key_blob_sha from fb_higgsfield_key where founder_id = ${workspace}`;
     const row = rows[0];
     return row
-      ? { connected: true, hint: row.key_hint, spentUsd: Number(row.spent_usd), capUsd: Number(row.cap_usd) }
+      ? {
+          connected: true,
+          hint: row.key_hint,
+          spentUsd: Number(row.spent_usd),
+          capUsd: Number(row.cap_usd),
+        }
       : { connected: false, hint: null, spentUsd: 0, capUsd: 50 };
   });
+}
+
+/** Higgsfield's dashboard shows one API key. That value is already `key id:secret`. */
+export function higgsfieldCredential(input: {
+  apiKey?: string;
+  keyId?: string;
+  keySecret?: string;
+}): { credential: string; hint: string } {
+  const raw =
+    input.apiKey?.trim().replace(/^Key\s+/i, "") ??
+    (input.keyId && input.keySecret ? `${input.keyId.trim()}:${input.keySecret.trim()}` : "");
+  const match = /^([^\s:]{8,200}):([^\s:]{8,400})$/.exec(raw);
+  if (!match)
+    throw new DomainError(
+      422,
+      "higgsfield_key_format",
+      "Paste the whole API key Higgsfield shows. It is one value.",
+    );
+  return { credential: `${match[1]}:${match[2]}`, hint: `…${match[1].slice(-4)}` };
 }
 
 export async function connectHiggsfield(
   store: PgBrainStore,
   workspace: string,
-  input: { keyId: string; keySecret: string },
+  input: { apiKey?: string; keyId?: string; keySecret?: string },
 ): Promise<HiggsfieldStatus> {
-  const keyId = input.keyId.trim();
-  const keySecret = input.keySecret.trim();
-  if (!/^[^\s:]{8,200}$/.test(keyId) || !/^[^\s:]{8,400}$/.test(keySecret))
-    throw new DomainError(422, "higgsfield_key_format", "Paste the key id and the secret exactly as Higgsfield shows them.");
+  const { credential, hint } = higgsfieldCredential(input);
   // A price check is free and proves the key works before it is stored.
-  await estimateWith(`Key ${keyId}:${keySecret}`, "image", "Test price check");
+  await estimateWith(`Key ${credential}`, "image", "Test price check");
   await store.scoped(workspace, async (tx) => {
-    const sha = await sealKey(tx, workspace, `${keyId}:${keySecret}`);
+    const sha = await sealKey(tx, workspace, credential);
     await tx`
       insert into fb_higgsfield_key (founder_id, key_blob_sha, key_hint)
-      values (${workspace}, ${sha}, ${"…" + keyId.slice(-4)})
+      values (${workspace}, ${sha}, ${hint})
       on conflict (founder_id) do update set key_blob_sha = excluded.key_blob_sha, key_hint = excluded.key_hint
     `;
   });
   return higgsfieldStatus(store, workspace);
 }
 
-export async function disconnectHiggsfield(store: PgBrainStore, workspace: string): Promise<HiggsfieldStatus> {
+export async function disconnectHiggsfield(
+  store: PgBrainStore,
+  workspace: string,
+): Promise<HiggsfieldStatus> {
   await store.scoped(workspace, async (tx) => {
     await tx`delete from fb_higgsfield_key where founder_id = ${workspace}`;
   });
@@ -152,7 +232,11 @@ export async function estimateMedia(
 ): Promise<{ usd: number; model: string; remainingUsd: number }> {
   const { auth, row } = await loadKey(store, workspace);
   const usd = await estimateWith(auth, input.kind, input.prompt);
-  return { usd, model: MODELS[input.kind].label, remainingUsd: Math.max(0, Number(row.cap_usd) - Number(row.spent_usd)) };
+  return {
+    usd,
+    model: MODELS[input.kind].label,
+    remainingUsd: Math.max(0, Number(row.cap_usd) - Number(row.spent_usd)),
+  };
 }
 
 export async function generateMedia(
@@ -163,7 +247,11 @@ export async function generateMedia(
 ): Promise<MediaItem> {
   const r2 = requireR2(config);
   if ((await countMedia(store, workspace)) >= 200)
-    throw new DomainError(422, "media_limit", "You have reached 200 files. Remove some to add more.");
+    throw new DomainError(
+      422,
+      "media_limit",
+      "You have reached 200 files. Remove some to add more.",
+    );
   const { auth } = await loadKey(store, workspace);
   const model = MODELS[input.kind];
   const usd = await estimateWith(auth, input.kind, input.prompt);
@@ -176,7 +264,11 @@ export async function generateMedia(
     return rows.length > 0;
   });
   if (!reserved)
-    throw new DomainError(422, "higgsfield_cap", "This would go over your $50 FounderBrain limit for Higgsfield.");
+    throw new DomainError(
+      422,
+      "higgsfield_cap",
+      "This would go over your $50 FounderBrain limit for Higgsfield.",
+    );
   const release = () =>
     store.scoped(workspace, async (tx) => {
       await tx`update fb_higgsfield_key set spent_usd = greatest(0, spent_usd - ${usd}) where founder_id = ${workspace}`;
@@ -186,7 +278,8 @@ export async function generateMedia(
     const res = await hf(auth, model.path, { method: "POST", body: model.body(input.prompt) });
     if (!res.ok) throw friendly(res.status, "Higgsfield did not accept that request. Try again.");
     const body = (await res.json().catch(() => ({}))) as { request_id?: string };
-    if (!body.request_id) throw new DomainError(502, "higgsfield_failed", "Higgsfield did not return a request id.");
+    if (!body.request_id)
+      throw new DomainError(502, "higgsfield_failed", "Higgsfield did not return a request id.");
     requestId = body.request_id;
   } catch (err) {
     await release();
@@ -222,13 +315,18 @@ export async function refreshMedia(
 ): Promise<MediaItem> {
   const r2 = requireR2(config);
   const row = await store.scoped(workspace, async (tx) => {
-    const rows = await tx<MediaRow[]>`select * from fb_media where founder_id = ${workspace} and id = ${id}`;
+    const rows = await tx<
+      MediaRow[]
+    >`select * from fb_media where founder_id = ${workspace} and id = ${id}`;
     return rows[0];
   });
   if (!row) throw new DomainError(404, "media_missing", "That file was not found.");
-  if (row.source !== "higgsfield" || row.status !== "pending" || !row.provider_request_id) return toItem(r2, row);
+  if (row.source !== "higgsfield" || row.status !== "pending" || !row.provider_request_id)
+    return toItem(r2, row);
   const { auth } = await loadKey(store, workspace);
-  const res = await hf(auth, `requests/${encodeURIComponent(row.provider_request_id)}/status`, { method: "GET" });
+  const res = await hf(auth, `requests/${encodeURIComponent(row.provider_request_id)}/status`, {
+    method: "GET",
+  });
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) throw friendly(res.status, "");
     return toItem(r2, row);
@@ -262,17 +360,28 @@ export async function refreshMedia(
   const download = await fetchGeneratedFile(outputUrl);
   if (!download.ok) return toItem(r2, row);
   const declared = Number(download.headers.get("content-length") ?? 0);
-  if (declared > MAX_OUTPUT_BYTES) throw new DomainError(422, "media_size", "That output is too large to store.");
+  if (declared > MAX_OUTPUT_BYTES)
+    throw new DomainError(422, "media_size", "That output is too large to store.");
   const bytes = Buffer.from(await download.arrayBuffer());
-  if (bytes.byteLength > MAX_OUTPUT_BYTES) throw new DomainError(422, "media_size", "That output is too large to store.");
-  const contentType = (download.headers.get("content-type") ?? (row.kind === "video" ? "video/mp4" : "image/jpeg")).split(";")[0]!.trim();
+  if (bytes.byteLength > MAX_OUTPUT_BYTES)
+    throw new DomainError(422, "media_size", "That output is too large to store.");
+  const contentType = (
+    download.headers.get("content-type") ?? (row.kind === "video" ? "video/mp4" : "image/jpeg")
+  )
+    .split(";")[0]!
+    .trim();
   const key = `${workspace}/${id}/higgsfield.${EXT[contentType] ?? (row.kind === "video" ? "mp4" : "jpg")}`;
   const put = await r2Fetch(presignR2(r2, "PUT", key, 300), {
     method: "PUT",
     headers: { "Content-Type": contentType, "Content-Length": String(bytes.byteLength) },
     body: bytes,
   });
-  if (!put.ok) throw new DomainError(503, "media_store_failed", "The file was made but could not be saved. Refresh to try again.");
+  if (!put.ok)
+    throw new DomainError(
+      503,
+      "media_store_failed",
+      "The file was made but could not be saved. Refresh to try again.",
+    );
   const ready = await store.scoped(workspace, async (tx) => {
     const rows = await tx<MediaRow[]>`
       update fb_media set status = 'ready', object_key = ${key}, content_type = ${contentType},

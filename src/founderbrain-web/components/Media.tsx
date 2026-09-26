@@ -4,7 +4,16 @@
  *   2. Make them with Higgsfield using the founder's own key.
  * The provider holds the list and polls Higgsfield jobs until they land in the bucket.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { ApiError, type FounderBrainApi } from "../api";
 import type { HiggsfieldStatus, MediaItem } from "../types";
@@ -19,11 +28,15 @@ type MediaState = {
   error: string;
   busy: string;
   upload: (files: FileList | File[], pieceN: number | null) => Promise<void>;
-  estimate: (kind: "image" | "video", prompt: string, pieceN: number | null) => Promise<{ usd: number; model: string; remainingUsd: number }>;
+  estimate: (
+    kind: "image" | "video",
+    prompt: string,
+    pieceN: number | null,
+  ) => Promise<{ usd: number; model: string; remainingUsd: number }>;
   generate: (kind: "image" | "video", prompt: string, pieceN: number | null) => Promise<void>;
   assign: (id: string, pieceN: number | null) => Promise<void>;
   remove: (id: string) => Promise<void>;
-  connect: (keyId: string, keySecret: string) => Promise<void>;
+  connect: (apiKey: string) => Promise<void>;
   disconnect: () => Promise<void>;
   openConnect: () => void;
 };
@@ -37,7 +50,12 @@ function message(err: unknown): string {
 
 export function MediaProvider({ api, children }: { api: FounderBrainApi; children: ReactNode }) {
   const [items, setItems] = useState<MediaItem[]>([]);
-  const [higgsfield, setHiggsfield] = useState<HiggsfieldStatus>({ connected: false, hint: null, spentUsd: 0, capUsd: 50 });
+  const [higgsfield, setHiggsfield] = useState<HiggsfieldStatus>({
+    connected: false,
+    hint: null,
+    spentUsd: 0,
+    capUsd: 50,
+  });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -67,7 +85,10 @@ export function MediaProvider({ api, children }: { api: FounderBrainApi; childre
     });
 
   // Poll Higgsfield jobs until they are copied into the bucket.
-  const pending = items.filter((x) => x.source === "higgsfield" && x.status === "pending").map((x) => x.id).join(",");
+  const pending = items
+    .filter((x) => x.source === "higgsfield" && x.status === "pending")
+    .map((x) => x.id)
+    .join(",");
   useEffect(() => {
     if (!pending) return undefined;
     const timer = window.setInterval(async () => {
@@ -104,14 +125,25 @@ export function MediaProvider({ api, children }: { api: FounderBrainApi; childre
         for (const file of Array.from(files)) {
           setBusy(`Uploading ${file.name}…`);
           try {
-            const created = await api.createUpload({ pieceN, filename: file.name, contentType: file.type, size: file.size });
+            const created = await api.createUpload({
+              pieceN,
+              filename: file.name,
+              contentType: file.type,
+              size: file.size,
+            });
             replace(created.item);
-            const put = await fetch(created.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+            const put = await fetch(created.uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": file.type },
+              body: file,
+            });
             if (!put.ok) throw new Error("upload_failed");
             const done = await api.completeUpload(created.item.id);
             replace(done.item);
           } catch (err) {
-            setError(err instanceof ApiError ? err.message : `${file.name} did not upload. Try again.`);
+            setError(
+              err instanceof ApiError ? err.message : `${file.name} did not upload. Try again.`,
+            );
           }
         }
         setBusy("");
@@ -147,8 +179,8 @@ export function MediaProvider({ api, children }: { api: FounderBrainApi; childre
           setError(message(err));
         }
       },
-      async connect(keyId, keySecret) {
-        setHiggsfield(await api.higgsfieldConnect(keyId, keySecret));
+      async connect(apiKey) {
+        setHiggsfield(await api.higgsfieldConnect(apiKey));
       },
       async disconnect() {
         try {
@@ -185,16 +217,24 @@ function Thumb({ item, pieces }: { item: MediaItem; pieces?: number[] }) {
         )
       ) : (
         <div className="media-placeholder">
-          {item.status === "pending" ? (item.source === "higgsfield" ? "Making…" : "Uploading…") : item.error ?? "Did not finish"}
+          {item.status === "pending"
+            ? item.source === "higgsfield"
+              ? "Making…"
+              : "Uploading…"
+            : (item.error ?? "Did not finish")}
         </div>
       )}
       <figcaption>
-        <span>{item.source === "higgsfield" ? `Higgsfield ${item.kind}` : `Your ${item.kind}`}</span>
+        <span>
+          {item.source === "higgsfield" ? `Higgsfield ${item.kind}` : `Your ${item.kind}`}
+        </span>
         {pieces ? (
           <select
             aria-label="Use for piece"
             value={item.pieceN ?? ""}
-            onChange={(e) => void media.assign(item.id, e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) =>
+              void media.assign(item.id, e.target.value ? Number(e.target.value) : null)
+            }
           >
             <option value="">Not on a piece</option>
             {pieces.map((n) => (
@@ -225,7 +265,10 @@ export function MediaOptions({ pieces }: { pieces: number[] }) {
       <div className="media-choice-grid">
         <div className="media-choice">
           <strong>1. Upload your own</strong>
-          <p>Photos and clips you already have. They are stored privately for your account and only you can see them.</p>
+          <p>
+            Photos and clips you already have. They are stored privately for your account and only
+            you can see them.
+          </p>
           <input
             ref={input}
             type="file"
@@ -237,7 +280,12 @@ export function MediaOptions({ pieces }: { pieces: number[] }) {
               e.target.value = "";
             }}
           />
-          <button type="button" className="entry-cta" onClick={() => input.current?.click()} disabled={Boolean(media.busy)}>
+          <button
+            type="button"
+            className="entry-cta"
+            onClick={() => input.current?.click()}
+            disabled={Boolean(media.busy)}
+          >
             Choose files
           </button>
           <small>JPG, PNG, WebP, GIF, MP4, MOV, or WebM. Up to 500 MB each.</small>
@@ -247,17 +295,25 @@ export function MediaOptions({ pieces }: { pieces: number[] }) {
           {media.higgsfield.connected ? (
             <>
               <p>
-                Connected with your key {media.higgsfield.hint}. ${media.higgsfield.spentUsd.toFixed(2)} of your $
-                {media.higgsfield.capUsd.toFixed(0)} FounderBrain limit used.
+                Connected with your key {media.higgsfield.hint}. $
+                {media.higgsfield.spentUsd.toFixed(2)} of your ${media.higgsfield.capUsd.toFixed(0)}{" "}
+                FounderBrain limit used.
               </p>
               <p>Use Generate on any piece below.</p>
-              <button type="button" className="typeform-external" onClick={() => void media.disconnect()}>
+              <button
+                type="button"
+                className="typeform-external"
+                onClick={() => void media.disconnect()}
+              >
                 Disconnect Higgsfield
               </button>
             </>
           ) : (
             <>
-              <p>An AI studio that makes an image or a short video from a description. You use your own Higgsfield account and pay them directly.</p>
+              <p>
+                An AI studio that makes an image or a short video from a description. You use your
+                own Higgsfield account and pay them directly.
+              </p>
               <button type="button" className="entry-cta" onClick={media.openConnect}>
                 Connect Higgsfield
               </button>
@@ -265,8 +321,16 @@ export function MediaOptions({ pieces }: { pieces: number[] }) {
           )}
         </div>
       </div>
-      {media.busy ? <p className="entry-lede" role="status">{media.busy}</p> : null}
-      {media.error ? <p className="entry-error" role="alert">{media.error}</p> : null}
+      {media.busy ? (
+        <p className="entry-lede" role="status">
+          {media.busy}
+        </p>
+      ) : null}
+      {media.error ? (
+        <p className="entry-error" role="alert">
+          {media.error}
+        </p>
+      ) : null}
       {loose.length ? (
         <>
           <p className="media-subhead">Not on a piece yet. Pick a piece to attach each one.</p>
@@ -287,8 +351,12 @@ export function PieceMedia({ n, text }: { n: number; text: string }) {
   const input = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<"image" | "video">("image");
-  const [prompt, setPrompt] = useState(() => `Social media visual for this post: ${text.slice(0, 600)}`);
-  const [quote, setQuote] = useState<{ usd: number; model: string; remainingUsd: number } | null>(null);
+  const [prompt, setPrompt] = useState(
+    () => `Social media visual for this post: ${text.slice(0, 600)}`,
+  );
+  const [quote, setQuote] = useState<{ usd: number; model: string; remainingUsd: number } | null>(
+    null,
+  );
   const [localError, setLocalError] = useState("");
   const [working, setWorking] = useState(false);
   if (!media) return null;
@@ -341,7 +409,12 @@ export function PieceMedia({ n, text }: { n: number; text: string }) {
             e.target.value = "";
           }}
         />
-        <button type="button" className="typeform-external" onClick={() => input.current?.click()} disabled={Boolean(media.busy)}>
+        <button
+          type="button"
+          className="typeform-external"
+          onClick={() => input.current?.click()}
+          disabled={Boolean(media.busy)}
+        >
           Upload photo or clip
         </button>
         {media.higgsfield.connected ? (
@@ -357,10 +430,24 @@ export function PieceMedia({ n, text }: { n: number; text: string }) {
       {open ? (
         <div className="piece-generate">
           <div className="piece-actions" role="radiogroup" aria-label="What to make">
-            <button type="button" className={kind === "image" ? "entry-cta" : "typeform-external"} onClick={() => { setKind("image"); setQuote(null); }}>
+            <button
+              type="button"
+              className={kind === "image" ? "entry-cta" : "typeform-external"}
+              onClick={() => {
+                setKind("image");
+                setQuote(null);
+              }}
+            >
               Image
             </button>
-            <button type="button" className={kind === "video" ? "entry-cta" : "typeform-external"} onClick={() => { setKind("video"); setQuote(null); }}>
+            <button
+              type="button"
+              className={kind === "video" ? "entry-cta" : "typeform-external"}
+              onClick={() => {
+                setKind("video");
+                setQuote(null);
+              }}
+            >
               6 second video
             </button>
           </div>
@@ -375,16 +462,29 @@ export function PieceMedia({ n, text }: { n: number; text: string }) {
           />
           {quote ? (
             <p className="entry-lede">
-              {quote.model}: about ${quote.usd.toFixed(quote.usd < 0.1 ? 3 : 2)}. ${quote.remainingUsd.toFixed(2)} left of your limit. Higgsfield charges your card.
+              {quote.model}: about ${quote.usd.toFixed(quote.usd < 0.1 ? 3 : 2)}. $
+              {quote.remainingUsd.toFixed(2)} left of your limit. Higgsfield charges your card.
             </p>
           ) : null}
           <div className="piece-actions">
             {quote ? (
-              <button type="button" className="entry-cta" onClick={() => void make()} disabled={working || quote.usd > quote.remainingUsd}>
-                {working ? "Sending…" : `Make it for $${quote.usd.toFixed(quote.usd < 0.1 ? 3 : 2)}`}
+              <button
+                type="button"
+                className="entry-cta"
+                onClick={() => void make()}
+                disabled={working || quote.usd > quote.remainingUsd}
+              >
+                {working
+                  ? "Sending…"
+                  : `Make it for $${quote.usd.toFixed(quote.usd < 0.1 ? 3 : 2)}`}
               </button>
             ) : (
-              <button type="button" className="entry-cta" onClick={() => void price()} disabled={working || prompt.trim().length < 3}>
+              <button
+                type="button"
+                className="entry-cta"
+                onClick={() => void price()}
+                disabled={working || prompt.trim().length < 3}
+              >
                 {working ? "Checking price…" : "Check the price"}
               </button>
             )}
@@ -410,8 +510,7 @@ export function PieceMedia({ n, text }: { n: number; text: string }) {
  */
 function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
   const media = useMedia()!;
-  const [keyId, setKeyId] = useState("");
-  const [keySecret, setKeySecret] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState("");
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -466,7 +565,7 @@ function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
     setSaving(true);
     setLocalError("");
     try {
-      await media.connect(keyId, keySecret);
+      await media.connect(apiKey);
       onClose();
     } catch (err) {
       setLocalError(message(err));
@@ -492,22 +591,35 @@ function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
 
         <h3>What it is</h3>
         <p>
-          Higgsfield is an AI studio that makes images and short videos from a written description. Once it is connected,
-          each of your 30 pieces gets a Generate button that makes the picture or clip that piece needs.
+          Higgsfield is an AI studio that makes images and short videos from a written description.
+          Once it is connected, each of your 30 pieces gets a Generate button that makes the picture
+          or clip that piece needs.
         </p>
 
         <h3>Why use it</h3>
         <p>
-          Most pieces land better with a picture or a clip. Your own photos and clips are usually the strongest, so upload
-          those first. Use Higgsfield for the pieces where you have nothing to show.
+          Most pieces land better with a picture or a clip. Your own photos and clips are usually
+          the strongest, so upload those first. Use Higgsfield for the pieces where you have nothing
+          to show.
         </p>
 
         <h3>What it costs</h3>
         <ul>
-          <li>You pay Higgsfield directly, on your own account and card. FounderBrain never charges you for it.</li>
-          <li>An image costs from under a cent to about 19 cents, depending on the model and size.</li>
-          <li>A 6 second video costs about 28 cents at Higgsfield's list price (less while they run discounts).</li>
-          <li>You see the exact price before anything is made. FounderBrain stops at $50 in total for your account.</li>
+          <li>
+            You pay Higgsfield directly, on your own account and card. FounderBrain never charges
+            you for it.
+          </li>
+          <li>
+            An image costs from under a cent to about 19 cents, depending on the model and size.
+          </li>
+          <li>
+            A 6 second video costs about 28 cents at Higgsfield's list price (less while they run
+            discounts).
+          </li>
+          <li>
+            You see the exact price before anything is made. FounderBrain stops at $50 in total for
+            your account.
+          </li>
         </ul>
 
         <h3>How to get your key (about 5 minutes)</h3>
@@ -517,35 +629,61 @@ function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
             <a href="https://open.higgsfield.ai" target="_blank" rel="noopener noreferrer">
               open.higgsfield.ai
             </a>{" "}
-            and create an account. This is the developer site. A plan on higgsfield.ai does not count.
+            and create an account. This is the developer site. A plan on higgsfield.ai does not
+            count.
           </li>
-          <li>Go to Billing, add a card, and add a small balance. Higgsfield's Billing page shows the minimum.</li>
-          <li>Go to API keys and create a key. Higgsfield shows a Key ID and a Secret once. Copy both now.</li>
-          <li>Paste them below. FounderBrain checks the key with a free price check, then stores it encrypted.</li>
+          <li>
+            Go to Billing, add a card, and add a small balance. Higgsfield's Billing page shows the
+            minimum.
+          </li>
+          <li>
+            Go to API keys and create a key. Higgsfield shows one API key, once. Copy that whole
+            key.
+          </li>
+          <li>
+            Paste it below. FounderBrain checks it with a free price check, then stores it
+            encrypted.
+          </li>
         </ol>
 
-        <label className="pack-label" htmlFor="hf-key-id">Key ID</label>
-        <input id="hf-key-id" className="typeform-input" value={keyId} onChange={(e) => setKeyId(e.target.value)} autoComplete="off" spellCheck={false} />
-        <label className="pack-label" htmlFor="hf-key-secret">Secret</label>
+        <label className="pack-label" htmlFor="hf-api-key">
+          API key
+        </label>
         <input
-          id="hf-key-secret"
+          id="hf-api-key"
           className="typeform-input"
           type="password"
-          value={keySecret}
-          onChange={(e) => setKeySecret(e.target.value)}
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
           autoComplete="off"
           spellCheck={false}
+          placeholder="Paste the API key Higgsfield shows"
         />
         <p className="entry-lede">
-          Your key is only used for generations you ask for on this screen. Disconnect it here any time, or delete it in
-          Higgsfield.
+          Your key is only used for generations you ask for on this screen. Disconnect it here any
+          time, or delete it in Higgsfield.
         </p>
-        {localError ? <p className="entry-error" role="alert">{localError}</p> : null}
+        {localError ? (
+          <p className="entry-error" role="alert">
+            {localError}
+          </p>
+        ) : null}
         <div className="pack-actions">
-          <button type="button" className="typeform-external" ref={closeButtonRef} onClick={onClose} disabled={saving}>
+          <button
+            type="button"
+            className="typeform-external"
+            ref={closeButtonRef}
+            onClick={onClose}
+            disabled={saving}
+          >
             Not now
           </button>
-          <button type="button" className="entry-cta" onClick={() => void save()} disabled={saving || keyId.trim().length < 8 || keySecret.trim().length < 8}>
+          <button
+            type="button"
+            className="entry-cta"
+            onClick={() => void save()}
+            disabled={saving || !apiKey.includes(":") || apiKey.trim().length < 17}
+          >
             {saving ? "Checking your key…" : "Connect"}
           </button>
         </div>
