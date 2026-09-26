@@ -187,13 +187,15 @@ export function higgsfieldCredential(input: {
     input.apiKey?.trim().replace(/^Key\s+/i, "") ??
     (input.keyId && input.keySecret ? `${input.keyId.trim()}:${input.keySecret.trim()}` : "");
   const match = /^([^\s:]{8,200}):([^\s:]{8,400})$/.exec(raw);
-  if (!match)
+  const keyId = match?.[1];
+  const keySecret = match?.[2];
+  if (!keyId || !keySecret)
     throw new DomainError(
       422,
       "higgsfield_key_format",
       "Paste the whole API key Higgsfield shows. It is one value.",
     );
-  return { credential: `${match[1]}:${match[2]}`, hint: `…${match[1].slice(-4)}` };
+  return { credential: `${keyId}:${keySecret}`, hint: `…${keyId.slice(-4)}` };
 }
 
 export async function connectHiggsfield(
