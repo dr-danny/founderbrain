@@ -1850,7 +1850,8 @@ button:not(.link-button) {
   width: 1.1rem;
   height: 1.1rem;
 }
-.typeform-field input {
+.typeform-field input,
+.typeform-field textarea {
   appearance: none;
   border: 1px solid rgba(247, 239, 230, 0.35);
   background: rgba(18, 12, 20, 0.45);
@@ -1858,8 +1859,17 @@ button:not(.link-button) {
   border-radius: 2px;
   padding: 0.85rem 0.95rem;
   font: inherit;
+  width: 100%;
 }
-.typeform-field input:focus-visible {
+.typeform-field textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+.typeform-field.wide {
+  max-width: 42rem;
+}
+.typeform-field input:focus-visible,
+.typeform-field textarea:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: 2px;
 }
