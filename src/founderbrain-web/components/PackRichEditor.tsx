@@ -25,7 +25,7 @@ export function PackRichEditor({ value, onChange, label, disabled = false }: {
     editorProps: { attributes: { class: "pack-prose", role: "textbox", "aria-label": label, "aria-multiline": "true", spellcheck: "true" } },
     onUpdate: ({ editor: current }) => change.current(current.getMarkdown()),
   });
-  useEffect(() => { editor?.setEditable(!disabled); }, [editor, disabled]);
+  useEffect(() => { editor?.setEditable(!disabled, false); }, [editor, disabled]);
   if (!editor) return <p role="status">Opening editor…</p>;
   const tool = (name: string, caption: string, run: () => void, active = false, unavailable = false) => (
     <button key={name} type="button" title={name} aria-label={name} aria-pressed={active}
