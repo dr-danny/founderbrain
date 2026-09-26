@@ -46,6 +46,16 @@ import {
   saveConnection,
   signOauthState,
 } from "./crm-oauth.ts";
+import {
+  completeInstagram,
+  disconnectInstagram,
+  instagramAuthorizeUrl,
+  instagramConfigured,
+  instagramStatus,
+  pullInstagramPhotos,
+  readInstagramState,
+  signInstagramState,
+} from "./instagram.ts";
 import { importSite } from "./site-import.ts";
 import { transcribeVoice } from "./voice.ts";
 import {
@@ -291,6 +301,7 @@ export async function buildApi(
           },
       aiEnabled: config.AI_ENABLED === "true",
       crmConnectEnabled: crmOAuthConfigured(config),
+      instagramConnectEnabled: instagramConfigured(config),
       siteImportEnabled: Boolean(config.FIRECRAWL_API_KEY),
       routinesEnabled: config.ROUTINES_ENABLED === "true",
       mediaEnabled: r2FromConfig(config) !== null,
@@ -338,6 +349,37 @@ export async function buildApi(
     const status = await connectionStatus(store, c.workspace);
     return { ...status, orientation };
   });
+  app.get("/api/instagram/status", async (req) =>
+    instagramStatus(store, context(req).workspace, config),
+  );
+  app.get("/api/instagram/start", async (req) => {
+    if (!instagramConfigured(config))
+      throw new DomainError(503, "instagram_not_configured", "Instagram Connect is not configured yet.");
+    const secret = config.ORIGIN_SECRET ?? config.INSTAGRAM_APP_SECRET;
+    if (!secret)
+      throw new DomainError(503, "instagram_not_configured", "Instagram Connect is not configured yet.");
+    return { url: instagramAuthorizeUrl(config, signInstagramState(secret, context(req).subject)) };
+  });
+  app.post("/api/instagram/complete", async (req) => {
+    if (!instagramConfigured(config))
+      throw new DomainError(503, "instagram_not_configured", "Instagram Connect is not configured yet.");
+    const secret = config.ORIGIN_SECRET ?? config.INSTAGRAM_APP_SECRET;
+    if (!secret)
+      throw new DomainError(503, "instagram_not_configured", "Instagram Connect is not configured yet.");
+    const body = parse(
+      z.object({ code: z.string().min(8).max(512), state: z.string().min(8).max(2000) }).strict(),
+      req.body,
+    );
+    const c = context(req);
+    const claimed = readInstagramState(secret, body.state);
+    if (claimed.sub !== c.subject)
+      throw new DomainError(403, "oauth_state_mismatch", "Connect belonged to a different session.");
+    return completeInstagram(config, store, c.workspace, body.code);
+  });
+  app.post("/api/instagram/pull", async (req) => pullInstagramPhotos(config, store, context(req).workspace));
+  app.delete("/api/instagram", async (req) =>
+    disconnectInstagram(config, store, context(req).workspace),
+  );
   app.post("/api/voice", { bodyLimit: 16 * 1024 * 1024 }, async (req) => {
     const body = parse(
       z
