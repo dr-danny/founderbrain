@@ -41,8 +41,12 @@ function requireLoopback(value: string | undefined, name: string): void {
 }
 requireLoopback(databaseUrl, "FB_TEST_DATABASE_URL");
 requireLoopback(migrationUrl, "FB_TEST_MIGRATION_DATABASE_URL");
-if (enabled && process.env.FB_TEST_EMBEDDED !== "true") {
-  throw new Error("FB_TEST_EMBEDDED=true is required for this disposable test");
+const nativeCi =
+  process.env.GITHUB_ACTIONS === "true" &&
+  Boolean(databaseUrl && new URL(databaseUrl).pathname === "/founderbrain_test") &&
+  Boolean(migrationUrl && new URL(migrationUrl).pathname === "/founderbrain_test");
+if (enabled && process.env.FB_TEST_EMBEDDED !== "true" && !nativeCi) {
+  throw new Error("Use the disposable embedded database or GitHub's loopback founderbrain_test database");
 }
 
 const config: Config = {
