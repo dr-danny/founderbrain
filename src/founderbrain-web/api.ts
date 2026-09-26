@@ -18,6 +18,8 @@ import type {
   UsageResponse,
 } from "./types";
 
+import type { GmailStatus, GmailDraft, SentMail } from "./components/GmailStudio";
+
 export type RoutineDraftRow = {
   id: string;
   kind: "monday_plan" | "content_top_up" | "readiness";
@@ -129,6 +131,35 @@ export class FounderBrainApi {
     return body as T;
   }
 
+  gmailStatus() { return this.request<GmailStatus>("/gmail/status"); }
+  gmailStart() { return this.request<{url: string}>("/gmail/oauth/start", { method: "POST" }); }
+  gmailComplete(input: {code: string; state: string}) {
+    return this.request<GmailStatus>("/gmail/oauth/complete", {method: "POST", body: JSON.stringify(input)}, 45_000);
+  }
+  gmailDisconnect() { return this.request<{disconnected: boolean; revoked: boolean}>("/gmail", {method: "DELETE"}, 30_000); }
+  gmailSent(pageToken?: string) {
+    return this.request<{messages: SentMail[]; nextPageToken?: string}>("/gmail/sent" + (pageToken ? "?pageToken=" + encodeURIComponent(pageToken) : ""), {}, 60_000);
+  }
+  gmailAnalyze(input: {messageIds: string[]; consent: true}) {
+    return this.request<GmailStatus>("/gmail/voice", {method: "POST", body: JSON.stringify(input)}, 90_000);
+  }
+  gmailDrafts() { return this.request<{drafts: GmailDraft[]}>("/gmail/drafts"); }
+  gmailCreateDraft(input: {requestId: string; recipient: string; brief: string; subject?: string; autoSend?: boolean}) {
+    return this.request<GmailDraft>("/gmail/drafts", {method: "POST", body: JSON.stringify(input)}, 90_000);
+  }
+  gmailUpdateDraft(input: {id: string; subject: string; body: string}) {
+    const {id, ...body} = input;
+    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(id), {method: "PUT", body: JSON.stringify(body)});
+  }
+  gmailSaveDraft(input: {id: string}) {
+    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(input.id) + "/save", {method: "POST"}, 45_000);
+  }
+  gmailSendDraft(input: {id: string}) {
+    return this.request<GmailDraft>("/gmail/drafts/" + encodeURIComponent(input.id) + "/send", {method: "POST", body: JSON.stringify({confirmed: true})}, 45_000);
+  }
+  gmailSettings(input: {autoSend: boolean; allowedRecipients: string[]; dailyLimit: number; confirmed: boolean}) {
+    return this.request<GmailStatus>("/gmail/settings", {method: "PUT", body: JSON.stringify(input)});
+  }
   config() {
     return this.request<Config>("/config", {}, 8_000);
   }

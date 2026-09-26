@@ -51,6 +51,7 @@ export function AtlantaReady({
   onContent,
   onOutreach,
   onGhl,
+  onGmail,
   onMissions,
   onOpenArtifact,
   onBrain,
@@ -65,6 +66,7 @@ export function AtlantaReady({
   onContent: () => void;
   onOutreach: () => void;
   onGhl: () => void;
+  onGmail: () => void;
   onMissions: () => void;
   onOpenArtifact: (target: string) => void;
   onBrain: () => void;
@@ -350,6 +352,11 @@ export function AtlantaReady({
             </section>
           ) : null}
 
+          <section className="gmail-hub-card" aria-label="Gmail voice and drafts">
+            <div><p className="eyebrow">WRITE LIKE YOURSELF</p><h2>Your voice. Your inbox.</h2>
+            <p>Learn from emails you choose. Draft messages in your voice. You control every send.</p></div>
+            <button className="atlanta-secondary" type="button" onClick={onGmail}>Gmail voice & drafts</button>
+          </section>
           <div className="atlanta-actions">
             <button className="atlanta-secondary" type="button" onClick={onContent}>
               {orientation.contentCompletedAt ? "Review your content plan" : "Set up your content plan"}
@@ -364,7 +371,7 @@ export function AtlantaReady({
               Your files & downloads
             </button>
           </div>
-          <small>Nothing is published or sent to customers.</small>
+          <small>Your Brain stays private. Gmail sends only when you choose Send or explicitly enable automatic sending.</small>
         </div>
       </section>
       {restoreTarget ? (

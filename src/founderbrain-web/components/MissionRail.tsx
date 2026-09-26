@@ -12,7 +12,8 @@ export type View =
   | "atlanta"
   | "content"
   | "outreach"
-  | "ghl";
+  | "ghl"
+  | "gmail";
 
 export function MissionRail({
   view,
