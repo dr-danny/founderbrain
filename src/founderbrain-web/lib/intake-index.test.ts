@@ -88,3 +88,16 @@ test("firstMissingItem is null once every required item is answered", () => {
   const items = guideIndexItems({ brain, track: "b2b", name: "Danny", readyAnswered: true, siteAnswered: true });
   assert.equal(firstMissingItem(items), null);
 });
+
+test("legacy sparse profiles can render the full index without a missing-field crash", () => {
+  const brain = emptyBrain();
+  delete (brain.offer as unknown as Record<string, unknown>).why;
+  delete (brain.identity as unknown as Record<string, unknown>).stage;
+  delete (brain.customer as unknown as Record<string, unknown>).evidence;
+  const items = guideIndexItems({ brain, track: null, name: "", readyAnswered: false, siteAnswered: false });
+  assert.equal(items.length, 3 + GUIDE_STEPS.length);
+  assert.equal(items.find((item) => item.id === "why")!.answered, false);
+  assert.equal(items.find((item) => item.id === "stage")!.answered, false);
+  assert.equal(items.find((item) => item.id === "proof")!.answered, false);
+  assert.equal(items.find((item) => item.id === "proof")!.required, false);
+});

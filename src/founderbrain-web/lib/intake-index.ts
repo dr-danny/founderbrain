@@ -19,7 +19,11 @@ const SECTION_LABEL: Record<GuideSection, string> = {
 
 /** A guide step's answered/required status, honest to `step.empty`/`step.optional`. */
 export function guideStepStatus(brain: Brain, track: string | null, step: GuideStep) {
-  return { required: !step.optional, answered: !step.empty(brain, track) };
+  // The index visits every question at once, including fields not present in
+  // older profiles. Do not call a field-specific .trim() on an absent value.
+  const value = step.section === "track" ? track :
+    (brain[step.section] as unknown as Record<string, unknown> | undefined)?.[step.field];
+  return { required: !step.optional, answered: value != null && !step.empty(brain, track) };
 }
 
 export function guideIndexItems(params: {
@@ -37,8 +41,8 @@ export function guideIndexItems(params: {
     {
       id: "name",
       title: "What should we call you?",
-      answered: Boolean(brain.identity.name.trim()),
-      detail: name.trim() && !brain.identity.name.trim() ? "Save this name to finish answering the question." : undefined,
+      answered: Boolean(brain.identity?.name?.trim()),
+      detail: name.trim() && !brain.identity?.name?.trim() ? "Save this name to finish answering the question." : undefined,
       required: true,
       group: "Welcome",
     },
