@@ -22,6 +22,7 @@ import type { Config } from "./config.ts";
 import type { PgBrainStore } from "./store.ts";
 import { openRouterProvider, type Provider } from "./provider.ts";
 import { sealBlob, openBlob, unwrapDataKey } from "../server/storage/crypto.ts";
+import { parseContentChannels } from "../founderbrain-shared/channels.ts";
 import { buildOrchestrationFromConfig, orchestrateInvitation } from "./orchestrate.ts";
 import { keyIsUsable, loadOpenRouterApiKey, recordOpenRouterSpend } from "./openrouter-keys.ts";
 import type { OrchestrationRole, RoleModels } from "./openrouter-privacy.ts";
@@ -160,6 +161,13 @@ export class BrainJobs {
         422,
         "brain_incomplete",
         "Save who you are before building the 90 day plan. Missing pieces are named as gaps, not invented.",
+      );
+    }
+    if (!parseContentChannels(state.brain.context.contentChannels).length) {
+      throw new DomainError(
+        422,
+        "channels_required",
+        "Select the channels this pack is for before generating. Choose at least one of Instagram, Facebook, LinkedIn, Reddit, TikTok, YouTube, or Threads.",
       );
     }
     const { meta } = await loadOpenRouterApiKey(this.store, workspace);
