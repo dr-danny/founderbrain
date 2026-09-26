@@ -8,6 +8,7 @@
  * WHY IT EXISTS. Product requirement: auto-orchestrate 2–3 approved roles with
  * hard budget + fallback, without inventing free-form agent graphs.
  */
+import { channelGenerationRules, parseContentChannels } from "../founderbrain-shared/channels.ts";
 import { DomainError } from "./domain.ts";
 import type { Provider, ProviderCall, ProviderResult } from "./provider.ts";
 import {
@@ -230,16 +231,23 @@ export async function orchestrateInvitation(
     };
     // Content-engine rules from the original repos: finished posts the founder
     // publishes, in their captured voice. Never tasks or advice to the founder.
+    let selected: ReturnType<typeof parseContentChannels> = [];
+    try {
+      const parsed = JSON.parse(plan.userContent) as { context?: { contentChannels?: string } };
+      selected = parseContentChannels(parsed.context?.contentChannels);
+    } catch {
+      selected = [];
+    }
     const contentRules =
+      channelGenerationRules(selected) +
       "You write finished social posts this founder will publish under their own name, from this Brain only. " +
       "Write in the founder's voice: use the Brain's tone, boundaries, and verbatim sample. " +
       "These are posts their customers read. Never write tasks, plans, tips, or instructions to the founder " +
       "(no 'Write down', 'Track', 'Document', 'Create a list', 'Calculate', 'Ask your accounts'). " +
-      "Read the track in the Brain. " +
-      "B2B: LinkedIn and X posts. Formats are Short post (80 to 150 words), Long post (200 to 250 words), " +
-      "and Soft ask (80 to 150 words ending with one low-friction ask). " +
-      "B2C: Instagram and TikTok. Formats are Video script (20 to 40 seconds: the spoken hook first, then the script, " +
-      "then a line starting 'On screen:'), Carousel (Frame 1 to Frame 7, one line each), and Caption (one image caption). " +
+      "Use only the selected channels. Do not default to LinkedIn or Instagram. " +
+      "A Video script is 20 to 40 seconds: the spoken hook first, then the script, then a line starting 'On screen:'. " +
+      "A Carousel is Frame 1 to Frame 7, one line each. A Caption is one image caption. " +
+      "A Short post is 80 to 150 words. A Long post is 200 to 250 words. A Soft ask is 80 to 150 words with one low-friction ask. " +
       "Every post opens with a specific line that earns the second line, holds one idea, and uses concrete detail. " +
       "Vary how posts open. Nothing templated. " +
       "Numbers: only ones the founder gave in the Brain, exactly as given. Never invent numbers, customers, results, or prices. " +
@@ -251,22 +259,20 @@ export async function orchestrateInvitation(
     const first = await section(
       contentRules +
         " This is batch 1 of 3. First write one line 'Pillars: A; B; C; D' naming four content pillars " +
-        "drawn from their proof, offer, customer pain, and point of view. Then write pieces 1 to 10: " +
-        "B2B 7 Short posts, 2 Long posts, 1 Soft ask. B2C 5 Video scripts, 3 Carousels, 2 Captions.",
+        "drawn from their proof, offer, customer pain, and point of view. Then write pieces 1 to 10. " +
+        "Use only the selected channels and their formats. Spread those 10 pieces across the selected channels.",
       "",
     );
     const second = await section(
       contentRules +
         " This is batch 2 of 3. Use the same four pillars. Do not write the Pillars line. " +
-        "Write pieces 11 to 20 with new angles: B2B 7 Short posts, 2 Long posts, 1 Soft ask. " +
-        "B2C 5 Video scripts, 3 Carousels, 2 Captions.",
+        "Write pieces 11 to 20 with new angles, only on the selected channels.",
       first,
     );
     const third = await section(
       contentRules +
         " This is batch 3 of 3. Use the same four pillars. Do not write the Pillars line. " +
-        "Write pieces 21 to 30 with new angles: B2B 6 Short posts, 2 Long posts, 2 Soft asks. " +
-        "B2C 5 Video scripts, 2 Carousels, 3 Captions.",
+        "Write pieces 21 to 30 with new angles, only on the selected channels.",
       first + "\n\n" + second,
     );
     const tidy = (batch: string) =>
