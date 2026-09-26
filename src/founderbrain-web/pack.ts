@@ -8,20 +8,19 @@ export function isPack(text: string): boolean {
   return text.includes("## Content") && text.includes("## Outreach") && text.includes("90 day plan");
 }
 
-function between(text: string, start: string, end: string | null): string {
-  const from = text.indexOf(start);
-  if (from < 0) return "";
-  const body = text.slice(from + start.length);
-  if (!end) return body.trim();
-  const to = body.indexOf(end);
-  return (to < 0 ? body : body.slice(0, to)).trim();
-}
-
+/** Match section headings, never mentions of the plan inside prose or a pack title. */
 export function splitPack(text: string): PackSections {
+  const content = /^##\s+Content\s*$/im.exec(text);
+  const outreach = /^##\s+Outreach\s*$/im.exec(text.slice(content ? content.index + content[0].length : 0));
+  const outreachAt = outreach ? (content ? content.index + content[0].length : 0) + outreach.index : -1;
+  const afterOutreach = outreachAt >= 0 ? outreachAt + outreach![0].length : content ? content.index + content[0].length : 0;
+  const plan = /^(?:#{1,6}\s*)?90[ -]day plan\s*$/im.exec(text.slice(afterOutreach));
+  const planAt = plan ? afterOutreach + plan.index : -1;
+  const cleanContent = (value: string) => value.trim().replace(/^(?:##\s+Content\s*\n\s*)+/i, "").trim();
   return {
-    content: between(text, "## Content", "## Outreach"),
-    outreach: between(text, "## Outreach", "90 day plan"),
-    plan: between(text, "90 day plan", null).replace(/^#+\s*90 day plan\s*/i, "").trim(),
+    content: content ? cleanContent(text.slice(content.index + content[0].length, outreachAt >= 0 ? outreachAt : planAt >= 0 ? planAt : undefined)) : "",
+    outreach: outreachAt >= 0 ? text.slice(afterOutreach, planAt >= 0 ? planAt : undefined).trim() : "",
+    plan: planAt >= 0 ? text.slice(planAt + plan![0].length).trim() : "",
   };
 }
 
