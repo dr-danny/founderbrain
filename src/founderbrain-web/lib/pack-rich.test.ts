@@ -31,3 +31,9 @@ test("top-level plan title and prose mentions never bleed Content into plan", ()
 test("a missing plan stays missing rather than showing the whole pack", () => {
   assert.equal(splitPack('90 day plan\n\n## Content\nPost\n\n## Outreach\nMessage').plan, '');
 });
+
+test("legacy 90-Day Growth Plan title is a plan section, not outreach", () => {
+  const split = splitPack("90 day plan\n\n## Content\nPost\n\n## Outreach\nMessage\n\n# 90-Day Growth Plan\n\n## Pressure Test\nPlan body");
+  assert.equal(split.outreach, "Message");
+  assert.equal(split.plan, "## Pressure Test\nPlan body");
+});
