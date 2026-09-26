@@ -193,6 +193,11 @@ async function generateCopy(
 
 type GhlValue = { id: string; name: string; value?: string };
 
+/** Update requires both fields. A value-only body is refused as "name should not be empty". */
+export function ghlCustomValueBody(name: string, value: string): { name: string; value: string } {
+  return { name, value };
+}
+
 async function ghlFetch(
   accessToken: string,
   path: string,
@@ -214,6 +219,42 @@ async function ghlFetch(
 function isUnfilled(value: string | undefined): boolean {
   if (!value || !value.trim()) return true;
   return /PLACEHOLDER/i.test(value) || /\[[^\]]+\]/.test(value) || /\{\{[^}]+\}\}/.test(value);
+}
+
+function hasValue(entry: { value?: string }): boolean {
+  return Object.prototype.hasOwnProperty.call(entry, "value");
+}
+
+async function ghlRefusal(name: string, response: Response): Promise<string> {
+  const body = await response.text();
+  let reason = "";
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+    const raw = Array.isArray(parsed.message)
+      ? parsed.message.filter((item): item is string => typeof item === "string").join(", ")
+      : typeof parsed.message === "string"
+        ? parsed.message
+        : "";
+    if (raw && raw.length < 160 && !/bearer|token|secret|authorization/i.test(raw)) reason = `: ${raw}`;
+  } catch {
+    reason = "";
+  }
+  return `GoHighLevel refused "${name}" (${response.status}${reason}). Try again.`;
+}
+
+/** List and get omit `value` when the slot is empty. A failed read must not be treated as empty. */
+async function readCustomValue(
+  accessToken: string,
+  locationId: string,
+  entry: GhlValue,
+): Promise<{ readable: boolean; text?: string }> {
+  if (hasValue(entry)) return { readable: true, text: entry.value };
+  const got = await ghlFetch(accessToken, `/locations/${locationId}/customValues/${entry.id}`);
+  if (!got.ok) return { readable: false };
+  const json = (await got.json()) as { customValue?: GhlValue };
+  const item = json.customValue ?? (json as GhlValue);
+  if (hasValue(item)) return { readable: true, text: item.value };
+  return { readable: true, text: undefined };
 }
 
 export async function pushGhlValues(
@@ -242,25 +283,42 @@ export async function pushGhlValues(
 
   const pushed: string[] = [];
   const skipped: string[] = [];
+  const unread: string[] = [];
   for (const w of wanted) {
     const value = copy.get(w.gname);
     if (!value) continue;
     const current = existing.get(w.gname);
     // The founder's own words win: never overwrite a filled value.
-    if (current && !isUnfilled(current.value)) {
-      skipped.push(w.gname);
-      continue;
-    }
     if (current) {
-      const updated = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues/${current.id}`, { method: "PUT", body: { value } });
-      if (!updated.ok) throw new DomainError(422, "ghl_push_failed", `GoHighLevel refused "${w.gname}". Try again.`);
+      const read = await readCustomValue(connection.accessToken, connection.locationId, current);
+      // A failed read is not proof the slot is empty. Leave founder words alone.
+      if (!read.readable) {
+        unread.push(w.gname);
+        continue;
+      }
+      if (!isUnfilled(read.text)) {
+        skipped.push(w.gname);
+        continue;
+      }
+      const updated = await ghlFetch(
+        connection.accessToken,
+        `/locations/${connection.locationId}/customValues/${current.id}`,
+        { method: "PUT", body: ghlCustomValueBody(w.gname, value) },
+      );
+      if (!updated.ok) throw new DomainError(422, "ghl_push_failed", await ghlRefusal(w.gname, updated));
       pushed.push(w.gname);
     } else {
-      const created = await ghlFetch(connection.accessToken, `/locations/${connection.locationId}/customValues`, { method: "POST", body: { name: w.gname, value } });
-      if (!created.ok) throw new DomainError(422, "ghl_push_failed", `GoHighLevel refused "${w.gname}". Try again.`);
+      const created = await ghlFetch(
+        connection.accessToken,
+        `/locations/${connection.locationId}/customValues`,
+        { method: "POST", body: ghlCustomValueBody(w.gname, value) },
+      );
+      if (!created.ok) throw new DomainError(422, "ghl_push_failed", await ghlRefusal(w.gname, created));
       pushed.push(w.gname);
     }
   }
+  if (unread.length > 0)
+    throw new DomainError(422, "ghl_push_failed", `GoHighLevel did not return "${unread[0]}". Try again.`);
   if (pushed.length === 0 && skipped.length === wanted.length)
     return { snapshot: snapshotFor(brain), firstPack, pushed, skipped, proven: true, clinicPaste: linkKeys, held };
 
@@ -275,11 +333,20 @@ export async function pushGhlValues(
     if (!verify.ok)
       throw new DomainError(422, "ghl_push_failed", "Could not verify the push. Check GoHighLevel and retry.");
     const verifyJson = (await verify.json()) as { customValues?: GhlValue[] };
-    const verifyMap = new Map((verifyJson.customValues ?? []).map((v) => [v.name, v.value]));
-    proven = [...copy.entries()].every(([gname]) => {
-      const value = verifyMap.get(gname);
-      return value !== undefined && !isUnfilled(value);
-    });
+    const verifyMap = new Map((verifyJson.customValues ?? []).map((v) => [v.name, v]));
+    proven = true;
+    for (const [gname] of copy.entries()) {
+      const listed = verifyMap.get(gname);
+      if (!listed) {
+        proven = false;
+        break;
+      }
+      const read = await readCustomValue(connection.accessToken, connection.locationId, listed);
+      if (!read.readable || isUnfilled(read.text)) {
+        proven = false;
+        break;
+      }
+    }
   }
   if (!proven) {
     const wrote = pushed.length > 0;
