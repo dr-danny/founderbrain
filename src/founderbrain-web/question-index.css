@@ -1,0 +1,273 @@
+/* Question index modal (Danny, 2026-09-26): the mission-section question map.
+   Same ember/ink glass language as the rest of the entry stage, but kept
+   clear and legible: a modest blur behind the backdrop only, an opaque-ish
+   card, and no giant blur washing out the list text. */
+
+.question-index-control {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.35rem 0 0.1rem;
+}
+
+.question-index-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: rgba(224, 137, 74, 0.14);
+  border: 1px solid rgba(224, 137, 74, 0.45);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.question-index-trigger:hover:not(:disabled) {
+  background: rgba(224, 137, 74, 0.26);
+  border-color: var(--ember);
+}
+
+.question-index-trigger:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+.question-index-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.question-index-trigger svg {
+  color: var(--ember);
+  flex-shrink: 0;
+}
+
+.question-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--ember);
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.question-index-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.6rem, 4vw, 2rem);
+  background: rgba(18, 12, 20, 0.7);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.question-index-dialog {
+  width: min(100%, 34rem);
+  max-height: min(88vh, 40rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(26, 18, 28, 0.97), rgba(12, 8, 14, 0.97));
+  border: 1px solid rgba(224, 137, 74, 0.4);
+  border-radius: clamp(12px, 1.6vw, 18px);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(247, 239, 230, 0.08);
+  animation: entry-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.question-index-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 1.1rem 1.2rem 0.6rem;
+  border-bottom: 1px solid rgba(247, 239, 230, 0.1);
+}
+
+.question-index-header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.1rem, 2.6vw, 1.35rem);
+  font-weight: 650;
+  color: var(--paper);
+  letter-spacing: -0.01em;
+}
+
+.question-index-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(247, 239, 230, 0.25);
+  background: transparent;
+  color: var(--paper-muted);
+  cursor: pointer;
+}
+
+.question-index-close:hover {
+  color: var(--paper);
+  border-color: var(--ember);
+}
+
+.question-index-close:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+.question-index-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  font-size: 0.85rem;
+  color: var(--paper-muted);
+  border-bottom: 1px solid rgba(247, 239, 230, 0.08);
+  cursor: pointer;
+}
+
+.question-index-toggle input {
+  accent-color: var(--ember);
+}
+
+.question-index-body {
+  overflow-y: auto;
+  padding: 0.7rem 1.2rem 1.2rem;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.question-index-section h3 {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-brand);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ember);
+}
+
+.question-index-group + .question-index-group {
+  margin-top: 0.7rem;
+}
+
+.question-index-group-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--paper-muted);
+}
+
+.question-index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.question-index-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(247, 239, 230, 0.12);
+  background: rgba(247, 239, 230, 0.04);
+  color: var(--paper);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.question-index-item:hover,
+.question-index-item:focus-visible {
+  border-color: var(--ember);
+  background: rgba(224, 137, 74, 0.12);
+  outline: none;
+}
+
+.question-index-item.missing .question-index-status {
+  color: var(--ember);
+}
+
+.question-index-item.answered .question-index-status {
+  color: #7fbf8f;
+}
+
+.question-index-status {
+  flex-shrink: 0;
+  display: inline-flex;
+  margin-top: 0.15rem;
+}
+
+.question-index-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.question-index-title-text {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.question-index-detail {
+  font-size: 0.78rem;
+  color: var(--paper-muted);
+  line-height: 1.35;
+}
+
+.question-index-label-text {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  padding-top: 0.15rem;
+}
+
+.question-index-empty {
+  margin: 0;
+  padding: 0.6rem 0;
+  color: var(--paper-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 30rem) {
+  .question-index-overlay {
+    padding: 0.5rem;
+  }
+  .question-index-dialog {
+    width: 100%;
+    max-height: 86vh;
+    border-radius: 14px;
+  }
+  .question-index-label-text {
+    display: none;
+  }
+}

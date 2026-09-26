@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { missions, missionCopy, type Mission } from "../mission-copy";
 import { sectionWouldApprove, type Artifact, type Brain, type Config, type MissionSection } from "../types";
 import { Output } from "./Output";
+import type { QuestionIndexConfig, QuestionIndexItem } from "./QuestionIndexModal";
+import { missionFieldStatus, missingMissionFields } from "../lib/mission-index";
 import { VoiceSampleGate } from "./VoiceSampleGate";
 import { TypeformShell } from "./TypeformShell";
 import { VoiceField } from "./VoiceField";
@@ -99,7 +101,7 @@ const MISSION_FIELDS: Record<Exclude<Mission, "output">, FieldDef[]> = {
     { field: "cta", title: "Call to action", kind: "text", maxLength: 160, placeholder: "The next move" },
   ],
   context: [
-    { field: "channelsActive", title: "Where do you publish today?", kind: "multi", maxLength: 400, placeholder: "Active channels, if any" },
+    { field: "channelsActive", title: "Where do you publish today?", kind: "multi", maxLength: 400, placeholder: "Your active channels, or choose None yet below" },
     { field: "channelsDormant", title: "Accounts you have but do not use?", kind: "multi", maxLength: 400, placeholder: "Dormant channels" },
     { field: "emailProvider", title: "What do you open your work email in?", kind: "choice", maxLength: 14, placeholder: "", options: EMAIL_PROVIDER_OPTIONS },
     { field: "domainStatus", title: "Is your sending domain warm?", kind: "choice", maxLength: 8, placeholder: "", options: DOMAIN_OPTIONS },
@@ -244,9 +246,14 @@ export function MissionTypeform(props: {
     setIdx((current) => Math.min(current, screens.length - 1));
   }, [screens.length]);
 
+  const [indexRequest, setIndexRequest] = useState(0);
+  const [returnToReview, setReturnToReview] = useState(false);
   const total = screens.length;
   const current = screens[Math.min(Math.max(idx, 0), total - 1)]!;
-  const go = (next: number) => setIdx(Math.min(Math.max(next, 0), total - 1));
+  const go = (next: number) => {
+    setIndexRequest(0);
+    setIdx(Math.min(Math.max(next, 0), total - 1));
+  };
 
   // Founder-facing position (Danny, 2026-09-21): the cumulative "43 of 43" counter
   // never said where inside a mission the founder stands. Map it explicitly.
@@ -270,6 +277,64 @@ export function MissionTypeform(props: {
     setLookError("");
   }, [idx]);
 
+  const sectionItems = (section: MissionSection): QuestionIndexItem[] => {
+    const items: QuestionIndexItem[] = (fieldsByMission[section] ?? []).map((field) => ({
+      id: section + ":" + field.field,
+      title: field.title,
+      ...missionFieldStatus(draft, section, field.field),
+      detail: field.field === "channelsActive" ? "Choose None yet if you do not publish anywhere." : undefined,
+      group: missionCopy[section].title,
+    }));
+    if (section === "voice") items.push({
+      id: "voice:sampleCount", title: "Your writing samples",
+      ...missionFieldStatus(draft, "voice", "sampleCount"),
+      detail: String(draft.voice.sampleCount ?? 0) + " of 10 separate writing samples saved. The sample sentence is a different answer.",
+      group: "Voice",
+    });
+    return items;
+  };
+  const openMissing = () => setIndexRequest((n) => n + 1);
+  const jumpToQuestion = (id: string) => {
+    const [section, field] = id.split(":");
+    const target = screens.findIndex((screen) => screen.mission === section &&
+      (field === "sampleCount" || field === "approval" ? screen.kind === "confirm" :
+        screen.kind === "field" && fieldsByMission[section]?.[screen.index]?.field === field));
+    if (target >= 0) { setReturnToReview(true); go(target); }
+  };
+  const indexItems = current.mission === "output"
+    ? missions.filter((m): m is MissionSection => m !== "output").flatMap((section) => [
+        ...sectionItems(section),
+        { id: section + ":approval", title: "Approve " + missionCopy[section].title.toLowerCase(),
+          answered: draft[section].approved, required: true, group: missionCopy[section].title },
+      ])
+    : sectionItems(current.mission);
+  const questionIndex: QuestionIndexConfig = {
+    title: current.mission === "output" ? "Your Brain questions" : missionCopy[current.mission].title + " questions",
+    items: indexItems,
+    onJump: jumpToQuestion,
+    request: indexRequest,
+  };
+  const finishField = () => {
+    if (current.mission === "output") return;
+    if (!returnToReview) {
+      go(idx + 1);
+      if (screens[idx + 1]?.kind === "confirm" && missingMissionFields(draft, current.mission).length) openMissing();
+      return;
+    }
+    const confirm = screens.findIndex((screen) => screen.mission === current.mission && screen.kind === "confirm");
+    setReturnToReview(false);
+    go(confirm);
+    if (missingMissionFields(draft, current.mission).length) openMissing();
+  };
+  const approveOrReview = () => {
+    if (current.mission === "output") return;
+    if (!draft[current.mission].approved && missingMissionFields(draft, current.mission).length) {
+      openMissing();
+      return;
+    }
+    props.onApprove(current.mission);
+  };
+
   if (current.kind === "output") {
     return (
       <TypeformShell
@@ -278,6 +343,7 @@ export function MissionTypeform(props: {
         total={total}
         progressText={`Mission ${missions.length} of ${missions.length} · your first output`}
         title="Your first output"
+        questionIndex={questionIndex}
         continueLabel="Done"
         showBack
         onBack={() => go(total - 2)}
@@ -321,11 +387,14 @@ export function MissionTypeform(props: {
           total,
           sectionApproved,
           canApprove,
+          questionIndex,
+          progressText,
+          onReviewMissing: openMissing,
           title: sectionApproved ? `${active.title} is locked in. Keep it?` : `Lock in ${active.title.toLowerCase()}?`,
           onBack: () => go(idx - 1),
           onAdvance: () => go(idx + 1),
           saving: props.saving,
-          onApprove: () => props.onApprove("voice"),
+          onApprove: approveOrReview,
           onSave: props.onSave,
           canRetrySave: props.canRetrySave,
           onRetrySave: props.onRetrySave,
@@ -346,6 +415,8 @@ export function MissionTypeform(props: {
         kicker={`Mission ${index + 1} · ${active.title}`}
         screen={Math.min(idx + 1, total)}
         total={total}
+        questionIndex={questionIndex}
+        progressText={progressText}
         title={sectionApproved ? `${active.title} is locked in. Keep it?` : `Lock in ${active.title.toLowerCase()}?`}
         hideContinue={!sectionApproved}
         continueLabel={next ? `Next: ${missionCopy[next].title}` : "Continue"}
@@ -356,15 +427,15 @@ export function MissionTypeform(props: {
       >
         {canApprove || sectionApproved ? null : (
           <p className="entry-lede typeform-lede">
-            Approve needs every required field filled. You can also continue with a draft.
+            A required answer is missing. Choose Approve mission to see exactly what needs attention, or Not yet to keep a draft.
           </p>
         )}
         <div className="typeform-choices mission-choices">
           <button
             type="button"
             className="typeform-choice yes"
-            disabled={props.saving || (!sectionApproved && !canApprove)}
-            onClick={() => props.onApprove(current.mission as MissionSection)}
+            disabled={props.saving}
+            onClick={approveOrReview}
           >
             {sectionApproved ? "Remove approval" : "Approve mission"}
           </button>
@@ -398,7 +469,7 @@ export function MissionTypeform(props: {
 
   const def = fieldsByMission[current.mission]![current.index]!;
   const value = fieldValue(draft, current.mission, def.field);
-  const advance = () => go(idx + 1);
+  const advance = finishField;
   const patchValue = (v: string) => {
     if (def.field === "hybrid") {
       props.onPatch(current.mission, "hybrid", v === "yes");
@@ -442,7 +513,9 @@ export function MissionTypeform(props: {
       screen={Math.min(idx + 1, total)}
       total={total}
       progressText={progressText}
+      questionIndex={questionIndex}
       title={def.title}
+      continueLabel={returnToReview ? "Back to review" : "Continue"}
       showBack
       onBack={() => (idx === 0 ? props.onFinished() : go(idx - 1))}
       onContinue={advance}
@@ -552,6 +625,13 @@ export function MissionTypeform(props: {
           />
         </>
       )}
+      {def.field === "channelsActive" ? (
+        <button type="button" className={value === "None yet" ? "typeform-choice picked" : "typeform-choice"}
+          disabled={props.saving} aria-pressed={value === "None yet"}
+          onClick={() => props.onPatch("context", "channelsActive", "None yet")}>
+          None yet
+        </button>
+      ) : null}
       {def.field === "evidence" && draft.customer.evidenceStatus !== "supported" ? (
         <p className="entry-lede typeform-lede">Only needed when evidence is supported.</p>
       ) : null}
