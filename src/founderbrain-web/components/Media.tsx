@@ -70,7 +70,7 @@ function snippet(text: string): string {
 }
 
 function fileLabel(item: MediaItem, names: Record<string, string>): string {
-  return item.name || names[item.id] || (item.source === "higgsfield" ? `Higgsfield ${item.kind}` : `Uploaded ${item.kind}`);
+  return item.name || names[item.id] || (item.source === "higgsfield" ? `Higgsfield ${item.kind}` : item.source === "instagram" ? "Instagram photo" : `Uploaded ${item.kind}`);
 }
 
 type Tone = "saved" | "uploading" | "stuck" | "failed" | "making";
@@ -545,11 +545,16 @@ function PickSavedDialog({
         <p className="eyebrow">POST {n}</p>
         <h2>Attach a saved file</h2>
         {files.length ? (
-          <div className="media-post-list">
+          <div className="media-pick-grid">
             {files.map((file) => (
-              <button key={file.id} type="button" className="media-post-pick" disabled={saving} onClick={() => void choose(file.id)}>
-                {fileLabel(file, media.names)}
-                <small>{formatSize(file.sizeBytes) || file.kind} · Saved, not on a post</small>
+              <button key={file.id} type="button" className="media-pick-tile" disabled={saving} onClick={() => void choose(file.id)}>
+                {file.kind === "image" && file.url ? (
+                  <img src={file.url} alt={fileLabel(file, media.names)} loading="lazy" decoding="async" />
+                ) : (
+                  <span className="media-pick-fallback">{file.kind === "video" ? "Clip" : "No preview"}</span>
+                )}
+                <span>{fileLabel(file, media.names)}</span>
+                <small>{formatSize(file.sizeBytes) || file.kind}</small>
               </button>
             ))}
           </div>
