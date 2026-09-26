@@ -5,8 +5,12 @@
  * The provider holds the list and polls Higgsfield jobs until they land in the bucket.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ApiError, type FounderBrainApi } from "../api";
 import type { HiggsfieldStatus, MediaItem } from "../types";
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type MediaState = {
   items: MediaItem[];
@@ -392,13 +396,71 @@ export function PieceMedia({ n, text }: { n: number; text: string }) {
   );
 }
 
-/** Explains Higgsfield, what it costs, and walks through getting a key. */
+/**
+ * Explains Higgsfield, what it costs, and walks through getting a key.
+ *
+ * Portaled straight to `document.body` (Danny/bug report, 2026-09-26): this dialog can be
+ * opened from deep inside the Content typeform chapter, whose `.entry-panel` ancestor runs a
+ * `both`-filled CSS animation (`entry-rise`). A `transform` from that animation never clears,
+ * so it permanently becomes the containing block for any `position: fixed` descendant. That
+ * blew up `.pack-modal` to the ancestor's scroll height (thousands of px tall) instead of the
+ * viewport, leaving founders staring at a dark, empty backdrop with the real card scrolled far
+ * out of view. Rendering through a portal keeps `MediaContext` (via React context, which
+ * crosses portals normally) while escaping that broken containing block.
+ */
 function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
   const media = useMedia()!;
   const [keyId, setKeyId] = useState("");
   const [keySecret, setKeySecret] = useState("");
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState("");
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // Initial focus lands on "Not now" (never the key fields, to keep a stray paste from
+  // landing anywhere but where the founder is looking) and returns to whatever opened the
+  // dialog once it closes, so keyboard and screen-reader users never lose their place.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    return () => {
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, []);
+
+  // Escape closes (unless a save is in flight) and Tab is trapped inside the dialog so
+  // background content, which now sits at a broken scroll position, is never reachable.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (saving) return;
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const node = dialogRef.current;
+      if (!node) return;
+      const focusable = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
+      if (!focusable.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey) {
+        if (active === first || !node.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !node.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [onClose, saving]);
 
   async function save() {
     setSaving(true);
@@ -413,8 +475,17 @@ function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
     }
   }
 
-  return (
-    <div className="pack-modal" role="dialog" aria-modal="true" aria-label="Connect Higgsfield">
+  return createPortal(
+    <div
+      className="pack-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Connect Higgsfield"
+      ref={dialogRef}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+    >
       <div className="pack-card higgsfield-card">
         <p className="eyebrow">OPTIONAL · YOUR OWN ACCOUNT</p>
         <h2>Connect Higgsfield</h2>
@@ -471,7 +542,7 @@ function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
         </p>
         {localError ? <p className="entry-error" role="alert">{localError}</p> : null}
         <div className="pack-actions">
-          <button type="button" className="typeform-external" onClick={onClose} disabled={saving}>
+          <button type="button" className="typeform-external" ref={closeButtonRef} onClick={onClose} disabled={saving}>
             Not now
           </button>
           <button type="button" className="entry-cta" onClick={() => void save()} disabled={saving || keyId.trim().length < 8 || keySecret.trim().length < 8}>
@@ -479,6 +550,7 @@ function HiggsfieldConnect({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
