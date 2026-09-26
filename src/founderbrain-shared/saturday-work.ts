@@ -77,11 +77,16 @@ export type SaturdayAnswers = {
   outreachAnswers: { copy?: string; accounts?: string; prospects?: string };
 };
 
+/** A blank handle is allowed. Instagram is optional and must not block the workflow pick. */
+export function instagramOptionalOk(value: string | undefined): boolean {
+  return !value?.trim() || instagramHandleOk(value);
+}
+
 export function contentFieldBlock(state: SaturdayAnswers): string | null {
   if (state.track === "b2c") {
-    return instagramHandleOk(state.contentAnswers.instagramHandle)
+    return instagramOptionalOk(state.contentAnswers.instagramHandle)
       ? null
-      : "Enter your Instagram handle before finishing the content chapter.";
+      : "That Instagram handle is not usable. Leave it blank, or use letters, numbers, periods, and underscores.";
   }
   if (state.track === "b2b") {
     return emailDomainOk(state.contentAnswers.emailDomain)

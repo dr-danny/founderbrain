@@ -65,8 +65,8 @@ export function contentScreens(track: FounderTrack | null): TypeformScreen[] {
           id: "instagram",
           title: "Instagram as Business",
           body: [
-            "For consumer founders, enter the Instagram handle you will post from.",
-            "Set that account to Business before Atlanta. The handle is what we save.",
+            "Instagram is optional. It does not block picking a workflow.",
+            "Enter the handle you will post from, or leave it blank and continue.",
           ],
           textField: {
             key: "instagramHandle",
