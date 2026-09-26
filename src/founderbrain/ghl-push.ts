@@ -221,7 +221,7 @@ function isUnfilled(value: string | undefined): boolean {
   return /PLACEHOLDER/i.test(value) || /\[[^\]]+\]/.test(value) || /\{\{[^}]+\}\}/.test(value);
 }
 
-function hasValue(entry: object): entry is { value?: string } {
+function hasValue(entry: { value?: string }): boolean {
   return Object.prototype.hasOwnProperty.call(entry, "value");
 }
 
