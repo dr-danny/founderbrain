@@ -48,6 +48,23 @@ jobs:
         run: |
           RUNTIME_DB_ROLE=fb_runtime npm run fb:migrate
           RUNTIME_DB_ROLE=fb_worker npm run fb:migrate
+      - name: Verify Gmail grants immediately after native migrations
+        run: |
+          psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $proof$
+          DECLARE checked integer;
+          BEGIN
+            SELECT count(*) INTO checked FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' AND c.relkind='r' AND c.relname LIKE 'fb_gmail_%'
+              AND c.relrowsecurity AND c.relforcerowsecurity
+              AND has_table_privilege('fb_runtime',c.oid,'SELECT')
+              AND has_table_privilege('fb_runtime',c.oid,'INSERT')
+              AND has_table_privilege('fb_runtime',c.oid,'UPDATE')
+              AND has_table_privilege('fb_runtime',c.oid,'DELETE')
+              AND NOT has_table_privilege('fb_worker',c.oid,'SELECT,INSERT,UPDATE,DELETE');
+            IF checked <> 9 THEN RAISE EXCEPTION 'Gmail API-only forced-RLS grant proof failed: % of 9 tables', checked; END IF;
+          END $proof$;
+          SQL
       - run: npm run fb:build
       - name: Run actual tests (capture log)
         run: npm run fb:test 2>&1 | tee /tmp/fb-test.log; test ${PIPESTATUS[0]} -eq 0

@@ -51,6 +51,9 @@ try {
     } finally {
       await sql.end();
     }
+    // Generic runtime grants must never restore Gmail access to fb_worker.
+    // Reapply the connector's API-only grants after the broad legacy grants.
+    await migrateGmail(admin);
   }
   // eslint-disable-next-line no-console -- this is a CLI entry point, not server code
   console.log(
