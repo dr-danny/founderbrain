@@ -4,7 +4,7 @@
  * sessionStorage.
  */
 import type { Brain } from "../types";
-import { GUIDE_STEPS, nextGuideStep } from "../guide-intake";
+import { GUIDE_STEPS, nextGuideStep, readStepValue } from "../guide-intake";
 
 /** The full screen order: name, ready, site-ask, (site-url), then every guide step. */
 export function guideSequence(includeUrl: boolean): string[] {
@@ -52,7 +52,7 @@ export function resolveInitialCursor(params: {
 
   const seq = guideSequence(includeUrl);
 
-  const hasSavedAnswers = GUIDE_STEPS.some((step) => step.id !== "stage" && !step.empty(brain, track));
+  const hasSavedAnswers = GUIDE_STEPS.some((step) => step.id !== "stage" && Boolean(readStepValue(brain, track, step).trim()));
   if (welcomeDone || yesAccepted || hasSavedAnswers) {
     const missing = nextGuideStep(brain, track);
     if (missing) {

@@ -129,3 +129,12 @@ test("the final confirmation is a reachable step", () => {
   assert.equal(sequence[sequence.length - 2], "g:sample");
   assert.equal(sequence[sequence.length - 1], "complete");
 });
+
+
+test("a sparse legacy empty Brain still opens Welcome", () => {
+  const brain = emptyBrain();
+  // Older clients/fixtures may omit fields later added with schema defaults.
+  delete (brain.offer as Partial<typeof brain.offer>).why;
+  const cursor = resolveInitialCursor({storedCursorRaw: "", welcomeDone: false, yesAccepted: false, screen: 1, includeUrl: false, brain, track: null});
+  assert.equal(cursor, 0);
+});
