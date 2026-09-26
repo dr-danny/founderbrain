@@ -112,6 +112,7 @@ export type MediaItem = {
   costUsd: number;
   error: string | null;
   createdAt: string;
+  name?: string;
 };
 
 export type HiggsfieldStatus = {

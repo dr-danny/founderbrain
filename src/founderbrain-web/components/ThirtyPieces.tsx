@@ -55,7 +55,7 @@ export function ThirtyPieces({
     return (
       <div className="piece-studio">
         <p>The app writes the 30 pieces from your Brain. You do not set them up by hand.</p>
-        <MediaOptions pieces={[]} />
+        <MediaOptions posts={[]} />
         <button type="button" className="entry-cta" onClick={onGenerate} disabled={generating}>
           {generating ? "Writing the 30…" : "Generate my 30 pieces"}
         </button>
@@ -68,12 +68,12 @@ export function ThirtyPieces({
       <p>
         {shown.length} pieces. Like the ones that sound like you. Dislike the rest and say why, then regenerate those only.
       </p>
-      <MediaOptions pieces={shown.map((piece) => piece.n)} />
+      <MediaOptions posts={shown.map((piece) => ({ n: piece.n, text: piece.text }))} />
       <ol className="piece-list">
         {shown.map((piece) => (
           <li key={piece.n} className={marks[piece.n] ? `piece ${marks[piece.n]}` : "piece"}>
             <p>{piece.text}</p>
-            <PieceMedia n={piece.n} text={piece.text} />
+            <PieceMedia n={piece.n} text={piece.text} posts={shown.map((row) => ({ n: row.n, text: row.text }))} />
             <div className="piece-actions">
               <button type="button" className="typeform-external" onClick={() => setMarks({ ...marks, [piece.n]: "like" })}>
                 {marks[piece.n] === "like" ? "Liked" : "Like"}
