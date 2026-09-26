@@ -3075,5 +3075,33 @@ button.media-placeholder {
 }
 .media-post-pick small { display: block; color: var(--paper-muted); margin-top: 0.15rem; }
 .media-post-pick.current { border-color: var(--ember); background: rgba(224, 137, 74, 0.12); }
+.media-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-height: min(62vh, 34rem);
+  overflow: auto;
+  margin-top: 0.6rem;
+}
+.media-pick-tile {
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(247, 239, 230, 0.16);
+  background: transparent;
+  color: var(--paper);
+}
+.media-pick-tile img, .media-pick-fallback {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: rgba(247, 239, 230, 0.08);
+}
+.media-pick-fallback { display: grid; place-items: center; font-size: 0.85rem; }
+.media-pick-tile span { font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-pick-tile small { color: var(--paper-muted); font-size: 0.7rem; }
 .media-search { width: 100%; box-sizing: border-box; margin-top: 0.4rem; }
 .piece-attached { margin: 0.35rem 0 0.5rem; }
