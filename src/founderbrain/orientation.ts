@@ -6,14 +6,17 @@ import { readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { DomainError } from "./domain.ts";
 import type { PgBrainStore } from "./store.ts";
+import { openBlob, unwrapDataKey } from "../server/storage/crypto.ts";
 import {
   applyOrientationPatch,
   emptyOrientationState,
   orientationPatchSchema,
   orientationStateSchema,
+  OrientationWorkError,
   type OrientationPatch,
   type OrientationState,
 } from "../founderbrain-shared/orientation.ts";
+import { contentPackBlock } from "../founderbrain-shared/saturday-work.ts";
 
 type OrientationRow = {
   first_login_screen: number;
@@ -129,7 +132,61 @@ export async function writeOrientation(
       for update
     `;
     const current = existing[0] ? rowToState(existing[0]) : emptyOrientationState();
-    const next = applyOrientationPatch(current, patch);
+    if (patch.contentComplete) {
+      const art = await tx<{ accepted_sha: string | null; draft_sha: string }[]>`
+        select accepted_sha, draft_sha
+        from fb_artifact
+        where founder_id = ${workspaceId}
+        order by created_at desc
+        limit 1
+      `;
+      const sha = art[0]?.accepted_sha ?? art[0]?.draft_sha;
+      if (!sha) {
+        throw new DomainError(
+          422,
+          "saturday_incomplete",
+          "Generate the 30 pieces before finishing the content chapter.",
+        );
+      }
+      const blob = await tx<{ ciphertext: Uint8Array; nonce: Uint8Array; wrapped_key: Uint8Array }[]>`
+        select b.ciphertext, b.nonce, f.wrapped_key
+        from ge_blob b
+        join founder f on f.id = b.founder_id
+        where b.founder_id = ${workspaceId} and b.sha = ${sha}
+      `;
+      if (!blob[0]) {
+        throw new DomainError(
+          422,
+          "saturday_incomplete",
+          "The 30 pieces could not be read. Generate them again before finishing.",
+        );
+      }
+      const text = openBlob(
+        workspaceId,
+        unwrapDataKey(workspaceId, blob[0].wrapped_key),
+        sha,
+        blob[0].ciphertext,
+        blob[0].nonce,
+      ).toString("utf8");
+      const media = await tx<{ piece_n: number }[]>`
+        select piece_n from fb_media
+        where founder_id = ${workspaceId} and status = 'ready' and piece_n is not null
+      `;
+      const blocked = contentPackBlock(
+        text,
+        media.map((row) => row.piece_n),
+      );
+      if (blocked) throw new DomainError(422, "saturday_incomplete", blocked);
+    }
+    let next: OrientationState;
+    try {
+      next = applyOrientationPatch(current, patch);
+    } catch (err) {
+      if (err instanceof OrientationWorkError) {
+        throw new DomainError(422, "saturday_incomplete", err.message);
+      }
+      throw err;
+    }
 
     await tx`
       insert into fb_orientation (
