@@ -14,7 +14,7 @@ export function splitPack(text: string): PackSections {
   const outreach = /^##\s+Outreach\s*$/im.exec(text.slice(content ? content.index + content[0].length : 0));
   const outreachAt = outreach ? (content ? content.index + content[0].length : 0) + outreach.index : -1;
   const afterOutreach = outreachAt >= 0 ? outreachAt + outreach![0].length : content ? content.index + content[0].length : 0;
-  const plan = /^(?:#{1,6}\s*)?90[ -]day plan\s*$/im.exec(text.slice(afterOutreach));
+  const plan = /^(?:#{1,6}\s*)?90[ -]day(?:[ \t]+growth)?[ \t]+plan\s*$/im.exec(text.slice(afterOutreach));
   const planAt = plan ? afterOutreach + plan.index : -1;
   const cleanContent = (value: string) => value.trim().replace(/^(?:##\s+Content\s*\n\s*)+/i, "").trim();
   return {
