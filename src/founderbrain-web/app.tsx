@@ -291,6 +291,8 @@ export function App() {
         {accountChip}
         <ContentChapter
           orientation={orientation}
+          channels={draft.context.contentChannels}
+          onChannels={(next) => void app.patch("context", "contentChannels", next)}
           saving={orientationSaving}
           error={error}
           mediaApi={config.mediaEnabled ? app.api : null}
