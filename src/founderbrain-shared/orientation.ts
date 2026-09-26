@@ -3,7 +3,12 @@
  * Kept out of Brain markdown: server-side row only, read back after write.
  */
 import { z } from "zod";
-import { contentFieldBlock, OrientationWorkError, outreachFieldBlock } from "./saturday-work.ts";
+import {
+  contentFieldBlock,
+  OrientationWorkError,
+  outreachFieldBlock,
+  trackSetupReady,
+} from "./saturday-work.ts";
 
 export { OrientationWorkError };
 
@@ -193,7 +198,7 @@ export function atlantaReadyMap(
   orientation: OrientationState,
 ): AtlantaReadyMap {
   const brainThesis = readiness.identity && readiness.customer && readiness.offer;
-  const trackSetup = contentFieldBlock(orientation) === null;
+  const trackSetup = trackSetupReady(orientation);
   const artifacts: AtlantaArtifact[] = [
     {
       key: "brainThesis",
