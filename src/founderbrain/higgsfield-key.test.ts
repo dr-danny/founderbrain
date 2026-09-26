@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DomainError } from "./domain.ts";
-import { higgsfieldCredential } from "./higgsfield.ts";
+import { higgsfieldCredential, MODELS } from "./higgsfield.ts";
 
 test("accepts the single API key Higgsfield shows", () => {
   const parsed = higgsfieldCredential({
@@ -19,4 +19,15 @@ test("still accepts a previously split key id and secret", () => {
 
 test("rejects a key that is not the combined value", () => {
   assert.throws(() => higgsfieldCredential({ apiKey: "only-one-part" }), DomainError);
+});
+
+test("prices the documented Soul v2 image model", () => {
+  assert.equal(MODELS.image.path, "higgsfield-ai/soul/v2/standard");
+  assert.deepEqual(MODELS.image.body("A quiet storefront"), {
+    prompt: "A quiet storefront",
+    batch_size: 1,
+    resolution: "1080p",
+    aspect_ratio: "3:4",
+    enhance_prompt: true,
+  });
 });
