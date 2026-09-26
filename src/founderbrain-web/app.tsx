@@ -294,6 +294,13 @@ export function App() {
           saving={orientationSaving}
           error={error}
           mediaApi={config.mediaEnabled ? app.api : null}
+          instagramConnectEnabled={Boolean(config.instagramConnectEnabled)}
+          instagramConnected={app.instagram.connected}
+          instagramUsername={app.instagram.username}
+          instagramBusy={app.connecting}
+          onInstagramConnect={() => void app.startInstagram()}
+          onInstagramPull={() => void app.pullInstagram()}
+          onInstagramDisconnect={() => void app.disconnectInstagram()}
           artifactText={app.artifactText}
           generating={app.generating}
           revising={revising}

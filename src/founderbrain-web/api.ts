@@ -131,6 +131,35 @@ export class FounderBrainApi {
     return body as T;
   }
 
+  instagramStatus() {
+    return this.request<{ configured: boolean; connected: boolean; username: string | null }>(
+      "/instagram/status",
+    );
+  }
+  instagramStart() {
+    return this.request<{ url: string }>("/instagram/start");
+  }
+  instagramComplete(input: { code: string; state: string }) {
+    return this.request<{
+      configured: boolean;
+      connected: boolean;
+      username: string | null;
+      handle: "fill" | "same" | "keep";
+      orientation: OrientationState | null;
+    }>("/instagram/complete", { method: "POST", body: JSON.stringify(input) }, 45_000);
+  }
+  instagramPull() {
+    return this.request<{ saved: number; skipped: number; username: string }>(
+      "/instagram/pull",
+      { method: "POST", body: "{}" },
+      45_000,
+    );
+  }
+  instagramDisconnect() {
+    return this.request<{ disconnected: boolean; revoked: boolean }>("/instagram", {
+      method: "DELETE",
+    });
+  }
   gmailStatus() {
     return this.request<GmailStatus>("/gmail/status");
   }
