@@ -506,6 +506,54 @@ select:focus-visible {
   line-height: 1.2;
   letter-spacing: 0.02em;
 }
+.account-chip-min-btn {
+  position: absolute;
+  top: 0.28rem;
+  right: 0.32rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.account-chip-min-btn:hover {
+  color: var(--paper);
+  background: rgba(247, 239, 230, 0.08);
+}
+.account-chip-min {
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border-radius: 999px;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ember);
+}
+.account-chip-min .tipjar-coin {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.channel-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+.channel-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.channel-picked {
+  margin: 0;
+  color: var(--paper-muted);
+  font-size: 0.85rem;
+}
 @media (max-width: 40rem) {
   .account-chip-email {
     display: none;

@@ -2,7 +2,9 @@
  * First-output mission UI: generate, edit, reconcile, and accept an artifact.
  * AI-off mode shows a deterministic preview from the structured brain.
  */
+import { parseContentChannels } from "../../founderbrain-shared/channels.ts";
 import type { Artifact, Brain, Config } from "../types";
+import { ChannelPicker } from "./ChannelPicker";
 
 export function Output({
   config,
@@ -21,6 +23,8 @@ export function Output({
   onRetryGenerate,
   onReconcile,
   onAccept,
+  channels,
+  onChannels,
 }: {
   config: Config;
   brain: Brain;
@@ -38,7 +42,11 @@ export function Output({
   onRetryGenerate: () => void;
   onReconcile: () => void;
   onAccept: () => void;
+  channels: string;
+  onChannels: (next: string) => void;
 }) {
+  const channelCount = parseContentChannels(channels).length;
+  const picker = <ChannelPicker value={channels} disabled={generating} onChange={onChannels} />;
   if (!config.aiEnabled) {
     return (
       <div className="output-empty">
@@ -63,8 +71,9 @@ Voice: ${brain.voice.tone || "Not set"}`}</pre>
         <h2>Build the 90 day plan.</h2>
         <p>
           This reads the Brain you already saved, then writes the content, the outreach, and the
-          90 day plan in one pass. Gaps stay gaps. Nothing is sent.
+          90 day plan in one pass. The 30 pieces use only the channels you select.
         </p>
+        {picker}
         {jobNeedsReconcile && (
           <button className="button secondary" onClick={onReconcile}>
             Reconcile output
@@ -73,7 +82,7 @@ Voice: ${brain.voice.tone || "Not set"}`}</pre>
         <button
           className="button primary"
           onClick={generationRetry ? onRetryGenerate : onGenerate}
-          disabled={generating}
+          disabled={generating || channelCount === 0}
         >
           {generating ? "Building the plan…" : generationRetry ? "Retry the plan" : "Build the 90 day plan"}
         </button>
@@ -117,9 +126,12 @@ Voice: ${brain.voice.tone || "Not set"}`}</pre>
           </button>
         )}
         {stale && (
-          <button className="button secondary" onClick={onGenerate} disabled={generating}>
-            {generating ? "Checking job…" : "Generate replacement"}
-          </button>
+          <>
+            {picker}
+            <button className="button secondary" onClick={onGenerate} disabled={generating || channelCount === 0}>
+              {generating ? "Checking job…" : "Generate replacement"}
+            </button>
+          </>
         )}
         {!accepted && !stale && (
           <button className="button primary" onClick={onAccept} disabled={accepting}>

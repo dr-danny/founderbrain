@@ -179,6 +179,8 @@ function ScreenBody({
 
 export function ContentChapter({
   orientation,
+  channels,
+  onChannels,
   saving,
   error,
   onPatch,
@@ -190,6 +192,8 @@ export function ContentChapter({
   onRevise,
   mediaApi = null,
 }: ChapterProps & {
+  channels: string;
+  onChannels: (next: string) => void;
   mediaApi?: FounderBrainApi | null;
   artifactText?: string;
   generating?: boolean;
@@ -322,6 +326,8 @@ export function ContentChapter({
   const thirty = (
     <ThirtyPieces
       content={splitPack(artifactText).content}
+      channels={channels}
+      onChannels={onChannels}
       generating={generating}
       revising={revising}
       onGenerate={() => onGenerate?.()}
