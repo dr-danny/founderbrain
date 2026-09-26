@@ -3010,6 +3010,13 @@ button:not(.link-button) {
   border: 1px solid rgba(247, 239, 230, 0.12);
   background: rgba(18, 12, 20, 0.28);
 }
+.media-step { display: grid; gap: 0.55rem; margin-top: 0.85rem; }
+button.media-placeholder {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 .media-row img, .media-row video, .media-row .media-placeholder {
   width: 4.4rem;
   height: 5.5rem;
