@@ -143,7 +143,7 @@ const NO_MEDIA = new Set(["none", "n/a", "na", "text only", "no media", "not nee
 export function pieceAsksForMedia(text: string): boolean {
   const match = text.match(/(?:^|\n)\s*Media:\s*(.+)/i);
   if (!match) return false;
-  const value = match[1].trim().toLowerCase();
+  const value = (match[1] ?? "").trim().toLowerCase();
   return value.length > 0 && !NO_MEDIA.has(value);
 }
 
