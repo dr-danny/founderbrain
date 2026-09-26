@@ -3,6 +3,7 @@
  * jobs, and handlers. Presentation stays in app.tsx + ./components.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { parseContentChannels } from "../founderbrain-shared/channels.ts";
 import { ApiError, FounderBrainApi } from "./api";
 import { createHexclave, type HexclaveSession } from "./hexclave";
 import {
@@ -688,16 +689,32 @@ export function useFounderBrainApp() {
         const outcome = interpretJobStatus(job.status);
         if (outcome.kind === "completed" && job.artifact) {
           window.sessionStorage.removeItem(jobStorage);
+          const fresh = await api.brain();
+          if (epoch !== sessionEpoch.current) return;
+          setState(fresh);
           setArtifact(job.artifact);
           setArtifactText(job.artifact.text);
-          setArtifactStale(false);
+          const moved = job.artifact.sourceVersion !== fresh.version;
+          setArtifactStale(moved);
           setJobNeedsReconcile(false);
-          setNotice("A draft output is ready for review.");
+          setNotice(
+            moved
+              ? "Your Brain has updated to a new version. Rebuild before accepting."
+              : "A draft output is ready for review.",
+          );
           return;
         }
         if (outcome.kind === "failed") {
           window.sessionStorage.removeItem(jobStorage);
-          throw new Error(job.error ?? "Generation did not complete.");
+          jobOperation.current = null;
+          const message = job.error ?? "Generation did not complete.";
+          if (/brain changed|updated to a new version/i.test(message)) {
+            setArtifactStale(true);
+            setGenerationRetry(true);
+            setError("Your Brain has updated to a new version. Rebuild before accepting.");
+            return;
+          }
+          throw new Error(message);
         }
         if (outcome.kind === "uncertain") {
           window.sessionStorage.removeItem(jobStorage);
@@ -727,11 +744,18 @@ export function useFounderBrainApp() {
 
   async function generate() {
     if (!api || !state || !config?.aiEnabled || generating) return;
+    if (!parseContentChannels(state.brain.context.contentChannels).length) {
+      setError(
+        "Select the channels this pack is for before generating. Choose at least one of Instagram, Facebook, LinkedIn, Reddit, TikTok, YouTube, or Threads.",
+      );
+      setGenerationRetry(false);
+      return;
+    }
     const epoch = sessionEpoch.current;
-    const operation = jobOperation.current ?? {
-      expectedVersion: state.version,
-      key: crypto.randomUUID(),
-    };
+    const operation =
+      jobOperation.current && jobOperation.current.expectedVersion === state.version
+        ? jobOperation.current
+        : { expectedVersion: state.version, key: crypto.randomUUID() };
     jobOperation.current = operation;
     setGenerating(true);
     setGenerationRetry(false);
@@ -774,7 +798,10 @@ export function useFounderBrainApp() {
         await pollJob(activeJob.jobId, epoch);
         return;
       }
-      if (err instanceof ApiError && err.code === "version_conflict") {
+      if (
+        err instanceof ApiError &&
+        (err.code === "version_conflict" || err.code === "idempotency_conflict")
+      ) {
         try {
           const fresh = await api.brain();
           if (epoch !== sessionEpoch.current) return;
@@ -786,7 +813,14 @@ export function useFounderBrainApp() {
           await pollJob(start.id, epoch);
           return;
         } catch (retryErr) {
-          setError(friendlyError(retryErr));
+          jobOperation.current = null;
+          setArtifactStale(true);
+          setError(
+            retryErr instanceof ApiError &&
+              (retryErr.code === "version_conflict" || retryErr.code === "idempotency_conflict")
+              ? "Your Brain has updated to a new version. Rebuild before accepting."
+              : friendlyError(retryErr),
+          );
           setGenerationRetry(true);
           setGenerating(false);
           return;
@@ -858,9 +892,21 @@ export function useFounderBrainApp() {
       );
     } catch (err) {
       if (epoch === sessionEpoch.current) {
-        setError(friendlyError(err));
-        setAcceptRetry(true);
-        setNotice("Acceptance outcome is unresolved. Retry uses the same request key.");
+        if (
+          err instanceof ApiError &&
+          (err.code === "stale_proposal" || err.code === "version_conflict")
+        ) {
+          acceptOperation.current = null;
+          setAcceptRetry(false);
+          setArtifactStale(true);
+          setGenerationRetry(true);
+          setError("Your Brain has updated to a new version. Rebuild before accepting.");
+          setNotice("");
+        } else {
+          setError(friendlyError(err));
+          setAcceptRetry(true);
+          setNotice("Acceptance outcome is unresolved. Retry uses the same request key.");
+        }
       }
     } finally {
       if (epoch === sessionEpoch.current) setAccepting(false);
