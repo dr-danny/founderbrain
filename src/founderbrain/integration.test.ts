@@ -634,6 +634,39 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
     },
   );
   it(
+    "rejects a content revision with no saved pack yet before any provider call",
+    { skip },
+    async () => {
+      // Preflight (duplicate/unknown-piece/no-artifact checks) must run
+      // before revisePieces() ever calls the paid model. A fresh workspace
+      // has no fb_artifact row at all, so this is the cheapest way to prove
+      // the refusal happens first: there is nothing further along in the
+      // pipeline (a real pack, a real duplicate) required to trigger it.
+      await workspace("regen-no-artifact");
+      const previous = provider;
+      let providerCalls = 0;
+      provider = async (...args) => {
+        providerCalls += 1;
+        return previous(...args);
+      };
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/content/regenerate",
+          headers: headers("regen-no-artifact"),
+          payload: {
+            pieces: [{ n: 1, text: "Sandbox current text for piece one.", feedback: "Make it punchier." }],
+          },
+        });
+        assert.equal(res.statusCode, 422);
+        assert.equal(res.json().error, "no_artifact");
+        assert.equal(providerCalls, 0, "the model must never be called when there is no pack to revise");
+      } finally {
+        provider = previous;
+      }
+    },
+  );
+  it(
     "persists first-login orientation with readback, resume, and skip on return",
     { skip },
     async () => {

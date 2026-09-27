@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { parseContentChannels } from "../../founderbrain-shared/channels.ts";
+import { ApiError } from "../api";
+import { jumpToNextMissingIndex } from "../lib/piece-navigation";
 import { parsePieces, type ContentPiece } from "../pack";
 import { ChannelPicker } from "./ChannelPicker";
 import { MediaOptions, PieceMedia } from "./Media";
@@ -14,6 +16,7 @@ export function ThirtyPieces({
   revising,
   onGenerate,
   onRevise,
+  missingMedia = [],
 }: {
   content: string;
   channels: string;
@@ -22,6 +25,8 @@ export function ThirtyPieces({
   revising: boolean;
   onGenerate: () => void;
   onRevise: (pieces: Array<{ n: number; text: string; feedback: string }>) => Promise<ContentPiece[]>;
+  /** Piece numbers that ask for media and have none attached yet. */
+  missingMedia?: number[];
 }) {
   const parsed = useMemo(() => parsePieces(content), [content]);
   const [pieces, setPieces] = useState<ContentPiece[]>(parsed);
@@ -35,6 +40,13 @@ export function ThirtyPieces({
   const piece = shown[place];
   const posts = shown.map((row) => ({ n: row.n, text: row.text }));
   const channelCount = parseContentChannels(channels).length;
+  const missingHere = missingMedia.includes(piece?.n ?? -1);
+
+  function goToMissingMedia() {
+    if (!piece) return;
+    const target = jumpToNextMissingIndex(shown, piece.n, missingMedia);
+    if (target !== null) setIndex(target);
+  }
   const picker = (
     <ChannelPicker value={channels} disabled={generating || revising} onChange={onChannels} />
   );
@@ -60,8 +72,8 @@ export function ThirtyPieces({
         for (const piece of next) copy[piece.n] = "";
         return copy;
       });
-    } catch {
-      setLocalError("Could not rewrite those pieces. Try again.");
+    } catch (err) {
+      setLocalError(err instanceof ApiError ? err.message : "Could not rewrite those pieces. Try again.");
     }
   }
 
@@ -85,6 +97,18 @@ export function ThirtyPieces({
       <p>
         Piece {place + 1} of {shown.length}. One piece at a time. Like the ones that sound like you. Dislike the rest and say why, then regenerate those only.
       </p>
+      {missingMedia.length ? (
+        <div className="piece-media-gate" role="status">
+          <p className="entry-lede typeform-lede">
+            {missingMedia.length} piece{missingMedia.length === 1 ? "" : "s"} still need media:{" "}
+            {missingMedia.slice(0, 8).join(", ")}
+            {missingMedia.length > 8 ? `, and ${missingMedia.length - 8} more` : ""}.
+          </p>
+          <button type="button" className="typeform-external" onClick={goToMissingMedia}>
+            {missingHere ? "Go to the next piece missing media" : "Go to a piece missing media"}
+          </button>
+        </div>
+      ) : null}
       {picker}
       <MediaOptions posts={posts} />
       <article className={marks[piece.n] ? `piece ${marks[piece.n]}` : "piece"}>

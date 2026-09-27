@@ -149,18 +149,28 @@ export function contentSection(pack: string): string {
   return (outreach ? rest.slice(0, outreach.index) : rest).trim();
 }
 
-export function parseContentPieces(content: string): ContentPiece[] {
-  const text = "\n" + contentSection(content).trim();
-  if (text.trim() === "") return [];
+/**
+ * Same split as `parseContentPieces`, but also returns whatever came before
+ * the first numbered piece (e.g. the 'Pillars: A; B; C; D' line orchestrate.ts
+ * writes). A revision that serializes pieces back into the pack must not
+ * silently drop that preamble.
+ */
+export function splitContentSection(pack: string): { preamble: string; pieces: ContentPiece[] } {
+  const text = "\n" + contentSection(pack).trim();
+  if (text.trim() === "") return { preamble: "", pieces: [] };
   const splitter = HEADER_SPLIT.test(text) ? HEADER_SPLIT : PLAIN_SPLIT;
   const chunks = text.split(splitter);
-  if (chunks.length && !/^\s*\d+\.\s/.test(chunks[0] ?? "")) chunks.shift();
+  const preamble = /^\s*\d+\.\s/.test(chunks[0] ?? "") ? "" : (chunks.shift() ?? "").trim();
   const pieces: ContentPiece[] = [];
   for (const chunk of chunks) {
     const match = chunk.trim().match(/^(\d+)\.\s*([\s\S]*)$/);
     if (match) pieces.push({ n: Number(match[1]), text: (match[2] ?? "").trim() });
   }
-  return pieces.sort((a, b) => a.n - b.n);
+  return { preamble, pieces: pieces.sort((a, b) => a.n - b.n) };
+}
+
+export function parseContentPieces(content: string): ContentPiece[] {
+  return splitContentSection(content).pieces;
 }
 
 const NO_MEDIA = new Set(["none", "n/a", "na", "text only", "no media", "not needed"]);
@@ -187,6 +197,124 @@ export function piecesMissingMedia(
   return pieces
     .filter((piece) => pieceAsksForMedia(piece.text) && !ready.has(piece.n))
     .map((piece) => piece.n);
+}
+
+/**
+ * A saved file count is not the same thing as piece coverage: two files can
+ * land on the same piece (leaving another piece with none), so "49 saved"
+ * and "29 pieces covered" are both true and both need to be shown. Never
+ * collapse this into a single number.
+ */
+export type PieceCoverage = {
+  /** Saved (ready) files that are attached to any piece. Counts duplicates. */
+  attachedCount: number;
+  /** Distinct piece numbers with at least one attached file. */
+  coveredCount: number;
+  /** Attached rows beyond the first one landing on the same piece. */
+  duplicateCount: number;
+  /** The piece numbers that have more than one file attached. */
+  duplicatePieces: number[];
+};
+
+export function pieceCoverage(pieceNumbers: Iterable<number | null | undefined>): PieceCoverage {
+  let attachedCount = 0;
+  const counts = new Map<number, number>();
+  for (const n of pieceNumbers) {
+    if (typeof n !== "number") continue;
+    attachedCount += 1;
+    counts.set(n, (counts.get(n) ?? 0) + 1);
+  }
+  const duplicatePieces = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([n]) => n)
+    .sort((a, b) => a - b);
+  const coveredCount = counts.size;
+  return {
+    attachedCount,
+    coveredCount,
+    duplicateCount: attachedCount - coveredCount,
+    duplicatePieces,
+  };
+}
+
+/**
+ * Piece numbers that show up more than once in a parsed piece list. A pack
+ * with any duplicate is not safe to patch by number: which occurrence is
+ * "piece 3" is ambiguous, and a blind replace would silently keep one copy
+ * and throw the other away.
+ */
+export function duplicatePieceNumbers(pieces: ContentPiece[]): number[] {
+  const counts = new Map<number, number>();
+  for (const piece of pieces) counts.set(piece.n, (counts.get(piece.n) ?? 0) + 1);
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([n]) => n)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * New packs mark every piece with a header line 'N. Pillar · Format ·
+ * Platform'. `splitContentSection`/`parseContentPieces` use the '·' on that
+ * first line to find piece boundaries. A rewritten piece that drops it is
+ * invisible as a boundary, so the piece before it silently swallows it.
+ */
+export function hasStructuredHeading(text: string): boolean {
+  return /·/.test((text.split("\n")[0] ?? ""));
+}
+
+/**
+ * Force the original piece's own heading (pillar · format · platform) onto
+ * a revised body, discarding whatever heading-like first line the model
+ * produced. This is unconditional, not a fallback for a missing heading:
+ * the model is asked to keep the header unchanged, but a malformed or
+ * drifted reply (wrong platform, reworded pillar, or no heading at all)
+ * must never be allowed to move a piece's channel or break the pack's own
+ * piece-boundary splitter. If the original never had a heading, the
+ * revision is returned as-is -- there is nothing canonical to enforce.
+ */
+export function enforceCanonicalHeading(revisedText: string, originalText: string): string {
+  const originalHeading = (originalText.split("\n")[0] ?? "").trim();
+  if (!hasStructuredHeading(originalHeading)) return revisedText;
+  const lines = revisedText.split("\n");
+  // The model may have written its own (possibly wrong) heading-like first
+  // line; drop it so the canonical heading is not stacked on top of it.
+  const body = hasStructuredHeading(lines[0] ?? "") ? lines.slice(1).join("\n") : revisedText;
+  return `${originalHeading}\n${body.trimStart()}`;
+}
+
+/** Serialize pieces back into the '## Content' section's own numbered-list shape. */
+export function piecesToContentText(pieces: ContentPiece[]): string {
+  return pieces.map((piece) => `${piece.n}. ${piece.text}`).join("\n\n");
+}
+
+/**
+ * Serialize a content section including whatever preamble (e.g. the
+ * 'Pillars: A; B; C; D' line) preceded the numbered pieces, so a revision
+ * that only touches a piece or two does not silently erase it.
+ */
+export function serializeContentSection(preamble: string, pieces: ContentPiece[]): string {
+  const body = piecesToContentText(pieces);
+  return preamble.trim() ? `${preamble.trim()}\n\n${body}` : body;
+}
+
+/**
+ * Splice fresh content-section text into a full pack without touching
+ * anything before '## Content' or at/after '## Outreach' -- outreach's own
+ * numbered touches and lists must never be reached by a content-piece edit.
+ * Returns the pack unchanged if it has no '## Content' heading to bound the
+ * edit to.
+ */
+export function replaceContentSection(pack: string, newContentText: string): string {
+  const content = /^##\s+Content\s*$/im.exec(pack);
+  if (!content) return pack;
+  const afterHeading = content.index + content[0].length;
+  const rest = pack.slice(afterHeading);
+  const outreach = /^##\s+Outreach\s*$/im.exec(rest);
+  const sectionEnd = outreach ? afterHeading + outreach.index : pack.length;
+  const before = pack.slice(0, afterHeading).trimEnd();
+  const after = pack.slice(sectionEnd);
+  const body = newContentText.trim();
+  return after ? `${before}\n\n${body}\n\n${after.trimStart()}` : `${before}\n\n${body}`;
 }
 
 function listTail(values: number[]): string {

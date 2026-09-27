@@ -332,6 +332,7 @@ export function ContentChapter({
       revising={revising}
       onGenerate={() => onGenerate?.()}
       onRevise={async (pieces) => (await onRevise?.(pieces)) ?? []}
+      missingMedia={pieceGate.missingMedia}
     />
   );
 
