@@ -572,7 +572,9 @@ class BrowserAuthTests(unittest.TestCase):
 
     def _assert_no_auth_or_api_traffic(self, seen):
         backend = [u for u in seen if u.startswith(self.origin + "/api")]
-        auth = [u for u in seen if AUTH_ORIGIN in u or "hexclave" in u]
+        # Vite module URLs can contain "hexclave" without contacting the auth service.
+        # Count actual auth-origin traffic, not same-origin JavaScript imports.
+        auth = [u for u in seen if u.startswith(AUTH_ORIGIN + "/")]
         self.assertEqual(backend, [], "a public recovery screen must never call the API")
         self.assertEqual(auth, [], "a public recovery screen must never touch Hexclave auth")
         self.assertEqual(self.auth_requests, [], "no cross-origin auth traffic should start at all")
