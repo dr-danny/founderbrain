@@ -127,6 +127,10 @@ const full = (): Brain => {
     customersNow: "12",
     avgMonthlyValue: "400",
     target90: "25 monthly orders",
+    // Explicit since PR132: generation now rejects with `channels_required`
+    // when no channel is selected. Fixtures must pick real channels rather
+    // than rely on any implicit default.
+    contentChannels: "LinkedIn\nInstagram",
     approved: true,
   };
   return b;
@@ -560,6 +564,72 @@ describe("FounderBrain API, durable jobs and failure regressions", () => {
         assert.equal((await db`select * from fb_budget where scope<>'global'`).length, 0);
       } finally {
         await db.end();
+      }
+    },
+  );
+  it(
+    "rejects generation with no channels selected before any provider call, then enqueues with the correct source version once channels are explicitly saved",
+    { skip },
+    async () => {
+      const id = await workspace("channels-gate");
+      const previous = provider;
+      let providerCalls = 0;
+      provider = async (...args) => {
+        providerCalls += 1;
+        return previous(...args);
+      };
+      try {
+        const noChannels = full();
+        noChannels.context.contentChannels = "";
+        const saved = await store.commit(id, noChannels, 0, "channels-gate-no-channels");
+        assert.equal(saved.version, 1);
+        await assert.rejects(jobs.enqueue(id, 1, "channels-gate-blocked-key"), {
+          code: "channels_required",
+        });
+        assert.equal(providerCalls, 0, "provider must never be called when channels are missing");
+        assert.equal(
+          (
+            await store.scoped(
+              id,
+              (tx) => tx`select * from fb_ai_job where founder_id = ${id}`,
+            )
+          ).length,
+          0,
+          "no job row is created for a rejected, channel-less enqueue",
+        );
+        const withChannels = full();
+        withChannels.identity.goal = "Channels now selected";
+        withChannels.context.contentChannels = "Reddit\nYouTube";
+        const savedWithChannels = await store.commit(
+          id,
+          withChannels,
+          1,
+          "channels-gate-with-channels",
+        );
+        assert.equal(savedWithChannels.version, 2);
+        const job = await jobs.enqueue(id, 2, "channels-gate-allowed-key");
+        assert.equal(job.status, "queued");
+        assert.equal(providerCalls, 0, "enqueue itself must still not call the provider");
+        const jobRow = await store.scoped(
+          id,
+          (tx) =>
+            tx`select id, status, source_version from fb_ai_job where founder_id = ${id} and id = ${job.id}`,
+        );
+        assert.equal(jobRow.length, 1, "exactly one job row is enqueued once channels are saved");
+        assert.equal(jobRow[0]?.status, "queued");
+        assert.equal(
+          Number(jobRow[0]?.source_version),
+          savedWithChannels.version,
+          "job is fenced to the source version that carried the explicit channels",
+        );
+        const dispatchRow = await store.scoped(
+          id,
+          (tx) => tx`select status from fb_job_dispatch where job_id = ${job.id}`,
+        );
+        assert.equal(dispatchRow.length, 1);
+        assert.equal(dispatchRow[0]?.status, "queued");
+      } finally {
+        provider = previous;
       }
     },
   );
