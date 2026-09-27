@@ -30,6 +30,17 @@ export type RoutineDraftRow = {
   createdAt: string;
 };
 import type { OrientationPatch, OrientationState } from "../founderbrain-shared/orientation";
+import type {
+  GhlBookingLinkInput,
+  GhlBookingLinkResult,
+  GhlBookingLinks,
+  GhlConnectionStatus,
+  GhlPushResult,
+} from "../founderbrain-shared/ghl";
+
+export type GhlConnectionMutationResult = GhlConnectionStatus & {
+  orientation: OrientationState;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -229,7 +240,7 @@ export class FounderBrainApi {
     });
   }
   oauthStatus() {
-    return this.request<{ connected: boolean; locationId: string | null }>("/oauth/status");
+    return this.request<GhlConnectionStatus>("/oauth/status");
   }
   usage() {
     return this.request<UsageResponse>("/usage");
@@ -293,15 +304,26 @@ export class FounderBrainApi {
   deleteVoiceSample(id: string) {
     return this.request<{ count: number }>(`/voice-samples/${id}`, { method: "DELETE" }, 15_000);
   }
-  ghlPush(pack?: string) {
-    return this.request<{
-      snapshot: string;
-      firstPack: string;
-      pushed: string[];
-      skipped: string[];
-      proven: boolean;
-      clinicPaste: string[];
-    }>("/ghl/push", { method: "POST", body: JSON.stringify(pack ? { pack } : {}) }, 60_000);
+  ghlBookingLinks(connectionId: string) {
+    return this.request<GhlBookingLinks>(
+      `/ghl/booking-links?connectionId=${encodeURIComponent(connectionId)}`,
+    );
+  }
+  saveGhlBookingLink(input: GhlBookingLinkInput) {
+    return this.request<GhlBookingLinkResult>("/ghl/booking-links", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+  ghlPush(connectionId: string, pack?: string) {
+    return this.request<GhlPushResult>(
+      "/ghl/push",
+      {
+        method: "POST",
+        body: JSON.stringify(pack ? { connectionId, pack } : { connectionId }),
+      },
+      60_000,
+    );
   }
   transcribeVoice(audio: { audioBase64: string; mime: string; seconds: number }) {
     return this.request<{ text: string }>(
@@ -310,16 +332,26 @@ export class FounderBrainApi {
       45_000,
     );
   }
-  completeOauth(body: { code: string; state: string }) {
-    return this.request<{
-      connected: boolean;
-      locationId: string | null;
-      orientation?: OrientationState;
-    }>(
+  completeOauth(
+    body:
+      | { code: string; state: string; error?: never }
+      | { error: string; state: string; code?: never },
+  ) {
+    return this.request<GhlConnectionMutationResult>(
       "/oauth/complete",
       {
         method: "POST",
         body: JSON.stringify(body),
+      },
+      30_000,
+    );
+  }
+  disconnectOauth(connectionId: string) {
+    return this.request<GhlConnectionMutationResult>(
+      "/oauth/connection",
+      {
+        method: "DELETE",
+        body: JSON.stringify({ connectionId, confirmed: true }),
       },
       30_000,
     );

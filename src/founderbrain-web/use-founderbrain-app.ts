@@ -4,6 +4,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, FounderBrainApi } from "./api";
+import type {
+  GhlBookingLinkInput,
+  GhlBookingLinkKey,
+  GhlBookingLinkResult,
+  GhlBookingLinks,
+  GhlConnectionStatus,
+  GhlPushResult,
+} from "../founderbrain-shared/ghl";
 import { createHexclave, type HexclaveSession } from "./hexclave";
 import {
   emptyBrain,
@@ -27,6 +35,11 @@ import {
 } from "./lib/brain-draft";
 import { prepareGenerateJob, runExclusive, type LockRef } from "./lib/generate-job";
 import {
+  captureGhlAsyncGuard,
+  isGhlAsyncGuardCurrent,
+  type GhlAsyncEpochs,
+} from "./lib/ghl-async-guard";
+import {
   JOB_POLL_DEADLINE_MS,
   JOB_POLL_INITIAL_WAIT_MS,
   interpretJobStatus,
@@ -40,7 +53,6 @@ import { type View } from "./components/MissionRail";
 import {
   emptyOrientationState,
   isFirstLoginComplete,
-  GHL_CHAPTER_SCREENS,
   type OrientationPatch,
   type OrientationState,
 } from "../founderbrain-shared/orientation";
@@ -60,7 +72,19 @@ export function useFounderBrainApp() {
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [view, setView] = useState<View>(() => window.location.pathname === "/gmail/callback" ? "gmail" : "atlanta");
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [ghlConnection, setGhlConnection] = useState<GhlConnectionStatus | null>(null);
+  const [ghlStatusVerified, setGhlStatusVerified] = useState(false);
+  const [ghlStatusLoading, setGhlStatusLoading] = useState(false);
+  const [ghlStatusError, setGhlStatusError] = useState("");
+  const [ghlConnectionGeneration, setGhlConnectionGeneration] = useState(0);
+  const [ghlBookingLinks, setGhlBookingLinks] = useState<GhlBookingLinks | null>(null);
+  const [ghlBookingLoading, setGhlBookingLoading] = useState(false);
+  const [ghlBookingError, setGhlBookingError] = useState("");
+  const [ghlLinkSavingKey, setGhlLinkSavingKey] = useState<GhlBookingLinkKey | null>(null);
+  const [view, setView] = useState<View>(() =>
+    window.location.pathname === "/gmail/callback" ? "gmail" : "atlanta",
+  );
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,7 +111,18 @@ export function useFounderBrainApp() {
   const [deleteText, setDeleteText] = useState("");
   const latestDraft = useRef(draft);
   const sessionEpoch = useRef(0);
+  const workspaceEpoch = useRef(0);
+  const workspaceIdentity = useRef<string | null>(null);
+  const connectionGeneration = useRef(0);
+  const ghlConnectionRef = useRef<GhlConnectionStatus | null>(null);
+  const ghlStatusVerifiedRef = useRef(false);
   const oauthHandled = useRef(false);
+  const statusOperation = useRef<symbol | null>(null);
+  const connectOperation = useRef<symbol | null>(null);
+  const disconnectOperation = useRef<symbol | null>(null);
+  const pushOperation = useRef<symbol | null>(null);
+  const bookingLoadOperation = useRef<symbol | null>(null);
+  const bookingWriteOperation = useRef<symbol | null>(null);
   // Bumped around Connect writes so an in-flight workspace GET cannot put the
   // old "not connected" orientation back on screen after OAuth succeeds.
   const orientationEpoch = useRef(0);
@@ -118,8 +153,69 @@ export function useFounderBrainApp() {
       : "Something went wrong. Your draft has not been discarded.";
   };
   const jobStorage = PENDING_JOB_STORAGE_KEY;
+  const currentGhlEpochs = (): GhlAsyncEpochs => ({
+    session: sessionEpoch.current,
+    workspace: workspaceEpoch.current,
+    connection: connectionGeneration.current,
+  });
+  const captureGhlGuard = () => captureGhlAsyncGuard(currentGhlEpochs());
+  const ghlGuardCurrent = (
+    guard: GhlAsyncEpochs,
+    scope: "workspace" | "connection" = "connection",
+  ) => isGhlAsyncGuardCurrent(guard, currentGhlEpochs(), scope);
+  const resetGhlLinks = () => {
+    setGhlBookingLinks(null);
+    setGhlBookingLoading(false);
+    setGhlBookingError("");
+    setGhlLinkSavingKey(null);
+  };
+  const bumpConnectionGeneration = () => {
+    connectionGeneration.current += 1;
+    setGhlConnectionGeneration(connectionGeneration.current);
+    resetGhlLinks();
+  };
+  const connectionIdentity = (status: GhlConnectionStatus | null) =>
+    status?.connected ? `${status.connectionId ?? ""}:${status.locationId ?? ""}` : "disconnected";
+  const applyGhlConnection = (status: GhlConnectionStatus, guard: GhlAsyncEpochs): boolean => {
+    if (!ghlGuardCurrent(guard)) return false;
+    if (connectionIdentity(ghlConnectionRef.current) !== connectionIdentity(status)) {
+      bumpConnectionGeneration();
+      pushOperation.current = null;
+      bookingLoadOperation.current = null;
+      bookingWriteOperation.current = null;
+    }
+    ghlConnectionRef.current = status;
+    ghlStatusVerifiedRef.current = true;
+    setGhlConnection(status);
+    setGhlStatusVerified(true);
+    setGhlStatusError("");
+    return true;
+  };
+  const invalidateGhlIdentity = () => {
+    bumpConnectionGeneration();
+    pushOperation.current = null;
+    bookingLoadOperation.current = null;
+    bookingWriteOperation.current = null;
+    ghlStatusVerifiedRef.current = false;
+    setGhlStatusVerified(false);
+    setGhlStatusError(
+      "The GoHighLevel connection changed during that request. Refresh status before writing again.",
+    );
+  };
   const clearPrivate = () => {
     sessionEpoch.current += 1;
+    workspaceEpoch.current += 1;
+    workspaceIdentity.current = null;
+    connectionGeneration.current += 1;
+    setGhlConnectionGeneration(connectionGeneration.current);
+    ghlConnectionRef.current = null;
+    ghlStatusVerifiedRef.current = false;
+    statusOperation.current = null;
+    connectOperation.current = null;
+    disconnectOperation.current = null;
+    pushOperation.current = null;
+    bookingLoadOperation.current = null;
+    bookingWriteOperation.current = null;
     saveOperation.current = null;
     jobOperation.current = null;
     acceptOperation.current = null;
@@ -127,6 +223,13 @@ export function useFounderBrainApp() {
     setState(null);
     setOrientation(null);
     setOrientationSaving(false);
+    setConnecting(false);
+    setDisconnecting(false);
+    setGhlConnection(null);
+    setGhlStatusVerified(false);
+    setGhlStatusLoading(false);
+    setGhlStatusError("");
+    resetGhlLinks();
     latestDraft.current = emptyBrain();
     setDraft(latestDraft.current);
     setChanged(false);
@@ -181,6 +284,16 @@ export function useFounderBrainApp() {
       try {
         const me = await api.me();
         if (epoch !== sessionEpoch.current) return;
+        if (workspaceIdentity.current !== me.email) {
+          workspaceIdentity.current = me.email;
+          workspaceEpoch.current += 1;
+          bumpConnectionGeneration();
+          ghlConnectionRef.current = null;
+          ghlStatusVerifiedRef.current = false;
+          setGhlConnection(null);
+          setGhlStatusVerified(false);
+          setGhlStatusError("");
+        }
         setEmail(me.email);
         setSessionExpired(false);
       } catch (err) {
@@ -224,6 +337,7 @@ export function useFounderBrainApp() {
   async function loadWorkspace() {
     if (!api) return;
     const epoch = sessionEpoch.current;
+    const workspace = workspaceEpoch.current;
     const epochOrientation = orientationEpoch.current;
     setError("");
     try {
@@ -235,7 +349,7 @@ export function useFounderBrainApp() {
         if (!(err instanceof ApiError && (err.status === 404 || err.status === 503))) throw err;
         nextOrientation = emptyOrientationState();
       }
-      if (epoch !== sessionEpoch.current) return;
+      if (epoch !== sessionEpoch.current || workspace !== workspaceEpoch.current) return;
       setState(nextState);
       if (orientationEpoch.current === epochOrientation) setOrientation(nextOrientation);
       latestDraft.current = nextState.brain;
@@ -248,7 +362,8 @@ export function useFounderBrainApp() {
       if (pendingJob) void pollJob(pendingJob, epoch);
       if (nextOrientation.ghlAnswers.connected !== true) void healGhlConnection();
     } catch (err) {
-      if (epoch === sessionEpoch.current) setError(friendlyError(err));
+      if (epoch === sessionEpoch.current && workspace === workspaceEpoch.current)
+        setError(friendlyError(err));
     }
   }
 
@@ -275,22 +390,50 @@ export function useFounderBrainApp() {
     }
   }
 
-  /** CRM row exists but the chapter flag does not. Heal it instead of sending them through OAuth again. */
-  async function healGhlConnection() {
-    if (!api) return;
+  async function refreshGhlStatus(options: { announce?: boolean } = {}) {
+    if (!api || statusOperation.current) return null;
+    const operation = Symbol("ghl-status");
+    statusOperation.current = operation;
+    const guard = captureGhlGuard();
+    ghlStatusVerifiedRef.current = false;
+    setGhlStatusVerified(false);
+    setGhlStatusLoading(true);
+    setGhlStatusError("");
     try {
       const status = await api.oauthStatus();
-      if (!status.connected) return;
-      await saveOrientation({
-        ghlScreen: GHL_CHAPTER_SCREENS,
-        ghlComplete: true,
-        ghlAnswers: { connected: true },
-      });
-      setNotice("GoHighLevel is already connected.");
+      if (!applyGhlConnection(status, guard)) return null;
+      if (options.announce) {
+        setNotice(
+          status.connected
+            ? "GoHighLevel connection refreshed."
+            : "No GoHighLevel subaccount is connected.",
+        );
+      }
+      return status;
     } catch {
-      // A failed status check must not block the hub. Connect can retry.
+      if (ghlGuardCurrent(guard, "workspace")) {
+        setGhlStatusError(
+          "FounderBrain could not verify the connected GoHighLevel subaccount. Your saved work is still here. Refresh status to enable external writes.",
+        );
+      }
+      return null;
+    } finally {
+      if (statusOperation.current === operation) {
+        statusOperation.current = null;
+        if (ghlGuardCurrent(guard, "workspace")) setGhlStatusLoading(false);
+      }
     }
   }
+
+  /** Read-only healing: live CRM state can correct the screen, but never writes stale orientation. */
+  async function healGhlConnection() {
+    const status = await refreshGhlStatus();
+    if (status?.connected) setNotice("GoHighLevel is already connected.");
+  }
+
+  useEffect(() => {
+    if (api && email && view === "ghl") void refreshGhlStatus();
+  }, [api, email, view]);
 
   useEffect(() => {
     if (!api || !email || oauthHandled.current) return;
@@ -299,57 +442,80 @@ export function useFounderBrainApp() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const oauthState = params.get("state");
-    const denied = params.get("error");
+    const denied = params.has("error")
+      ? (params.get("error") || "access_denied").slice(0, 200)
+      : null;
     window.history.replaceState({}, "", "/");
     setView("ghl");
-    if (denied || !code || !oauthState) {
+    if (!oauthState || (!denied && !code)) {
       setError("GoHighLevel Connect did not finish. Try Connect again.");
       return;
     }
-    orientationEpoch.current += 1;
+    if (!denied) {
+      bumpConnectionGeneration();
+      ghlStatusVerifiedRef.current = false;
+      setGhlStatusVerified(false);
+      orientationEpoch.current += 1;
+    }
+    const guard = captureGhlGuard();
+    const operation = Symbol("ghl-connect-callback");
+    connectOperation.current = operation;
     setConnecting(true);
+    setError("");
     void (async () => {
       try {
-        const completed = await api.completeOauth({ code, state: oauthState });
-        orientationEpoch.current += 1;
-        if (completed.orientation) setOrientation(completed.orientation);
-        else {
-          await saveOrientation({
-            ghlScreen: GHL_CHAPTER_SCREENS,
-            ghlComplete: true,
-            ghlAnswers: { connected: true },
-          });
+        if (denied) {
+          await api.completeOauth({ error: denied, state: oauthState });
+          if (ghlGuardCurrent(guard)) {
+            setError("GoHighLevel Connect was cancelled. Start Connect again when you are ready.");
+          }
+          return;
         }
+        const completed = await api.completeOauth({ code: code!, state: oauthState });
+        if (!ghlGuardCurrent(guard)) return;
+        if (!applyGhlConnection(completed, guard)) return;
+        orientationEpoch.current += 1;
+        setOrientation(completed.orientation);
         setNotice("GoHighLevel connected.");
       } catch (err) {
-        setError(friendlyError(err));
+        if (ghlGuardCurrent(guard)) setError(friendlyError(err));
       } finally {
-        setConnecting(false);
+        if (connectOperation.current === operation) {
+          connectOperation.current = null;
+          if (ghlGuardCurrent(guard, "workspace")) setConnecting(false);
+        }
       }
     })();
   }, [api, email]);
 
   async function startConnect() {
-    if (!api) throw new Error("api_unavailable");
+    if (!api || connectOperation.current || disconnectOperation.current) return;
+    const operation = Symbol("ghl-connect");
+    connectOperation.current = operation;
+    let guard = captureGhlGuard();
+    ghlStatusVerifiedRef.current = false;
+    setGhlStatusVerified(false);
     setConnecting(true);
     setError("");
     try {
       const status = await api.oauthStatus();
+      if (!applyGhlConnection(status, guard)) return;
       if (status.connected) {
-        await saveOrientation({
-          ghlScreen: GHL_CHAPTER_SCREENS,
-          ghlComplete: true,
-          ghlAnswers: { connected: true },
-        });
         setNotice("GoHighLevel is already connected.");
-        setConnecting(false);
         return;
       }
+      bumpConnectionGeneration();
+      guard = captureGhlGuard();
       const started = await api.startOauth();
+      if (!ghlGuardCurrent(guard)) return;
       window.location.assign(started.url);
     } catch (err) {
-      setConnecting(false);
-      setError(friendlyError(err));
+      if (ghlGuardCurrent(guard, "workspace")) setError(friendlyError(err));
+    } finally {
+      if (connectOperation.current === operation) {
+        connectOperation.current = null;
+        if (ghlGuardCurrent(guard, "workspace")) setConnecting(false);
+      }
     }
   }
 
@@ -408,9 +574,141 @@ export function useFounderBrainApp() {
     }
     return result.pieces;
   }
-  async function ghlPush(pack?: string) {
-    if (!api) throw new Error("api_unavailable");
-    return api.ghlPush(pack);
+  function requireVerifiedGhlConnection(): GhlConnectionStatus {
+    const connection = ghlConnectionRef.current;
+    if (
+      !connection?.connected ||
+      !connection.connectionId ||
+      !connection.locationId ||
+      !ghlStatusVerifiedRef.current ||
+      disconnectOperation.current
+    ) {
+      throw new ApiError(
+        409,
+        "ghl_connection_unverified",
+        "Refresh GoHighLevel status before writing anything externally.",
+      );
+    }
+    return connection;
+  }
+
+  async function disconnectGhl() {
+    if (!api || disconnectOperation.current || connectOperation.current) return null;
+    const connection = requireVerifiedGhlConnection();
+    const operation = Symbol("ghl-disconnect");
+    disconnectOperation.current = operation;
+    bumpConnectionGeneration();
+    const guard = captureGhlGuard();
+    ghlStatusVerifiedRef.current = false;
+    setGhlStatusVerified(false);
+    setDisconnecting(true);
+    setGhlStatusError("");
+    try {
+      const result = await api.disconnectOauth(connection.connectionId!);
+      if (!ghlGuardCurrent(guard)) return null;
+      if (!applyGhlConnection(result, guard)) return null;
+      orientationEpoch.current += 1;
+      setOrientation(result.orientation);
+      resetGhlLinks();
+      setNotice(
+        "FounderBrain disconnected from GoHighLevel. Existing GoHighLevel content and workflows were not deleted.",
+      );
+      return result;
+    } catch (err) {
+      if (ghlGuardCurrent(guard)) setGhlStatusError(friendlyError(err));
+      throw err;
+    } finally {
+      if (disconnectOperation.current === operation) {
+        disconnectOperation.current = null;
+        if (ghlGuardCurrent(guard, "workspace")) setDisconnecting(false);
+      }
+    }
+  }
+
+  async function loadGhlBookingLinks() {
+    if (!api || bookingLoadOperation.current) return null;
+    const connection = requireVerifiedGhlConnection();
+    const operation = Symbol("ghl-booking-read");
+    bookingLoadOperation.current = operation;
+    const guard = captureGhlGuard();
+    setGhlBookingLoading(true);
+    setGhlBookingError("");
+    try {
+      const result = await api.ghlBookingLinks(connection.connectionId!);
+      if (!ghlGuardCurrent(guard)) return null;
+      if (result.connection.connectionId !== connection.connectionId) {
+        invalidateGhlIdentity();
+        return null;
+      }
+      setGhlBookingLinks(result);
+      return result;
+    } catch (err) {
+      if (ghlGuardCurrent(guard)) setGhlBookingError(friendlyError(err));
+      return null;
+    } finally {
+      if (bookingLoadOperation.current === operation) {
+        bookingLoadOperation.current = null;
+        if (ghlGuardCurrent(guard, "workspace")) setGhlBookingLoading(false);
+      }
+    }
+  }
+
+  async function saveGhlBookingLink(
+    input: Omit<GhlBookingLinkInput, "connectionId">,
+  ): Promise<GhlBookingLinkResult | null> {
+    if (!api || bookingWriteOperation.current) return null;
+    const connection = requireVerifiedGhlConnection();
+    const operation = Symbol("ghl-booking-write");
+    bookingWriteOperation.current = operation;
+    const guard = captureGhlGuard();
+    setGhlLinkSavingKey(input.key);
+    setGhlBookingError("");
+    try {
+      const result = await api.saveGhlBookingLink({
+        ...input,
+        connectionId: connection.connectionId!,
+      });
+      if (!ghlGuardCurrent(guard)) return null;
+      if (result.connection.connectionId !== connection.connectionId) {
+        invalidateGhlIdentity();
+        return null;
+      }
+      setGhlBookingLinks((current) => {
+        if (!current || current.connection.connectionId !== connection.connectionId) return current;
+        return {
+          connection: result.connection,
+          links: current.links.map((link) => (link.key === result.link.key ? result.link : link)),
+        };
+      });
+      return result;
+    } catch (err) {
+      if (ghlGuardCurrent(guard)) setGhlBookingError(friendlyError(err));
+      throw err;
+    } finally {
+      if (bookingWriteOperation.current === operation) {
+        bookingWriteOperation.current = null;
+        if (ghlGuardCurrent(guard, "workspace")) setGhlLinkSavingKey(null);
+      }
+    }
+  }
+
+  async function ghlPush(pack?: string): Promise<GhlPushResult | null> {
+    if (!api || pushOperation.current) return null;
+    const connection = requireVerifiedGhlConnection();
+    const operation = Symbol("ghl-push");
+    pushOperation.current = operation;
+    const guard = captureGhlGuard();
+    try {
+      const result = await api.ghlPush(connection.connectionId!, pack);
+      if (!ghlGuardCurrent(guard)) return null;
+      if (result.connection.connectionId !== connection.connectionId) {
+        invalidateGhlIdentity();
+        return null;
+      }
+      return result;
+    } finally {
+      if (pushOperation.current === operation) pushOperation.current = null;
+    }
   }
   async function transcribeVoice(blob: Blob, seconds: number) {
     if (!api) throw new Error("api_unavailable");
@@ -487,7 +785,11 @@ export function useFounderBrainApp() {
     if (!saved) throw new Error("The imported answers have not been saved yet. Please retry.");
   }
 
-  function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean | number) {
+  function patch(
+    section: Exclude<Mission, "output">,
+    field: string,
+    value: string | boolean | number,
+  ) {
     if (saving) return;
     // Background synchronization and repeated choices are not edits.
     const prior = (latestDraft.current[section] as unknown as Record<string, unknown>)[field];
@@ -808,7 +1110,11 @@ export function useFounderBrainApp() {
             err instanceof ApiError
               ? ((err.details as { details?: { jobId?: unknown; status?: unknown } }).details ?? {})
               : {};
-          if (err instanceof ApiError && err.code === "job_active" && typeof activeJob.jobId === "string") {
+          if (
+            err instanceof ApiError &&
+            err.code === "job_active" &&
+            typeof activeJob.jobId === "string"
+          ) {
             if (activeJob.status === "uncertain") {
               jobOperation.current = {
                 expectedVersion: current.version,
@@ -1089,6 +1395,20 @@ export function useFounderBrainApp() {
     ghlPush,
     regeneratePieces,
     connecting,
+    disconnecting,
     startConnect,
+    refreshGhlStatus,
+    disconnectGhl,
+    ghlConnection,
+    ghlStatusVerified,
+    ghlStatusLoading,
+    ghlStatusError,
+    ghlConnectionGeneration,
+    ghlBookingLinks,
+    ghlBookingLoading,
+    ghlBookingError,
+    ghlLinkSavingKey,
+    loadGhlBookingLinks,
+    saveGhlBookingLink,
   };
 }

@@ -114,10 +114,12 @@ export function App() {
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
   const inTypeform = (node: ReactNode) => (
-    <TypeformExitContext.Provider value={() => {
-      if (state) setPausedIntakeWorkspace(state.workspaceId);
-      setView("atlanta");
-    }}>
+    <TypeformExitContext.Provider
+      value={() => {
+        if (state) setPausedIntakeWorkspace(state.workspaceId);
+        setView("atlanta");
+      }}
+    >
       {node}
       {reviewOpen && packDraft ? (
         <PackReview
@@ -165,7 +167,9 @@ export function App() {
       ) : null}
       {showV2 ? (
         <div className="v2-banner" role="region" aria-label="Update to V2">
-          <p>Your saved Brain has not been run through the 90 day plan, content, and outreach yet.</p>
+          <p>
+            Your saved Brain has not been run through the 90 day plan, content, and outreach yet.
+          </p>
           <button
             className="entry-cta"
             type="button"
@@ -197,7 +201,11 @@ export function App() {
   );
 
   if (window.location.pathname === "/privacy") {
-    return <main className="public-privacy"><PrivacyDisclosure onBack={() => window.location.assign("/")} /></main>;
+    return (
+      <main className="public-privacy">
+        <PrivacyDisclosure onBack={() => window.location.assign("/")} />
+      </main>
+    );
   }
   if (!config) {
     return <AuthPage kind="boot" message={error || "Opening your FounderBrain…"} />;
@@ -230,58 +238,80 @@ export function App() {
   }
 
   // Signed-in views without the full TopBar still get the account chip top right.
-  const accountChip = email ? <AccountChip email={email} usage={app.usage} onSignOut={() => void app.signOut()} onDeleteAccount={() => setDeleteOpen(true)} /> : null;
+  const accountChip = email ? (
+    <AccountChip
+      email={email}
+      usage={app.usage}
+      onSignOut={() => void app.signOut()}
+      onDeleteAccount={() => setDeleteOpen(true)}
+    />
+  ) : null;
   if (view === "gmail" && app.api) {
-    return <>{accountChip}<GmailStudio api={app.api} onBack={() => setView("atlanta")} />{deleteOpen ? <DeleteAccountModal email={email ?? ""} onClose={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void app.deleteAccountNow(); }} /> : null}</>;
+    return (
+      <>
+        {accountChip}
+        <GmailStudio api={app.api} onBack={() => setView("atlanta")} />
+        {deleteOpen ? (
+          <DeleteAccountModal
+            email={email ?? ""}
+            onClose={() => setDeleteOpen(false)}
+            onConfirm={() => {
+              setDeleteOpen(false);
+              void app.deleteAccountNow();
+            }}
+          />
+        ) : null}
+      </>
+    );
   }
   const needsIntake = !firstLoginComplete || !guideIsComplete(draft, orientation.track);
   if (needsIntake && pausedIntakeWorkspace !== state.workspaceId) {
     return inTypeform(
       <>
-      {accountChip}
-      <OrientationFlow
-        workspaceKey={state.workspaceId}
-        screen={orientation.firstLoginScreen}
-        saving={orientationSaving || app.saving}
-        error={error}
-        welcomeDone={firstLoginComplete}
-        brain={draft}
-        track={orientation.track}
-        siteImportEnabled={Boolean(config.siteImportEnabled)}
-        onNamed={(name) => app.patch("identity", "name", name)}
-        onAdvance={async (next) => {
-          await app.saveOrientation({ firstLoginScreen: next });
-        }}
-        onComplete={() => app.completeFirstLogin()}
-        onDecline={() => void app.signOut()}
-        onFill={async (section, field, value) => {
-          return app.commitField(section, field, value);
-        }}
-        onApplyIntake={async (proposal) => {
-          await app.applyIntake(proposal);
-        }}
-        onTrack={async (value) => {
-          // Missions fork on the saved Brain, chapters on orientation. Persist
-          // both before advancing, and return the receipt for review routing.
-          const brain = await app.commitField("identity", "track", value);
-          await app.saveOrientation({ track: value });
-          return brain;
-        }}
-        onImport={(url) => app.importSite(url)}
-        onTranscribe={(blob, seconds) =>
-          app.transcribeVoice(blob, seconds).then((result) => result.text)
-        }
-      />
-      {conflict ? (
-        <ConflictDialog
-          conflict={conflict}
-          draft={draft}
-          closeRef={closeConflict}
-          onKeepDraft={app.keepMyDraft}
-          onLoadServer={app.loadServerConflict}
+        {accountChip}
+        <OrientationFlow
+          workspaceKey={state.workspaceId}
+          screen={orientation.firstLoginScreen}
+          saving={orientationSaving || app.saving}
+          error={error}
+          welcomeDone={firstLoginComplete}
+          brain={draft}
+          track={orientation.track}
+          siteImportEnabled={Boolean(config.siteImportEnabled)}
+          onNamed={(name) => app.patch("identity", "name", name)}
+          onAdvance={async (next) => {
+            await app.saveOrientation({ firstLoginScreen: next });
+          }}
+          onComplete={() => app.completeFirstLogin()}
+          onDecline={() => void app.signOut()}
+          onFill={async (section, field, value) => {
+            return app.commitField(section, field, value);
+          }}
+          onApplyIntake={async (proposal) => {
+            await app.applyIntake(proposal);
+          }}
+          onTrack={async (value) => {
+            // Missions fork on the saved Brain, chapters on orientation. Persist
+            // both before advancing, and return the receipt for review routing.
+            const brain = await app.commitField("identity", "track", value);
+            await app.saveOrientation({ track: value });
+            return brain;
+          }}
+          onImport={(url) => app.importSite(url)}
+          onTranscribe={(blob, seconds) =>
+            app.transcribeVoice(blob, seconds).then((result) => result.text)
+          }
         />
-      ) : null}
-      </>
+        {conflict ? (
+          <ConflictDialog
+            conflict={conflict}
+            draft={draft}
+            closeRef={closeConflict}
+            onKeepDraft={app.keepMyDraft}
+            onLoadServer={app.loadServerConflict}
+          />
+        ) : null}
+      </>,
     );
   }
 
@@ -318,7 +348,7 @@ export function App() {
           }}
           onFinished={() => setView("atlanta")}
         />
-      </>
+      </>,
     );
   }
 
@@ -335,7 +365,7 @@ export function App() {
           }}
           onFinished={() => setView("atlanta")}
         />
-      </>
+      </>,
     );
   }
 
@@ -344,23 +374,41 @@ export function App() {
       <>
         {accountChip}
         <GhlChapter
-        orientation={orientation}
-        saving={orientationSaving}
-        error={error}
-        connectEnabled={Boolean(config.crmConnectEnabled)}
-        connecting={app.connecting}
-        onConnect={() => app.startConnect()}
-        loadUsage={() => app.getUsage()}
-        packAccepted={packAccepted}
-        packReady={packDraft}
-        onReviewPack={() => setReviewOpen(true)}
-        onGhlPush={() => app.ghlPush()}
-        onPatch={async (patch) => {
-          await app.saveOrientation(patch);
-        }}
-        onFinished={() => setView("atlanta")}
+          orientation={orientation}
+          saving={orientationSaving}
+          error={error}
+          connectEnabled={Boolean(config.crmConnectEnabled)}
+          connecting={app.connecting}
+          disconnecting={app.disconnecting}
+          connection={app.ghlConnection}
+          statusVerified={app.ghlStatusVerified}
+          statusLoading={app.ghlStatusLoading}
+          statusError={app.ghlStatusError}
+          connectionGeneration={app.ghlConnectionGeneration}
+          bookingLinks={app.ghlBookingLinks}
+          bookingLoading={app.ghlBookingLoading}
+          bookingError={app.ghlBookingError}
+          linkSavingKey={app.ghlLinkSavingKey}
+          onConnect={() => app.startConnect()}
+          onRefreshStatus={async () => {
+            await app.refreshGhlStatus({ announce: true });
+          }}
+          onDisconnect={async () => Boolean(await app.disconnectGhl())}
+          onLoadBookingLinks={async () => {
+            await app.loadGhlBookingLinks();
+          }}
+          onSaveBookingLink={(input) => app.saveGhlBookingLink(input)}
+          loadUsage={() => app.getUsage()}
+          packAccepted={packAccepted}
+          packReady={packDraft}
+          onReviewPack={() => setReviewOpen(true)}
+          onGhlPush={() => app.ghlPush()}
+          onPatch={async (patch) => {
+            await app.saveOrientation(patch);
+          }}
+          onFinished={() => setView("atlanta")}
         />
-      </>
+      </>,
     );
   }
 
@@ -432,7 +480,7 @@ export function App() {
           onReconcile={() => void app.reconcileOutput()}
           onAccept={() => void app.acceptOutput()}
         />
-      </>
+      </>,
     );
   }
 
@@ -470,7 +518,7 @@ export function App() {
           onHome={() => setView("atlanta")}
           onPrivacy={() => setView("privacy")}
         />
-      </>
+      </>,
     );
   }
 
@@ -522,9 +570,10 @@ export function App() {
             // The business-profile card is labeled as one item but covers Identity,
             // Customer, and Offer. Opening it always at Identity replayed Mission 1
             // after that mission was already approved.
-            const mission = target === "mission-identity"
-              ? profileResumeMission(state.readiness)
-              : target.replace("mission-", "") as (typeof missions)[number];
+            const mission =
+              target === "mission-identity"
+                ? profileResumeMission(state.readiness)
+                : (target.replace("mission-", "") as (typeof missions)[number]);
             setMission(mission);
             setView("missions");
           }}
@@ -540,7 +589,7 @@ export function App() {
             onLoadServer={app.loadServerConflict}
           />
         ) : null}
-      </>
+      </>,
     );
   }
 
