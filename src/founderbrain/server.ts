@@ -61,6 +61,13 @@ import {
   pushGhlValues,
 } from "./ghl-push.ts";
 import { revisePieces } from "./content-revise.ts";
+import { hashArtifactText } from "./jobs.ts";
+import {
+  duplicatePieceNumbers,
+  serializeContentSection,
+  splitContentSection,
+  replaceContentSection,
+} from "../founderbrain-shared/saturday-work.ts";
 import {
   UPLOAD_TYPES,
   assignMedia,
@@ -576,6 +583,10 @@ export async function buildApi(
             .array(
               z.object({
                 n: z.number().int().min(1).max(30),
+                // Kept for API/client compatibility, but never trusted: the
+                // "original" text used for heading/platform integrity always
+                // comes from the server's own read of the persisted pack
+                // below, not from whatever the client happens to send here.
                 text: z.string().min(1).max(4000),
                 feedback: z.string().max(1000),
               }),
@@ -587,16 +598,66 @@ export async function buildApi(
       req.body,
     );
     const workspace = context(req).workspace;
-    const pieces = await revisePieces(config, store, workspace, body.pieces);
+
+    // --- Preflight: every check that can refuse the request happens here,
+    // before revisePieces() ever calls the paid model. ---
     const current = await jobs.artifact(workspace);
-    if (current) {
-      let next = current.text;
-      for (const piece of pieces) {
-        const pattern = new RegExp(`(^|\\n)${piece.n}\\.\\s[\\s\\S]*?(?=\\n\\d+\\.\\s|$)`);
-        next = next.replace(pattern, `$1${piece.n}. ${piece.text}`);
-      }
-      await jobs.saveLatestText(workspace, next);
+    if (!current) {
+      throw new DomainError(
+        422,
+        "no_artifact",
+        "There is no saved pack yet. Generate the 30 pieces before revising any of them.",
+      );
     }
+    const { preamble, pieces: existing } = splitContentSection(current.text);
+    const dupes = duplicatePieceNumbers(existing);
+    if (dupes.length) {
+      // A pack with any duplicate piece number is not safe to patch by
+      // number: which occurrence is "piece N" is ambiguous, and picking one
+      // would silently drop the founder's other copy of it. Refuse instead
+      // of guessing, and refuse before spending anything on the model.
+      throw new DomainError(
+        409,
+        "duplicate_pieces",
+        `This pack already has more than one piece ${dupes.join(", ")}. Regenerate the 30 pieces, or fix the duplicates by hand, before revising -- a rewrite here would have to guess which copy to keep.`,
+      );
+    }
+    const existingByN = new Map(existing.map((piece) => [piece.n, piece]));
+    const unknown = body.pieces.map((piece) => piece.n).filter((n) => !existingByN.has(n));
+    if (unknown.length) {
+      throw new DomainError(
+        422,
+        "unknown_piece",
+        `Piece ${unknown.join(", ")} is not in the current pack. Reload the pieces before revising.`,
+      );
+    }
+
+    // The model only ever sees the persisted, server-read original text --
+    // never the client's copy of it.
+    const requests = body.pieces.map((piece) => ({
+      n: piece.n,
+      feedback: piece.feedback,
+      originalText: existingByN.get(piece.n)!.text,
+    }));
+    const expectedArtifact = { id: current.id, textHash: hashArtifactText(current.text) };
+
+    // --- Only past here does anything paid happen. ---
+    const pieces = await revisePieces(config, store, workspace, requests);
+
+    const byNumber = new Map(existing.map((piece) => [piece.n, piece]));
+    for (const piece of pieces) {
+      if (!byNumber.has(piece.n)) continue; // already validated above; defensive only
+      byNumber.set(piece.n, { n: piece.n, text: piece.text });
+    }
+    const nextContent = serializeContentSection(
+      preamble,
+      [...byNumber.values()].sort((a, b) => a.n - b.n),
+    );
+    const nextPack = replaceContentSection(current.text, nextContent);
+    // Compare-and-swap against the artifact read at the top of this request:
+    // if a slower rewrite finishes after a newer edit or accept landed, this
+    // refuses instead of overwriting the founder's newer work.
+    await jobs.saveLatestText(workspace, expectedArtifact, nextPack);
     return { pieces };
   });
   app.post("/api/ghl/push", { bodyLimit: 1024 * 1024 }, async (req) => {

@@ -11,6 +11,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import { ApiError, type FounderBrainApi } from "../api";
 import { videoLengthError } from "../lib/video-length";
+import { pieceCoverage } from "../../founderbrain-shared/saturday-work.ts";
 import type { HiggsfieldStatus, MediaItem } from "../types";
 
 const FOCUSABLE_SELECTOR =
@@ -645,6 +646,8 @@ export function MediaOptions({ posts }: { posts: MediaPost[] }) {
   const uploading = visible.filter((item) => item.status !== "ready");
   const saved = visible.filter((item) => item.status === "ready");
   const loose = saved.filter((item) => item.pieceN === null);
+  const coverage = pieceCoverage(saved.map((item) => item.pieceN));
+  const totalPieces = posts.length;
 
   return (
     <section className="media-options" aria-label="Photos and clips for your posts">
@@ -654,7 +657,20 @@ export function MediaOptions({ posts }: { posts: MediaPost[] }) {
         <span className="media-count"><strong>{saved.length}</strong> saved</span>
         <span className="media-count"><strong>{media.jobs.length + uploading.length}</strong> still uploading</span>
         <span className="media-count"><strong>{loose.length}</strong> not on a piece</span>
+        {totalPieces ? (
+          <span className="media-count">
+            <strong>{coverage.coveredCount}</strong> of {totalPieces} pieces covered
+          </span>
+        ) : null}
       </div>
+      {coverage.duplicateCount > 0 ? (
+        <p className="media-row-meta" role="note">
+          {saved.length} files saved is not the same as {coverage.coveredCount} pieces covered:{" "}
+          {coverage.duplicateCount} extra file{coverage.duplicateCount === 1 ? "" : "s"} landed on a piece that
+          already had one (piece {coverage.duplicatePieces.slice(0, 5).join(", ")}
+          {coverage.duplicatePieces.length > 5 ? ", and more" : ""}).
+        </p>
+      ) : null}
       <div className="media-choice-grid">
         <div className="media-choice">
           <strong>Upload your own</strong>
