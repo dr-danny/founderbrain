@@ -12,7 +12,9 @@ If a founder installs directly from the Marketplace and returns without the stat
 
 `/highlevel` is a public launch page for external website/help links. It renders without API availability or authentication. Query parameters and fragments are discarded. Neither public page inspects private account state or claims connection success. Both use a fixed, same-origin, top-level link to `/`.
 
-Valid authorization and denial callbacks still run through the existing authenticated flow. Server-side user binding, expiration, one-time state consumption, and connection-generation checks are unchanged.
+`main.tsx` classifies and strips `/oauth/callback`'s query and fragment from the address bar before anything else mounts, for every shape: malformed, a valid authorization code, and a valid denial alike. This is not only cosmetic. The Hexclave identity SDK is constructed later, inside the app's state hook, and also reads the current URL on init; an `error`+`state` pair meant for GoHighLevel's Connect step previously read to it as its own hosted-sign-in denial and hijacked the boot before the app's own callback handling ever ran. A valid classification is kept only in page memory (an in-memory value handed to the app as a prop, then to its state hook as a parameter) and consumed once the existing authenticated gate (a real session, the one-shot handling guard, and the `/oauth/callback` path marker) allows it. The value is never re-read from the URL, logged, or persisted to storage.
+
+Valid authorization and denial callbacks still run through the existing authenticated flow, calling the same completion endpoint the same way. Server-side user binding, expiration, one-time state consumption, and connection-generation checks are unchanged.
 
 ## Marketplace settings
 
@@ -25,7 +27,7 @@ This patch does **not** embed the private app in HighLevel. All pages retain `X-
 ## Release checks
 
 - Run `npm run lint`, `npm run fb:build`, and `npm run fb:test` on Node 22. In the restricted sandbox, set `ESBUILD_BINARY_PATH="$PWD/node_modules/esbuild-wasm/bin/esbuild"`.
-- Run the existing `scripts/founderbrain-browser-test.py` browser suite, including public-launch, malformed-callback, valid-callback, and mobile regressions. Use disposable fixtures only.
+- Run the existing `scripts/founderbrain-browser-test.py` browser suite, including public-launch, malformed-callback, valid-callback (authorization and denial, each asserting the completion endpoint is called exactly once), the pre-boot query/fragment strip, the signed-out boot showing no Hexclave-SDK-hijack error text, and mobile regressions. Use disposable fixtures only, never a real provider.
 - Verify CI with native PostgreSQL; database-gated skips are not full integration verification.
 - Follow the existing explicit merge/deploy gate. Main merges also redeploy Railway, even for a frontend-only change: check queued/running generation jobs first.
 - Build the exact merged tree, recheck the active Cloudflare version, upload with `--keep-vars`, and explicitly promote the reviewed version. Do not change routes, DNS, secrets, or unrelated staged Railway changes.

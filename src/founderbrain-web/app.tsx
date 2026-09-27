@@ -23,9 +23,20 @@ import { GmailStudio } from "./components/GmailStudio";
 import { isPack } from "./pack";
 import { guideIsComplete } from "./guide-intake";
 import { profileResumeMission } from "./lib/mission-index";
+import { type UsableOauthCallback } from "./lib/oauth-callback";
 
-export function App() {
-  const app = useFounderBrainApp();
+export function App({
+  initialOauthCallback = null,
+}: {
+  /**
+   * A legitimate GoHighLevel /oauth/callback classification captured by main.tsx
+   * before this component mounted, or null on every other route. Passed straight
+   * through to useFounderBrainApp; see main.tsx for why the URL itself is never
+   * re-read here.
+   */
+  initialOauthCallback?: UsableOauthCallback | null;
+} = {}) {
+  const app = useFounderBrainApp(initialOauthCallback);
   const {
     config,
     session,
@@ -225,7 +236,9 @@ export function App() {
       <AuthPage
         kind="sign-in"
         sessionExpired={sessionExpired}
-        notice={notice}
+        notice={initialOauthCallback
+          ? "Sign in with your existing FounderBrain account, then start Connect GoHighLevel again."
+          : notice}
         error={error}
         hexclave={hexclave}
         onSignInError={app.onSignInError}

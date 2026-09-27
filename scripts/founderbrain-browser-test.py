@@ -571,7 +571,17 @@ class BrowserAuthTests(unittest.TestCase):
         return seen
 
     def _assert_no_auth_or_api_traffic(self, seen):
-        backend = [u for u in seen if u.startswith(self.origin + "/api")]
+        def is_backend_call(url):
+            # Match the request path, not a raw string prefix: "/api.ts" is the Vite
+            # module for api.ts (a same-origin source file, not a backend call) and
+            # must not be miscounted as "/api" traffic just because it starts with
+            # those four characters.
+            if not url.startswith(self.origin):
+                return False
+            path = urlparse(url).path
+            return path == "/api" or path.startswith("/api/")
+
+        backend = [u for u in seen if is_backend_call(u)]
         # Vite module URLs can contain "hexclave" without contacting the auth service.
         # Count actual auth-origin traffic, not same-origin JavaScript imports.
         auth = [u for u in seen if u.startswith(AUTH_ORIGIN + "/")]
@@ -666,16 +676,122 @@ class BrowserAuthTests(unittest.TestCase):
     def test_oauth_callback_valid_code_and_state_is_not_swallowed_by_recovery_screen(self):
         # A legitimate callback must fall through to the existing authenticated flow
         # (here: the normal signed-out boot, since no session cookie is set) rather
-        # than being caught by the public recovery screen.
+        # than being caught by the public recovery screen. The query must also already
+        # be gone from the address bar before the Hexclave SDK (constructed inside
+        # useFounderBrainApp once config loads) ever gets a chance to read it.
         self.page.goto(self.origin + "/oauth/callback?code=abc123&state=xyz789")
         expect(self.page.get_by_role("button", name="Sign in", exact=True)).to_be_visible()
         self._expect_no_launch_screen()
+        self.assertEqual(urlparse(self.page.url).query, "")
         self.assertEqual(self.errors, [])
 
     def test_oauth_callback_error_with_state_is_not_swallowed_by_recovery_screen(self):
+        # Regression: a bare error+state pair here is GoHighLevel's Connect denial, not
+        # a Hexclave hosted-sign-in denial. Before main.tsx stripped this pre-boot, the
+        # Hexclave SDK read it on init and redirected through its own error handling
+        # (surfaced as OAUTH_PROVIDER_ACCESS_DENIED), never reaching the normal
+        # signed-out boot at all.
         self.page.goto(self.origin + "/oauth/callback?error=access_denied&state=xyz789")
         expect(self.page.get_by_role("button", name="Sign in", exact=True)).to_be_visible()
         self._expect_no_launch_screen()
+        self.assertEqual(urlparse(self.page.url).query, "")
+        expect(self.page.get_by_text("OAUTH_PROVIDER_ACCESS_DENIED", exact=False)).to_have_count(0)
+        self.assertEqual(self.errors, [])
+
+    def _route_oauth_callback_completion_fixture(self, *, ghl_screen=5):
+        """Authenticated callback with disposable state and no live API/provider traffic."""
+        self.context.route(self.origin + "/api/**", lambda r: r.fulfill(
+            status=404, json={"message": "Unknown fixture endpoint"}))
+        self._callback_connection = {
+            "connected": False, "locationId": None, "locationName": None,
+            "connectionId": None, "nameUnavailable": False,
+        }
+        self.context.route(self.origin + "/api/oauth/status", lambda r: r.fulfill(
+            json=self._callback_connection))
+        self.context.route(self.origin + "/api/ghl/booking-links*", lambda r: r.fulfill(
+            json={"connection": self._callback_connection, "links": []}))
+        brain = self._complete_brain()
+        brain["identity"]["track"] = "b2c"
+        orientation = self._complete_orientation()
+        orientation.update({
+            "track": "b2c", "ghlScreen": ghl_screen, "ghlCompletedAt": None,
+            "ghlAnswers": {"hasAccount": True, "connected": False},
+        })
+        self.context.route(self.origin + "/api/config", lambda r: r.fulfill(json={
+            "authMode": "hexclave", "hexclave": {"projectId": PROJECT, "apiUrl": AUTH_ORIGIN,
+            "publishableClientKey": None}, "aiEnabled": False, "crmConnectEnabled": True,
+        }))
+        self.context.route(self.origin + "/api/me", lambda r: r.fulfill(json={"email": "ada@example.test"}))
+        self.context.route(self.origin + "/api/brain", lambda r: r.fulfill(json={
+            "workspaceId": "ws_fixture", "version": 3, "sha": "0" * 64,
+            "updatedAt": "2026-09-27T00:00:00.000Z", "brain": brain,
+            "readiness": dict.fromkeys(["identity", "customer", "offer", "voice", "context", "output"], True),
+            "verified": True, "artifact": None,
+        }))
+        self.context.route(self.origin + "/api/artifact", lambda r: r.fulfill(json={"artifact": None, "stale": False}))
+        self.context.route(self.origin + "/api/orientation", lambda r: r.fulfill(json=orientation))
+        self.context.route(self.origin + "/api/history", lambda r: r.fulfill(json={"versions": []}))
+        self.context.route(self.origin + "/api/usage", lambda r: r.fulfill(json={
+            "ai": {"events": 0, "inputTokens": 0, "outputTokens": 0, "priceMicroUsd": 0},
+            "firecrawl": {"scrapes": 0, "credits": 0, "priceMicroUsd": 0}, "totalMicroUsd": 0,
+        }))
+        return orientation
+
+    def test_oauth_callback_valid_code_completes_via_api_exactly_once(self):
+        """Authenticated path: the code/state captured pre-boot by main.tsx reaches the
+        existing completion effect once useFounderBrainApp resolves api+email, and is
+        POSTed to the real completion endpoint exactly once. No real provider is used;
+        /api/oauth/complete is a disposable fixture like every other route here."""
+        orientation = self._route_oauth_callback_completion_fixture()
+        completes = []
+        def complete(route):
+            completes.append(route.request.post_data_json)
+            self._callback_connection.update({
+                "connected": True, "locationId": "demo-location", "locationName": "Demo Clinic",
+                "connectionId": "fixture-connection-1", "nameUnavailable": False,
+            })
+            route.fulfill(json={
+                **self._callback_connection,
+                "orientation": {**orientation, "ghlCompletedAt": "2026-09-27T00:00:00.000Z",
+                                "ghlAnswers": {"hasAccount": True, "connected": True}},
+            })
+        self.context.route(self.origin + "/api/oauth/complete", complete)
+        self.set_session()
+        self.page.goto(self.origin + "/oauth/callback?code=abc123&state=xyz789")
+        panel = self.page.get_by_role("region", name="Connected GoHighLevel subaccount", exact=True)
+        expect(panel.get_by_role("heading", name="Demo Clinic", exact=True)).to_be_visible(timeout=20000)
+        self.assertEqual(completes, [{"code": "abc123", "state": "xyz789"}])
+        parsed = urlparse(self.page.url)
+        self.assertEqual(parsed.path, "/")
+        self.assertEqual(parsed.query, "")
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_denial_completes_via_api_exactly_once_and_shows_cancelled_notice(self):
+        """The denial branch also calls the completion endpoint (to consume the
+        server-side state once), exactly once, and never reaches Hexclave's own error
+        handling: the founder sees FounderBrain's own cancelled message."""
+        self._route_oauth_callback_completion_fixture()
+        completes = []
+        def complete(route):
+            completes.append(route.request.post_data_json)
+            route.fulfill(json={
+                "connected": False, "locationId": None, "locationName": None,
+                "connectionId": None, "nameUnavailable": False,
+            })
+        self.context.route(self.origin + "/api/oauth/complete", complete)
+        self.set_session()
+        self.page.goto(self.origin + "/oauth/callback?error=access_denied&state=xyz789")
+        expect(
+            self.page.get_by_text(
+                "GoHighLevel Connect was cancelled. Start Connect again when you are ready.",
+                exact=True,
+            )
+        ).to_be_visible(timeout=20000)
+        self.assertEqual(completes, [{"error": "access_denied", "state": "xyz789"}])
+        parsed = urlparse(self.page.url)
+        self.assertEqual(parsed.path, "/")
+        self.assertEqual(parsed.query, "")
+        expect(self.page.get_by_text("OAUTH_PROVIDER_ACCESS_DENIED", exact=False)).to_have_count(0)
         self.assertEqual(self.errors, [])
 
 

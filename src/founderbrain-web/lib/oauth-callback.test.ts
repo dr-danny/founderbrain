@@ -101,3 +101,9 @@ test("malformed / truncated query text does not throw and classifies as invalid"
   assert.deepEqual(classifyOauthCallback("?code&state"), { kind: "invalid" });
   assert.deepEqual(classifyOauthCallback("???not=a=query"), { kind: "invalid" });
 });
+
+test("code and state retain their exact decoded values for server validation", () => {
+  assert.deepEqual(classifyOauthCallback("?code=%20abc123%20&state=%20xyz789%20"), {
+    kind: "code", code: " abc123 ", state: " xyz789 ",
+  });
+});

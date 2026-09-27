@@ -16,16 +16,24 @@ export type OauthCallbackClassification =
   | { kind: "error"; error: string; state: string }
   | { kind: "invalid" };
 
+/**
+ * The two legitimate shapes, with "invalid" excluded. `main.tsx` never lets an
+ * "invalid" classification reach the app: only this narrowed type is threaded
+ * through as `initialOauthCallback`, so the authenticated completion effect can
+ * never receive a shape it would have to re-validate as legitimate.
+ */
+export type UsableOauthCallback = Exclude<OauthCallbackClassification, { kind: "invalid" }>;
+
 /** True only when `key` appears exactly once. Missing or duplicated both fail. */
 function hasSingleParam(params: URLSearchParams, key: string): boolean {
   return params.getAll(key).length === 1;
 }
 
-/** The single value for `key`, trimmed, or null if missing/duplicated/blank. */
+/** Preserve the exact value for server verification; reject missing/duplicated/blank. */
 function singleTrimmedValue(params: URLSearchParams, key: string): string | null {
   if (!hasSingleParam(params, key)) return null;
-  const value = (params.get(key) ?? "").trim();
-  return value.length > 0 ? value : null;
+  const value = params.get(key) ?? "";
+  return value.trim().length > 0 ? value : null;
 }
 
 export function classifyOauthCallback(search: string): OauthCallbackClassification {

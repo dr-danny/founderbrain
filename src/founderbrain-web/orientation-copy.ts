@@ -264,7 +264,7 @@ export function ghlScreens(hasAccount: boolean | undefined): TypeformScreen[] {
       id: "ghl-connect",
       title: "Connect GoHighLevel",
       body: [
-        "One click opens the GoHighLevel Marketplace. Install FounderBrain there, or select it if it is already installed, then pick your sub-account. GoHighLevel returns you to this page automatically once that finishes.",
+        "Connect opens GoHighLevel. Choose the intended subaccount and approve FounderBrain's access. GoHighLevel returns you here so FounderBrain can verify the connection.",
         "If the Marketplace shows Installed but there is no Open button for your account, do not wait on that. Come back to the FounderBrain website yourself and use Connect GoHighLevel from here.",
         "Nothing is published or sent in that click. It only authorizes FounderBrain to push later. The authenticated connection always starts from FounderBrain, not from inside the Marketplace listing.",
       ],
