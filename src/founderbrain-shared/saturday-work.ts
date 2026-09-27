@@ -96,6 +96,26 @@ export function contentFieldBlock(state: SaturdayAnswers): string | null {
   return "Choose B2B or B2C before finishing the content chapter.";
 }
 
+/**
+ * Restored after a recent change dropped this export while orientation.ts
+ * kept importing it (build break). Track setup is a Sunday readiness item,
+ * distinct from finishing the Saturday content chapter: a blank Instagram
+ * handle is allowed to finish that chapter (contentFieldBlock treats it as
+ * optional), but it does not make the Sunday "Instagram is a business
+ * account" item ready — that needs an actual saved, well-formed handle. b2b
+ * mirrors the content chapter's email-domain check, since there is no
+ * separate confirmation step for that track.
+ */
+export function trackSetupReady(state: SaturdayAnswers): boolean {
+  if (state.track === "b2c") {
+    return instagramHandleOk(state.contentAnswers.instagramHandle);
+  }
+  if (state.track === "b2b") {
+    return emailDomainOk(state.contentAnswers.emailDomain);
+  }
+  return false;
+}
+
 export function outreachFieldBlock(state: SaturdayAnswers): string | null {
   if (!copyOk(state.outreachAnswers.copy)) {
     return "Write the outreach copy you will actually send before finishing this chapter.";

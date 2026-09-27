@@ -1,3 +1,7 @@
+import { useState } from "react";
+
+const ACCOUNT_CHIP_MINIMIZED_KEY = "fb-account-chip-min";
+
 /**
  * Minimal signed-in account chip for views without the full TopBar (Typeform
  * wizard and chapters). Same sign-out action, fixed top right.
@@ -14,6 +18,21 @@ export function AccountChip({
   onSignOut: () => void;
   onDeleteAccount?: () => void;
 }) {
+  const [minimized, setMinimized] = useState(() => {
+    try {
+      return window.localStorage.getItem(ACCOUNT_CHIP_MINIMIZED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  function toggleMinimized(next: boolean) {
+    setMinimized(next);
+    try {
+      window.localStorage.setItem(ACCOUNT_CHIP_MINIMIZED_KEY, next ? "1" : "0");
+    } catch {
+      // The control still works when browser storage is unavailable.
+    }
+  }
   const tokens = usage ? usage.ai.inputTokens + usage.ai.outputTokens : null;
   const tooltip = usage
     ? `${usage.ai.events} AI actions · ${usage.firecrawl.scrapes} site reads (${usage.firecrawl.credits} credits)`
@@ -24,8 +43,30 @@ export function AccountChip({
       : tokens === 0 && usage && usage.ai.events > 0
         ? "AI ran, token count missing"
         : `${compactTokens(tokens)} tokens used`;
+  if (minimized) {
+    return (
+      <button
+        type="button"
+        className="account-chip account-chip-min"
+        onClick={() => toggleMinimized(false)}
+        aria-label="Show tokens and tip jar"
+        title="Show tokens and tip jar"
+      >
+        <span className="tipjar-coin" aria-hidden="true" />
+      </button>
+    );
+  }
   return (
     <div className="account-chip">
+      <button
+        type="button"
+        className="account-chip-min-btn"
+        onClick={() => toggleMinimized(true)}
+        aria-label="Minimize tokens and tip jar"
+        title="Minimize"
+      >
+        <span aria-hidden="true">−</span>
+      </button>
       {usageLine ? (
         <span className="account-chip-usage" title={tooltip}>
           {usageLine}
