@@ -36,15 +36,14 @@ import {
 import type { OpenRouterManagement } from "./openrouter-management.ts";
 import { usageResponse, usageTotals } from "./usage.ts";
 import { readOrientation, writeOrientation } from "./orientation.ts";
-import { GHL_CHAPTER_SCREENS } from "../founderbrain-shared/orientation.ts";
 import {
-  authorizeUrl,
+  completeOauthConnection,
   connectionStatus,
   crmOAuthConfigured,
-  exchangeCode,
-  readOauthState,
-  saveConnection,
-  signOauthState,
+  disconnectConnection,
+  hasConnectionUnlocked,
+  startOauthConnection,
+  withCrmOperationLock,
 } from "./crm-oauth.ts";
 import { importSite } from "./site-import.ts";
 import { transcribeVoice } from "./voice.ts";
@@ -60,6 +59,7 @@ import {
   loadValueCatalog,
   pushGhlValues,
 } from "./ghl-push.ts";
+import { getGhlBookingLinks, putGhlBookingLink } from "./ghl-booking-links.ts";
 import { revisePieces } from "./content-revise.ts";
 import { hashArtifactText } from "./jobs.ts";
 import {
@@ -303,47 +303,33 @@ export async function buildApi(
       mediaEnabled: r2FromConfig(config) !== null,
     };
   });
-  app.get("/api/oauth/status", async (req) => connectionStatus(store, context(req).workspace));
+  app.get("/api/oauth/status", async (req) =>
+    connectionStatus(store, context(req).workspace, config),
+  );
   app.get("/api/oauth/start", async (req) => {
-    if (!crmOAuthConfigured(config))
-      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
-    const secret = config.ORIGIN_SECRET ?? config.HIGHLEVEL_CLIENT_SECRET;
-    if (!secret)
-      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
     const c = context(req);
-    const state = signOauthState(secret, c.subject);
-    return { url: authorizeUrl(config, state) };
+    return startOauthConnection(store, c.workspace, config, c.subject);
   });
   app.post("/api/oauth/complete", async (req) => {
-    if (!crmOAuthConfigured(config))
-      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
-    const secret = config.ORIGIN_SECRET ?? config.HIGHLEVEL_CLIENT_SECRET;
-    if (!secret)
-      throw new DomainError(503, "crm_oauth_not_configured", "Connect is not configured yet.");
     const body = parse(
-      z.object({ code: z.string().min(8).max(512), state: z.string().min(8).max(2000) }).strict(),
+      z.union([
+        z.object({ code: z.string().min(8).max(512), state: z.string().min(8).max(2000) }).strict(),
+        z.object({ error: z.string().min(1).max(200), state: z.string().min(8).max(2000) }).strict(),
+      ]),
       req.body,
     );
     const c = context(req);
-    const claimed = readOauthState(secret, body.state);
-    if (claimed.sub !== c.subject)
-      throw new DomainError(
-        403,
-        "oauth_state_mismatch",
-        "Connect belonged to a different session.",
-      );
-    const tokens = await exchangeCode(config, body.code);
-    await saveConnection(store, c.workspace, tokens);
-    // The CRM row is the source of truth. Write the chapter flag in the same
-    // request so a later client save, or a refresh that loses the callback,
-    // cannot leave the founder on "Connect" forever.
-    const orientation = await writeOrientation(store, c.workspace, {
-      ghlScreen: GHL_CHAPTER_SCREENS,
-      ghlComplete: true,
-      ghlAnswers: { connected: true },
-    });
-    const status = await connectionStatus(store, c.workspace);
-    return { ...status, orientation };
+    const status = await completeOauthConnection(store, c.workspace, config, c.subject, body);
+    return { ...status, orientation: await readOrientation(store, c.workspace) };
+  });
+  app.delete("/api/oauth/connection", async (req) => {
+    const body = parse(
+      z.object({ connectionId: z.string().min(16).max(80), confirmed: z.literal(true) }).strict(),
+      req.body,
+    );
+    const workspace = context(req).workspace;
+    const status = await disconnectConnection(store, workspace, body.connectionId);
+    return { ...status, orientation: await readOrientation(store, workspace) };
   });
   app.post("/api/voice", { bodyLimit: 16 * 1024 * 1024 }, async (req) => {
     const body = parse(
@@ -660,8 +646,37 @@ export async function buildApi(
     await jobs.saveLatestText(workspace, expectedArtifact, nextPack);
     return { pieces };
   });
+  app.get("/api/ghl/booking-links", async (req) => {
+    const query = parse(
+      z.object({ connectionId: z.string().min(16).max(80) }).strict(),
+      req.query,
+    );
+    const workspace = context(req).workspace;
+    const state = await store.read(workspace);
+    return getGhlBookingLinks(config, store, workspace, state.brain, query.connectionId);
+  });
+  app.put("/api/ghl/booking-links", async (req) => {
+    const body = parse(
+      z
+        .object({
+          connectionId: z.string().min(16).max(80),
+          key: z.enum(["dm_booking_link", "call_booking_link"]),
+          url: z.string().min(1).max(2048),
+          expectedValue: z.string().max(2048).nullable(),
+          replaceExisting: z.boolean(),
+        })
+        .strict(),
+      req.body,
+    );
+    const workspace = context(req).workspace;
+    const state = await store.read(workspace);
+    return putGhlBookingLink(config, store, workspace, state.brain, body);
+  });
   app.post("/api/ghl/push", { bodyLimit: 1024 * 1024 }, async (req) => {
-    const body = parse(z.object({ pack: z.string().max(40).optional() }).strict(), req.body ?? {});
+    const body = parse(
+      z.object({ connectionId: z.string().min(16).max(80), pack: z.string().max(40).optional() }).strict(),
+      req.body,
+    );
     const state = await store.read(context(req).workspace);
     if (!brainReadyForPush(state.brain))
       throw new DomainError(
@@ -687,6 +702,7 @@ export async function buildApi(
       config,
       store,
       context(req).workspace,
+      body.connectionId,
       state.brain,
       firstPack,
       reviewed.text,
@@ -703,9 +719,44 @@ export async function buildApi(
     usageResponse(config, await usageTotals(store, context(req).workspace)),
   );
   app.get("/api/orientation", async (req) => readOrientation(store, context(req).workspace));
-  app.put("/api/orientation", async (req) =>
-    writeOrientation(store, context(req).workspace, req.body),
-  );
+  app.put("/api/orientation", async (req) => {
+    const workspace = context(req).workspace;
+    const raw = req.body as {
+      ghlComplete?: unknown;
+      ghlAnswers?: { connected?: unknown };
+    } | null;
+    const requestsConnected = raw?.ghlComplete === true || raw?.ghlAnswers?.connected === true;
+    if (!requestsConnected) return writeOrientation(store, workspace, req.body);
+
+    // Serialize the authoritative CRM check with disconnect/reconnect. A stale
+    // browser save may keep its other chapter fields, but cannot resurrect GHL.
+    await withCrmOperationLock(store, workspace, async (tx) => {
+      const connected = await hasConnectionUnlocked(tx, workspace);
+      if (connected) {
+        await writeOrientation(store, workspace, req.body);
+        return;
+      }
+      const patch = {
+        ...(typeof req.body === "object" && req.body !== null ? req.body : {}),
+        ghlComplete: false,
+        ghlAnswers: {
+          ...((typeof raw?.ghlAnswers === "object" && raw.ghlAnswers !== null)
+            ? raw.ghlAnswers
+            : {}),
+          connected: false,
+        },
+      };
+      await writeOrientation(store, workspace, patch);
+      await tx`
+        update fb_orientation
+           set ghl_completed_at = null,
+               ghl_answers = coalesce(ghl_answers, '{}'::jsonb) || ${tx.json({ connected: false } as never)}::jsonb,
+               updated_at = now()
+         where founder_id = ${workspace}
+      `;
+    });
+    return readOrientation(store, workspace);
+  });
   app.get("/api/brain", async (req) => {
     const query = parse(
       z.object({ version: z.coerce.number().int().positive().optional() }).strict(),

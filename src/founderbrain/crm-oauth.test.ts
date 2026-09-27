@@ -25,3 +25,52 @@ test("authorize URL uses the SPA callback and never contains ghl in the redirect
   assert.equal(url.searchParams.get("scope"), CRM_SCOPES.join(" "));
   assert.equal(url.searchParams.get("state"), "state-token");
 });
+
+
+test("provider identity uses the workspace location id and fails closed to nameUnavailable", async () => {
+  const { statusForConnectionUnlocked } = await import("./crm-oauth.ts");
+  const original = globalThis.fetch;
+  const calls: string[] = [];
+  try {
+    globalThis.fetch = async (input) => {
+      calls.push(String(input));
+      return new Response("provider unavailable", { status: 503 });
+    };
+    const status = await statusForConnectionUnlocked({
+      accessToken: "fixture-token",
+      locationId: "real-location-id",
+      connectionId: "11111111-1111-4111-8111-111111111111",
+    });
+    assert.deepEqual(status, {
+      connected: true,
+      locationId: "real-location-id",
+      locationName: null,
+      connectionId: "11111111-1111-4111-8111-111111111111",
+      nameUnavailable: true,
+    });
+    assert.deepEqual(calls, ["https://services.leadconnectorhq.com/locations/real-location-id"]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+
+test("provider identity rejects a location name returned for another location id", async () => {
+  const { statusForConnectionUnlocked } = await import("./crm-oauth.ts");
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      location: { id: "another-location", name: "Wrong Account" },
+    }), { status: 200, headers: { "content-type": "application/json" } });
+    const status = await statusForConnectionUnlocked({
+      accessToken: "fixture-token",
+      locationId: "real-location-id",
+      connectionId: "11111111-1111-4111-8111-111111111111",
+    });
+    assert.equal(status.locationId, "real-location-id");
+    assert.equal(status.locationName, null);
+    assert.equal(status.nameUnavailable, true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
