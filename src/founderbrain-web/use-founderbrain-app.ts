@@ -30,6 +30,7 @@ import {
   patchBrain,
   settleSaveDecision,
 } from "./lib/brain-draft";
+import { prepareGenerateJob, runExclusive, type LockRef } from "./lib/generate-job";
 import {
   JOB_POLL_DEADLINE_MS,
   JOB_POLL_INITIAL_WAIT_MS,
@@ -102,6 +103,8 @@ export function useFounderBrainApp() {
   const orientationEpoch = useRef(0);
   const saveOperation = useRef<{ brain: Brain; expectedVersion: number; key: string } | null>(null);
   const jobOperation = useRef<{ expectedVersion: number; key: string } | null>(null);
+  // Synchronous duplicate-call guard for generate(); see lib/generate-job.ts.
+  const generatingRef: LockRef = useRef(false);
   const acceptOperation = useRef<{
     id: string;
     text: string;
@@ -827,15 +830,24 @@ export function useFounderBrainApp() {
         const outcome = interpretJobStatus(job.status);
         if (outcome.kind === "completed" && job.artifact) {
           window.sessionStorage.removeItem(jobStorage);
+          const fresh = await api.brain();
+          if (epoch !== sessionEpoch.current) return;
+          setState(fresh);
           setArtifact(job.artifact);
           setArtifactText(job.artifact.text);
-          setArtifactStale(false);
+          const moved = job.artifact.sourceVersion !== fresh.version;
+          setArtifactStale(moved);
           setJobNeedsReconcile(false);
-          setNotice("A draft output is ready for review.");
+          setNotice(
+            moved
+              ? "Your Brain has updated to a new version. Rebuild before accepting."
+              : "A draft output is ready for review.",
+          );
           return;
         }
         if (outcome.kind === "failed") {
           window.sessionStorage.removeItem(jobStorage);
+          jobOperation.current = null;
           // job.error is a plain string, not an ApiError, so it must be shown
           // directly: friendlyError() below only passes through ApiError
           // messages and would otherwise flatten this to a generic line,
@@ -875,79 +887,129 @@ export function useFounderBrainApp() {
   async function generate() {
     if (!api || !state || !config?.aiEnabled || generating) return;
     const epoch = sessionEpoch.current;
-    const operation = jobOperation.current ?? {
-      expectedVersion: state.version,
-      key: crypto.randomUUID(),
-    };
-    jobOperation.current = operation;
-    setGenerating(true);
-    setGenerationRetry(false);
-    setError("");
-    try {
-      const start = await api.startJob(operation.expectedVersion, operation.key);
-      if (epoch !== sessionEpoch.current) return;
-      jobOperation.current = null;
-      window.sessionStorage.setItem(jobStorage, start.id);
-      await pollJob(start.id, epoch);
-    } catch (err) {
-      if (epoch !== sessionEpoch.current) return;
-      // The API sends { error, message, details: { jobId, status } }; ApiError keeps
-      // the whole body in `details`, so the job id sits one level down.
-      const activeJob =
-        err instanceof ApiError
-          ? ((err.details as { details?: { jobId?: unknown; status?: unknown } }).details ?? {})
-          : {};
-      if (
-        err instanceof ApiError &&
-        err.code === "job_active" &&
-        typeof activeJob.jobId === "string"
-      ) {
-        if (activeJob.status === "uncertain") {
-          jobOperation.current = {
-            expectedVersion: state.version,
-            key: crypto.randomUUID(),
-          };
-          try {
-            const again = await api.startJob(state.version, jobOperation.current.key, true);
-            jobOperation.current = null;
-            window.sessionStorage.setItem(jobStorage, again.id);
-            await pollJob(again.id, epoch);
-            return;
-          } catch (retryErr) {
-            setError(friendlyError(retryErr));
-            setGenerationRetry(true);
-            setGenerating(false);
-            return;
-          }
+    // `generatingRef` is a plain ref cell mutated synchronously by
+    // runExclusive, so a second click fired before React re-renders with
+    // `generating: true` still sees the lock and is dropped, instead of
+    // racing in and starting a second save or a second job.
+    const outcome = await runExclusive(generatingRef, async () => {
+      setGenerating(true);
+      setGenerationRetry(false);
+      setError("");
+      try {
+        // Channels the picker writes only land in the local draft until Save
+        // runs, and `state` is the last-saved snapshot -- so the plan is built
+        // from the live draft and saves it first, awaiting the result, before
+        // any job version is chosen. See lib/generate-job.ts for the ordering
+        // this guarantees (no job on missing channels, no job on a save that
+        // failed/conflicted, no job silently built on a selection that was
+        // superseded by further edits made while the save was in flight).
+        const plan = await prepareGenerateJob({
+          getDraft: () => latestDraft.current,
+          state,
+          save,
+        });
+        if (epoch !== sessionEpoch.current) return;
+        if (plan.kind === "no_channels") {
+          setError(
+            "Select the channels this pack is for before generating. Choose at least one of Instagram, Facebook, LinkedIn, Reddit, TikTok, YouTube, or Threads.",
+          );
+          setGenerationRetry(false);
+          return;
         }
-        window.sessionStorage.setItem(jobStorage, activeJob.jobId);
-        setNotice("A build is already running. Staying with it.");
-        await pollJob(activeJob.jobId, epoch);
-        return;
-      }
-      if (err instanceof ApiError && err.code === "version_conflict") {
+        if (plan.kind === "save_failed") {
+          // save() already surfaced a conflict/error banner and left the draft
+          // untouched; do not start a job against a stale/unsaved version.
+          return;
+        }
+        if (plan.kind === "superseded") {
+          setError(
+            "Your channel selection changed while saving. Click Generate again to build with the latest selection.",
+          );
+          setGenerationRetry(true);
+          return;
+        }
+        const current = plan.state;
+        const operation =
+          jobOperation.current && jobOperation.current.expectedVersion === current.version
+            ? jobOperation.current
+            : { expectedVersion: current.version, key: crypto.randomUUID() };
+        jobOperation.current = operation;
         try {
-          const fresh = await api.brain();
+          const start = await api.startJob(operation.expectedVersion, operation.key);
           if (epoch !== sessionEpoch.current) return;
-          setState(fresh);
-          jobOperation.current = { expectedVersion: fresh.version, key: crypto.randomUUID() };
-          const start = await api.startJob(fresh.version, jobOperation.current.key);
           jobOperation.current = null;
           window.sessionStorage.setItem(jobStorage, start.id);
           await pollJob(start.id, epoch);
-          return;
-        } catch (retryErr) {
-          setError(friendlyError(retryErr));
+        } catch (err) {
+          if (epoch !== sessionEpoch.current) return;
+          // The API sends { error, message, details: { jobId, status } }; ApiError keeps
+          // the whole body in `details`, so the job id sits one level down.
+          const activeJob =
+            err instanceof ApiError
+              ? ((err.details as { details?: { jobId?: unknown; status?: unknown } }).details ?? {})
+              : {};
+          if (err instanceof ApiError && err.code === "job_active" && typeof activeJob.jobId === "string") {
+            if (activeJob.status === "uncertain") {
+              jobOperation.current = {
+                expectedVersion: current.version,
+                key: crypto.randomUUID(),
+              };
+              try {
+                const again = await api.startJob(current.version, jobOperation.current.key, true);
+                jobOperation.current = null;
+                window.sessionStorage.setItem(jobStorage, again.id);
+                await pollJob(again.id, epoch);
+                return;
+              } catch (retryErr) {
+                setError(friendlyError(retryErr));
+                setGenerationRetry(true);
+                return;
+              }
+            }
+            window.sessionStorage.setItem(jobStorage, activeJob.jobId);
+            setNotice("A build is already running. Staying with it.");
+            await pollJob(activeJob.jobId, epoch);
+            return;
+          }
+          if (
+            err instanceof ApiError &&
+            (err.code === "version_conflict" || err.code === "idempotency_conflict")
+          ) {
+            try {
+              const fresh = await api.brain();
+              if (epoch !== sessionEpoch.current) return;
+              setState(fresh);
+              jobOperation.current = { expectedVersion: fresh.version, key: crypto.randomUUID() };
+              const start = await api.startJob(fresh.version, jobOperation.current.key);
+              jobOperation.current = null;
+              window.sessionStorage.setItem(jobStorage, start.id);
+              await pollJob(start.id, epoch);
+              return;
+            } catch (retryErr) {
+              jobOperation.current = null;
+              setArtifactStale(true);
+              setError(
+                retryErr instanceof ApiError &&
+                  (retryErr.code === "version_conflict" || retryErr.code === "idempotency_conflict")
+                  ? "Your Brain has updated to a new version. Rebuild before accepting."
+                  : friendlyError(retryErr),
+              );
+              setGenerationRetry(true);
+              return;
+            }
+          }
+          setError(friendlyError(err));
           setGenerationRetry(true);
-          setGenerating(false);
-          return;
+          setNotice("Generation start is unresolved. Retry uses the same request key.");
         }
+      } finally {
+        // Runs on every exit path, including the early no_channels/save_failed/
+        // superseded returns above, so the lock and the spinner never get stuck
+        // on together after a failure.
+        if (epoch === sessionEpoch.current) setGenerating(false);
       }
-      setError(friendlyError(err));
-      setGenerationRetry(true);
-      setNotice("Generation start is unresolved. Retry uses the same request key.");
-      setGenerating(false);
-    }
+    });
+    if (outcome.kind === "already_running") return;
   }
 
   async function reconcileOutput() {
@@ -1009,9 +1071,21 @@ export function useFounderBrainApp() {
       );
     } catch (err) {
       if (epoch === sessionEpoch.current) {
-        setError(friendlyError(err));
-        setAcceptRetry(true);
-        setNotice("Acceptance outcome is unresolved. Retry uses the same request key.");
+        if (
+          err instanceof ApiError &&
+          (err.code === "stale_proposal" || err.code === "version_conflict")
+        ) {
+          acceptOperation.current = null;
+          setAcceptRetry(false);
+          setArtifactStale(true);
+          setGenerationRetry(true);
+          setError("Your Brain has updated to a new version. Rebuild before accepting.");
+          setNotice("");
+        } else {
+          setError(friendlyError(err));
+          setAcceptRetry(true);
+          setNotice("Acceptance outcome is unresolved. Retry uses the same request key.");
+        }
       }
     } finally {
       if (epoch === sessionEpoch.current) setAccepting(false);

@@ -60,6 +60,7 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
   },
   context: {
     channelsActive: "Channels you publish on today",
+    contentChannels: "Channels this pack uses",
     channelsDormant: "Dormant accounts",
     emailProvider: "Work email provider",
     domainStatus: "Sending domain status",

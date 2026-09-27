@@ -3,6 +3,14 @@
  * Kept out of Brain markdown: server-side row only, read back after write.
  */
 import { z } from "zod";
+import {
+  contentFieldBlock,
+  OrientationWorkError,
+  outreachFieldBlock,
+  trackSetupReady,
+} from "./saturday-work.ts";
+
+export { OrientationWorkError };
 
 export const ORIENTATION_FIRST_LOGIN_SCREENS = 4 as const;
 export const CONTENT_CHAPTER_SCREENS = 6 as const;
@@ -17,6 +25,8 @@ export const contentAnswersSchema = z
     domainReady: z.boolean().optional(),
     instagramBusiness: z.boolean().optional(),
     thirtyPieces: z.boolean().optional(),
+    instagramHandle: z.string().max(64).optional(),
+    emailDomain: z.string().max(253).optional(),
     bottleneck: z.string().max(500).optional(),
     workflow: z.string().max(200).optional(),
   })
@@ -27,6 +37,9 @@ export const outreachAnswersSchema = z
     copyFinalised: z.boolean().optional(),
     prospectList: z.boolean().optional(),
     targetAccounts: z.boolean().optional(),
+    copy: z.string().max(8000).optional(),
+    accounts: z.string().max(8000).optional(),
+    prospects: z.string().max(8000).optional(),
   })
   .strict();
 
@@ -128,10 +141,14 @@ export function applyOrientationPatch(
     next.firstLoginCompletedAt = next.firstLoginCompletedAt ?? now.toISOString();
   }
   if (patch.contentComplete) {
+    const blocked = contentFieldBlock(next);
+    if (blocked) throw new OrientationWorkError(blocked);
     next.contentScreen = CONTENT_CHAPTER_SCREENS;
     next.contentCompletedAt = next.contentCompletedAt ?? now.toISOString();
   }
   if (patch.outreachComplete) {
+    const blocked = outreachFieldBlock(next);
+    if (blocked) throw new OrientationWorkError(blocked);
     next.outreachScreen = OUTREACH_CHAPTER_SCREENS;
     next.outreachCompletedAt = next.outreachCompletedAt ?? now.toISOString();
   }
@@ -181,12 +198,7 @@ export function atlantaReadyMap(
   orientation: OrientationState,
 ): AtlantaReadyMap {
   const brainThesis = readiness.identity && readiness.customer && readiness.offer;
-  const trackSetup =
-    orientation.track === "b2b"
-      ? orientation.contentAnswers.domainReady === true
-      : orientation.track === "b2c"
-        ? orientation.contentAnswers.instagramBusiness === true
-        : false;
+  const trackSetup = trackSetupReady(orientation);
   const artifacts: AtlantaArtifact[] = [
     {
       key: "brainThesis",
@@ -210,13 +222,13 @@ export function atlantaReadyMap(
       key: "contentChapter",
       label: "Your content plan: what you post and how to keep it flowing",
       day: "saturday",
-      ready: orientation.contentCompletedAt !== null,
+      ready: orientation.contentCompletedAt !== null && contentFieldBlock(orientation) === null,
     },
     {
       key: "outreachChapter",
       label: "Your outreach plan: who to contact and what to say",
       day: "saturday",
-      ready: orientation.outreachCompletedAt !== null,
+      ready: orientation.outreachCompletedAt !== null && outreachFieldBlock(orientation) === null,
     },
     {
       key: "trackSetup",

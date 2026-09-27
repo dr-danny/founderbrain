@@ -23,3 +23,20 @@ export function missingMissionFields(brain: Brain, section: MissionSection): str
   if (section === "customer" && brain.customer.evidenceStatus === "supported") fields.push("evidence");
   return fields.filter((field) => !missionFieldStatus(brain, section, field).answered);
 }
+
+/** Business-profile card covers Identity, Customer, and Offer. Open the first unfinished one. */
+export function profileResumeMission(readiness: {
+  identity: boolean;
+  customer: boolean;
+  offer: boolean;
+}): MissionSection {
+  if (!readiness.identity) return "identity";
+  if (!readiness.customer) return "customer";
+  if (!readiness.offer) return "offer";
+  return "identity";
+}
+
+/** First missing required question, or the confirm screen when the section can be approved. */
+export function resumeQuestion(brain: Brain, section: MissionSection): string {
+  return missingMissionFields(brain, section)[0] ?? "confirm";
+}

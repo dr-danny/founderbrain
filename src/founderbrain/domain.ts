@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { channelGenerationRules, parseContentChannels } from "../founderbrain-shared/channels.ts";
 import {
   canonicalize,
   readiness as sharedReadiness,
@@ -210,6 +211,8 @@ export function generationPayload(
       "Days 1 to 30 get the engines running. Days 31 to 60 test and measure. Days 61 to 90 double down or cut. " +
       "Monday morning is the first three actions, in order, with a time estimate each. " +
       "Kill criteria name the day-30 result that means stop. " +
+      channelGenerationRules(parseContentChannels(brain.context.contentChannels)) +
+      "The 90 day plan may schedule only those selected channels. Do not add LinkedIn, Instagram, or any platform that was not selected. " +
       "B2B plans sequence the list, the sequence, and sending. B2C plans sequence posts, hooks, and inbound. Never put the other track's method in the plan. " +
       "Every number is one the founder gave, or an assumption. Label assumptions with the word assume and show the arithmetic in one line. Never promise replies. " +
       "If an engine file is missing, name the gap. Do not pretend it is running. " +

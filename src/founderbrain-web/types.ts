@@ -36,6 +36,7 @@ export interface Config {
   hexclave: HexclaveClientConfig | null;
   aiEnabled: boolean;
   crmConnectEnabled?: boolean;
+  instagramConnectEnabled?: boolean;
   siteImportEnabled?: boolean;
   routinesEnabled?: boolean;
   mediaEnabled?: boolean;
@@ -104,7 +105,7 @@ export type MediaItem = {
   id: string;
   pieceN: number | null;
   kind: "image" | "video";
-  source: "upload" | "higgsfield";
+  source: "upload" | "higgsfield" | "instagram";
   status: "pending" | "ready" | "failed";
   contentType: string | null;
   sizeBytes: number | null;

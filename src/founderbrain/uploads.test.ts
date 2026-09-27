@@ -443,11 +443,15 @@ async function workspaceFor(label: string): Promise<string> {
 
 /** jobs.enqueue only requires a non-empty name or venture (see its "named" check) —
  *  not full section readiness — so this deliberately leaves every section
- *  unapproved rather than tripping validateBrain's incomplete_section check. */
+ *  unapproved rather than tripping validateBrain's incomplete_section check.
+ *  A channel is selected too: jobs.enqueue also refuses to start with none
+ *  selected (channels_required), and these tests are about the document
+ *  budget/allocation path, not channel selection. */
 function namedBrain(): Brain {
   const b = emptyBrain();
   b.identity.name = "Ada";
   b.identity.venture = "Northwind";
+  b.context.contentChannels = "Instagram";
   return b;
 }
 

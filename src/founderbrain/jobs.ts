@@ -23,6 +23,7 @@ import type { Config } from "./config.ts";
 import type { PgBrainStore } from "./store.ts";
 import { openRouterProvider, type Provider } from "./provider.ts";
 import { sealBlob, openBlob, unwrapDataKey } from "../server/storage/crypto.ts";
+import { parseContentChannels } from "../founderbrain-shared/channels.ts";
 import { buildOrchestrationFromConfig, orchestrateInvitation } from "./orchestrate.ts";
 import { keyIsUsable, loadOpenRouterApiKey, recordOpenRouterSpend } from "./openrouter-keys.ts";
 import type { OrchestrationRole, RoleModels } from "./openrouter-privacy.ts";
@@ -60,6 +61,12 @@ interface Pinned {
 }
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
+/** Same sha256-of-plaintext scheme `sealBlob` uses for content-addressed
+ * storage, so this always matches the row's own draft_sha/accepted_sha for
+ * text that has not changed -- the basis for `saveLatestText`'s CAS check. */
+export function hashArtifactText(text: string): string {
+  return hash(text);
+}
 const MAX_OUTPUT = 6000;
 const PACK_LIMIT = 60000;
 /** Per-role lease window. Provider calls time out at 90s; renew between roles. */
@@ -169,6 +176,13 @@ export class BrainJobs {
         422,
         "brain_incomplete",
         "Save who you are before building the 90 day plan. Missing pieces are named as gaps, not invented.",
+      );
+    }
+    if (!parseContentChannels(state.brain.context.contentChannels).length) {
+      throw new DomainError(
+        422,
+        "channels_required",
+        "Select the channels this pack is for before generating. Choose at least one of Instagram, Facebook, LinkedIn, Reddit, TikTok, YouTube, or Threads.",
       );
     }
     const { meta } = await loadOpenRouterApiKey(this.store, workspace);
@@ -356,15 +370,42 @@ export class BrainJobs {
     });
   }
 
-  async saveLatestText(workspace: string, text: string): Promise<void> {
+  /**
+   * Optimistic compare-and-swap: `expected` is the artifact id and content
+   * hash the caller read before doing any slow work (e.g. a paid AI
+   * rewrite). If a newer edit or accept landed on this workspace's artifact
+   * in the meantime -- a different id, or the same id but a different
+   * current sha -- this refuses instead of overwriting it. The check and
+   * the write happen in the same transaction, so there is no window between
+   * verifying freshness and committing the new text.
+   */
+  async saveLatestText(
+    workspace: string,
+    expected: { id: string; textHash: string },
+    text: string,
+  ): Promise<void> {
     await this.store.scoped(workspace, async (tx: Tx) => {
+      // Share the generation/accept lock so a new artifact cannot appear
+      // between reading the latest artifact and writing the revision.
+      await tx`select pg_advisory_xact_lock(hashtext(${workspace}))`;
       const rows = await tx`
-        select id, accepted_at from fb_artifact
+        select id, accepted_at, draft_sha, accepted_sha from fb_artifact
         where founder_id = ${workspace}
         order by created_at desc
         limit 1
+        for update
       `;
-      if (!rows[0]) return;
+      if (!rows[0]) {
+        throw new DomainError(404, "no_artifact", "There is no saved pack to update.");
+      }
+      const currentSha = rows[0].accepted_at ? rows[0].accepted_sha : rows[0].draft_sha;
+      if (rows[0].id !== expected.id || currentSha !== expected.textHash) {
+        throw new DomainError(
+          409,
+          "artifact_conflict",
+          "This pack changed since the rewrite started. Reload and try again so nothing newer gets overwritten.",
+        );
+      }
       const sha = await putPrivate(tx, workspace, text);
       if (rows[0].accepted_at) {
         await tx`update fb_artifact set draft_sha = ${sha}, accepted_sha = ${sha} where founder_id = ${workspace} and id = ${rows[0].id}`;

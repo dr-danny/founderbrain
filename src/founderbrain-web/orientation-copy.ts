@@ -28,7 +28,14 @@ export type TypeformScreen = {
   /** Choice buttons; selecting one advances with that value. */
   choices?: TypeformChoice[];
   /** Free-text field key into chapter answers. */
-  textField?: { key: string; label: string; placeholder: string };
+  textField?: {
+    key: string;
+    label: string;
+    placeholder: string;
+    hint?: string;
+    multiline?: boolean;
+    maxLength?: number;
+  };
   /** Confirm checkbox key into chapter answers. */
   confirm?: { key: string; label: string };
   /** Opens in a new tab. Used for GoHighLevel Starter. */
@@ -58,24 +65,30 @@ export function contentScreens(track: FounderTrack | null): TypeformScreen[] {
           id: "instagram",
           title: "Instagram as Business",
           body: [
-            "For consumer founders, set Instagram to a Business account before Atlanta.",
-            "Mark it ready when it is done. Partial is fine — partial is not Green.",
+            "Instagram is optional. It does not block picking a workflow.",
+            "Enter the handle you will post from, or leave it blank and continue.",
           ],
-          confirm: {
-            key: "instagramBusiness",
-            label: "Instagram is set to Business",
+          textField: {
+            key: "instagramHandle",
+            label: "Instagram handle",
+            placeholder: "@yourhandle",
+            hint: "Letters, numbers, periods, and underscores. Up to 30 characters.",
+            maxLength: 64,
           },
         }
       : {
           id: "domain",
           title: "Email domain ready",
           body: [
-            "For B2B founders, have a real email domain ready before Atlanta.",
-            "Mark it ready when it is done. Partial is fine — partial is not Green.",
+            "For B2B founders, enter the domain you will send from.",
+            "This is the domain itself, not a checkbox that it is ready.",
           ],
-          confirm: {
-            key: "domainReady",
-            label: "Email domain is ready",
+          textField: {
+            key: "emailDomain",
+            label: "Email domain",
+            placeholder: "yourcompany.com",
+            hint: "No @ and no https. Example: yourcompany.com",
+            maxLength: 253,
           },
         };
 
@@ -103,12 +116,8 @@ export function contentScreens(track: FounderTrack | null): TypeformScreen[] {
       title: "Thirty pieces",
       body: [
         "Generate and edit thirty content pieces in FounderBrain once Voice is in place.",
-        "Mark this when the draft set is edited, not when it is merely generated.",
+        "If a piece asks for a photo or clip, attach a saved file to that piece before you continue.",
       ],
-      confirm: {
-        key: "thirtyPieces",
-        label: "Thirty pieces generated and edited",
-      },
     },
     {
       id: "bottleneck",
@@ -141,23 +150,31 @@ export function outreachScreens(track: FounderTrack | null): TypeformScreen[] {
           title: "Twenty-five target accounts",
           body: [
             "Name twenty-five accounts you will actually reach.",
-            "Mark ready when the list is real, not aspirational.",
+            "One account per line. Duplicates count once.",
           ],
-          confirm: {
-            key: "targetAccounts",
-            label: "Twenty-five target accounts are listed",
+          textField: {
+            key: "accounts",
+            label: "Target accounts",
+            placeholder: "@account or a name, one per line",
+            hint: "25 lines required.",
+            multiline: true,
+            maxLength: 8000,
           },
         }
       : {
           id: "prospects",
           title: "Prospect list",
           body: [
-            "Finalise a B2B prospect list you can work on Saturday.",
-            "Mark ready when names and emails are good enough to use.",
+            "Enter the people you will contact on Saturday.",
+            "One person per line, with a name and an email.",
           ],
-          confirm: {
-            key: "prospectList",
-            label: "Prospect list is ready",
+          textField: {
+            key: "prospects",
+            label: "Prospects",
+            placeholder: "Ada Lovelace <ada@example.com>",
+            hint: "At least 5. Each line needs a name and an email.",
+            multiline: true,
+            maxLength: 8000,
           },
         };
 
@@ -166,12 +183,16 @@ export function outreachScreens(track: FounderTrack | null): TypeformScreen[] {
       id: "outreach-intro",
       title: "Outreach copy",
       body: [
-        "Saturday is content and outreach. Finalise the copy the engines will reuse.",
-        "Apollo stays weekend work for B2B. GoHighLevel has its own chapter.",
+        "Write the outreach copy you will actually send.",
+        "Apollo stays weekend work for B2B. GoHighLevel has its own chapter. Nothing is sent from here.",
       ],
-      confirm: {
-        key: "copyFinalised",
-        label: "Outreach copy is finalised",
+      textField: {
+        key: "copy",
+        label: "Outreach copy",
+        placeholder: "The message you will send, in your own words.",
+        hint: "At least a short paragraph. This is saved. A checkbox does not count.",
+        multiline: true,
+        maxLength: 8000,
       },
     },
     listScreen,

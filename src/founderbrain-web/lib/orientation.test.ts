@@ -6,7 +6,14 @@ import {
   atlantaReadyMap,
   emptyOrientationState,
   isFirstLoginComplete,
+  OrientationWorkError,
 } from "../../founderbrain-shared/orientation.ts";
+import {
+  contentPackBlock,
+  instagramHandleOk,
+  pieceAsksForMedia,
+  trackSetupReady,
+} from "../../founderbrain-shared/saturday-work.ts";
 import {
   DROPPED_PREP_DELIVERY,
   GHL_STARTER_URL,
@@ -91,18 +98,21 @@ test("connecting GoHighLevel merges the flag and does not drop the account answe
 });
 
 test("atlanta ready map is green only when all artifacts are ready", () => {
+  const prospects = [1, 2, 3, 4, 5].map((n) => `Person ${n} <p${n}@example.com>`).join("\n");
   const orientation = applyOrientationPatch(emptyOrientationState(), {
     firstLoginComplete: true,
     track: "b2b",
     contentComplete: true,
     outreachComplete: true,
     contentAnswers: {
-      domainReady: true,
-      thirtyPieces: true,
+      emailDomain: "northwind.example",
       bottleneck: "time",
       workflow: "batch-weekly",
     },
-    outreachAnswers: { copyFinalised: true, prospectList: true },
+    outreachAnswers: {
+      copy: "A real outreach note that is long enough to send on Saturday to a named person.",
+      prospects,
+    },
     ghlComplete: true,
     ghlAnswers: { hasAccount: true, connected: true },
   });
@@ -119,4 +129,90 @@ test("atlanta ready map is green only when all artifacts are ready", () => {
   );
   assert.equal(green.green, true);
   assert.equal(green.readyCount, green.total);
+});
+
+test("a checkbox cannot finish Saturday content or outreach", () => {
+  assert.throws(
+    () =>
+      applyOrientationPatch(emptyOrientationState(), {
+        track: "b2b",
+        contentComplete: true,
+        contentAnswers: { domainReady: true, thirtyPieces: true },
+      }),
+    OrientationWorkError,
+  );
+  assert.throws(
+    () =>
+      applyOrientationPatch(emptyOrientationState(), {
+        track: "b2c",
+        outreachComplete: true,
+        outreachAnswers: { copyFinalised: true, targetAccounts: true },
+      }),
+    OrientationWorkError,
+  );
+  assert.equal(instagramHandleOk("@geauxride"), true);
+  assert.equal(instagramHandleOk("not a handle"), false);
+  const pieces = Array.from({ length: 30 }, (_, index) => {
+    const n = index + 1;
+    return `${n}. Pillar · Short post · LinkedIn\n\nBody ${n}\n\nMedia: Photo ${n}`;
+  }).join("\n\n");
+  assert.equal(pieceAsksForMedia("Body\n\nMedia: Photo of the shop"), true);
+  assert.equal(pieceAsksForMedia("Body\n\nMedia: none"), false);
+  assert.match(contentPackBlock(pieces, []) ?? "", /Still missing a file/);
+  assert.equal(contentPackBlock(pieces, Array.from({ length: 30 }, (_, index) => index + 1)), null);
+});
+
+// Regression for a build break where orientation.ts imports trackSetupReady
+// from saturday-work.ts, but the export had been dropped. This locks the
+// restored semantics in place: b2b mirrors the same email-domain check
+// contentFieldBlock uses, independent of chapter completion. b2c is stricter
+// than contentFieldBlock on purpose — a blank handle can finish the Saturday
+// content chapter, but the separate Sunday "Instagram is a business account"
+// item stays unfinished until an actual valid handle is saved.
+test("trackSetupReady mirrors the track's field validity, not chapter completion", () => {
+  assert.equal(trackSetupReady({ track: null, contentAnswers: {}, outreachAnswers: {} }), false);
+
+  assert.equal(
+    trackSetupReady({ track: "b2b", contentAnswers: {}, outreachAnswers: {} }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2b",
+      contentAnswers: { emailDomain: "not a domain" },
+      outreachAnswers: {},
+    }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2b",
+      contentAnswers: { emailDomain: "northwind.example" },
+      outreachAnswers: {},
+    }),
+    true,
+  );
+
+  // A blank handle finishes the content chapter (contentFieldBlock treats it
+  // as optional) but does NOT satisfy the Sunday track-setup item.
+  assert.equal(
+    trackSetupReady({ track: "b2c", contentAnswers: {}, outreachAnswers: {} }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2c",
+      contentAnswers: { instagramHandle: "not a handle" },
+      outreachAnswers: {},
+    }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2c",
+      contentAnswers: { instagramHandle: "geauxride" },
+      outreachAnswers: {},
+    }),
+    true,
+  );
 });

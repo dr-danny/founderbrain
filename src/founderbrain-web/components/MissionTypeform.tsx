@@ -5,9 +5,10 @@
 import { useEffect, useState } from "react";
 import { missions, missionCopy, type Mission } from "../mission-copy";
 import { sectionWouldApprove, type Artifact, type Brain, type Config, type MissionSection } from "../types";
+import { ChannelPicker } from "./ChannelPicker";
 import { Output } from "./Output";
 import type { QuestionIndexConfig, QuestionIndexItem } from "./QuestionIndexModal";
-import { missionFieldStatus, missingMissionFields } from "../lib/mission-index";
+import { missionFieldStatus, missingMissionFields, resumeQuestion } from "../lib/mission-index";
 import { toQuestionKey } from "../lib/uploads";
 import { VoiceSampleGate } from "./VoiceSampleGate";
 import { TypeformShell } from "./TypeformShell";
@@ -103,6 +104,7 @@ const MISSION_FIELDS: Record<Exclude<Mission, "output">, FieldDef[]> = {
   ],
   context: [
     { field: "channelsActive", title: "Where do you publish today?", kind: "multi", maxLength: 400, placeholder: "Your active channels, or choose None yet below" },
+    { field: "contentChannels", title: "Which channels should this pack use?", kind: "multi", maxLength: 200, placeholder: "Select the channels below" },
     { field: "channelsDormant", title: "Accounts you have but do not use?", kind: "multi", maxLength: 400, placeholder: "Dormant channels" },
     { field: "emailProvider", title: "What do you open your work email in?", kind: "choice", maxLength: 14, placeholder: "", options: EMAIL_PROVIDER_OPTIONS },
     { field: "domainStatus", title: "Is your sending domain warm?", kind: "choice", maxLength: 8, placeholder: "", options: DOMAIN_OPTIONS },
@@ -195,6 +197,19 @@ function screenIndexOf(mission: Mission, track: "b2b" | "b2c"): number {
   return found >= 0 ? found : screens.length - 1;
 }
 
+/** Open a mission on its first gap, or its confirm screen when the required answers are already in. */
+function resumeIndex(mission: Mission, track: "b2b" | "b2c", brain: Brain): number {
+  const { screens, fields } = screensFor(track);
+  if (mission === "output") return screenIndexOf(mission, track);
+  const target = resumeQuestion(brain, mission);
+  const found = screens.findIndex((screen) => {
+    if (screen.mission !== mission) return false;
+    if (target === "confirm") return screen.kind === "confirm";
+    return screen.kind === "field" && fields[mission]?.[screen.index]?.field === target;
+  });
+  return found >= 0 ? found : screenIndexOf(mission, track);
+}
+
 function fieldValue(draft: Brain, mission: Exclude<Mission, "output">, field: string): string {
   const section = draft[mission] as unknown as Record<string, unknown>;
   const raw = section[field];
@@ -237,11 +252,13 @@ export function MissionTypeform(props: {
   const draft = props.draft;
   const track = draft.identity.track === "b2c" ? "b2c" : "b2b";
   const { screens, fields: fieldsByMission } = screensFor(track);
-  const [idx, setIdx] = useState(() => screenIndexOf(props.mission, track));
+  const [idx, setIdx] = useState(() => resumeIndex(props.mission, track, draft));
   // Reset only when the entry mission changes. A track flip re-forks later
   // missions but must NOT teleport the walk back to the entry mission.
+  // Resume on the first gap, or the confirm screen when required answers are in,
+  // so an approved Identity is not replayed from question 1.
   useEffect(() => {
-    setIdx(screenIndexOf(props.mission, track));
+    setIdx(resumeIndex(props.mission, track, props.draft));
   }, [props.mission]);
   useEffect(() => {
     setIdx((current) => Math.min(current, screens.length - 1));
@@ -345,10 +362,19 @@ export function MissionTypeform(props: {
         progressText={`Mission ${missions.length} of ${missions.length} · your first output`}
         title="Your first output"
         questionIndex={questionIndex}
-        continueLabel="Done"
+        continueLabel={
+          props.artifactStale || props.generationRetry
+            ? props.generating
+              ? "Building the plan…"
+              : "Rebuild the plan"
+            : "Done"
+        }
+        continueDisabled={props.generating}
         showBack
         onBack={() => go(total - 2)}
-        onContinue={props.onFinished}
+        onContinue={
+          props.artifactStale || props.generationRetry ? props.onGenerate : props.onFinished
+        }
         saving={props.saving}
       >
         <Output
@@ -368,6 +394,8 @@ export function MissionTypeform(props: {
           onRetryGenerate={props.onGenerate}
           onReconcile={props.onReconcile}
           onAccept={props.onAccept}
+          channels={draft.context.contentChannels}
+          onChannels={(next) => props.onPatch("context", "contentChannels", next)}
         />
       </TypeformShell>
     );
@@ -615,17 +643,25 @@ export function MissionTypeform(props: {
           {look === "done" ? (
             <p className="entry-lede typeform-lede">Read your site. Correct anything that is off, then continue.</p>
           ) : null}
-          <VoiceField
-            label={def.title}
-            value={value}
-            maxLength={def.maxLength}
-            placeholder={def.placeholder}
-            multiline={def.kind === "multi"}
-            serverTranscribe={props.onTranscribe}
-            onEnter={def.kind === "text" ? advance : undefined}
-            onChange={(next) => props.onPatch(current.mission, def.field, next)}
-            questionKey={toQuestionKey(current.mission, def.field)}
-          />
+          {def.field === "contentChannels" ? (
+            <ChannelPicker
+              value={value}
+              disabled={props.saving}
+              onChange={(next) => props.onPatch("context", "contentChannels", next)}
+            />
+          ) : (
+            <VoiceField
+              label={def.title}
+              value={value}
+              maxLength={def.maxLength}
+              placeholder={def.placeholder}
+              multiline={def.kind === "multi"}
+              serverTranscribe={props.onTranscribe}
+              onEnter={def.kind === "text" ? advance : undefined}
+              onChange={(next) => props.onPatch(current.mission, def.field, next)}
+              questionKey={toQuestionKey(current.mission, def.field)}
+            />
+          )}
         </>
       )}
       {def.field === "channelsActive" ? (
