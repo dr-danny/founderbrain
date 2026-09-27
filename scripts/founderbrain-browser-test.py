@@ -557,6 +557,125 @@ class BrowserAuthTests(unittest.TestCase):
         self.assertEqual(state["writes"], [])
         self.assertEqual(self.errors, [])
 
+    # -- /highlevel and /oauth/callback recovery: no useFounderBrainApp mount --------
+    #
+    # These cover the GoHighLevel Marketplace "Open" landing and a broken/expired
+    # /oauth/callback redirect. Both must render without ever checking a session or
+    # calling the API: nothing here is a private-app boot screen.
+
+    def _no_backend_requests(self):
+        """Collects every request the page makes so a test can assert none of them
+        reached the API or the Hexclave auth origin (asset/document loads are fine)."""
+        seen = []
+        self.page.on("request", lambda r: seen.append(r.url))
+        return seen
+
+    def _assert_no_auth_or_api_traffic(self, seen):
+        backend = [u for u in seen if u.startswith(self.origin + "/api")]
+        auth = [u for u in seen if AUTH_ORIGIN in u or "hexclave" in u]
+        self.assertEqual(backend, [], "a public recovery screen must never call the API")
+        self.assertEqual(auth, [], "a public recovery screen must never touch Hexclave auth")
+        self.assertEqual(self.auth_requests, [], "no cross-origin auth traffic should start at all")
+
+    LAUNCH_HEADING = "Open FounderBrain."
+
+    def _expect_launch_screen(self):
+        expect(self.page.get_by_role("heading", name=self.LAUNCH_HEADING, exact=True)).to_be_visible()
+        link = self.page.get_by_role("link", name="Open FounderBrain", exact=True)
+        expect(link).to_be_visible()
+        self.assertEqual(link.get_attribute("href"), "/")
+        self.assertEqual(link.get_attribute("target"), "_top")
+        return link
+
+    def _expect_no_launch_screen(self):
+        expect(self.page.get_by_role("heading", name=self.LAUNCH_HEADING, exact=True)).to_have_count(0)
+
+    def test_highlevel_launch_route_shows_launch_screen_with_no_auth_or_network(self):
+        seen = self._no_backend_requests()
+        self.page.goto(self.origin + "/highlevel")
+        link = self._expect_launch_screen()
+        self.page.wait_for_timeout(200)
+        self._assert_no_auth_or_api_traffic(seen)
+        self.assertEqual(self.errors, [])
+        # It must never claim a connection: this screen has no way to know one exists,
+        # and must never show the real connected-status region from the authenticated app.
+        expect(
+            self.page.get_by_role("region", name="Connected GoHighLevel subaccount")
+        ).to_have_count(0)
+        box = link.bounding_box()
+        self.assertIsNotNone(box)
+        self.assertGreaterEqual(box["x"], 0)
+
+        # Same route, phone viewport: the CTA must stay reachable and on-screen.
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.page.goto(self.origin + "/highlevel")
+        mobile_link = self._expect_launch_screen()
+        mobile_box = mobile_link.bounding_box()
+        self.assertIsNotNone(mobile_box)
+        self.assertGreaterEqual(mobile_box["x"], 0)
+        self.assertLessEqual(mobile_box["x"] + mobile_box["width"], 390)
+        self.assertEqual(self.errors, [])
+
+    def test_highlevel_launch_route_strips_a_stray_query_or_fragment(self):
+        # /highlevel never needs a query or fragment; any that arrive (e.g. a stale
+        # bookmark or a Marketplace link with tracking params) are dropped on load.
+        self.page.goto(self.origin + "/highlevel?code=abc123&state=xyz789#leftover")
+        self._expect_launch_screen()
+        parsed = urlparse(self.page.url)
+        self.assertEqual(parsed.path, "/highlevel")
+        self.assertEqual(parsed.query, "")
+        self.assertEqual(parsed.fragment, "")
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_missing_state_shows_recovery_and_strips_query(self):
+        seen = self._no_backend_requests()
+        self.page.goto(self.origin + "/oauth/callback?code=abc123")
+        self._expect_launch_screen()
+        parsed = urlparse(self.page.url)
+        self.assertEqual(parsed.path, "/oauth/callback")
+        self.assertEqual(parsed.query, "", "the code must be stripped from the address bar promptly")
+        self.assertEqual(parsed.fragment, "")
+        self.page.wait_for_timeout(200)
+        self._assert_no_auth_or_api_traffic(seen)
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_duplicate_code_is_not_silently_accepted(self):
+        self.page.goto(self.origin + "/oauth/callback?code=a&code=b&state=xyz")
+        self._expect_launch_screen()
+        self.assertEqual(urlparse(self.page.url).query, "")
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_blank_state_shows_recovery(self):
+        self.page.goto(self.origin + "/oauth/callback?code=abc123&state=")
+        self._expect_launch_screen()
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_code_and_error_together_is_ambiguous_and_shows_recovery(self):
+        # code+error together is not a legitimate GoHighLevel shape; do not resolve it
+        # in favor of either side, including when the code is also duplicated.
+        self.page.goto(self.origin + "/oauth/callback?error=access_denied&code=abc123&state=xyz789")
+        self._expect_launch_screen()
+        self.page.goto(
+            self.origin + "/oauth/callback?error=access_denied&code=a&code=b&state=xyz789"
+        )
+        self._expect_launch_screen()
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_valid_code_and_state_is_not_swallowed_by_recovery_screen(self):
+        # A legitimate callback must fall through to the existing authenticated flow
+        # (here: the normal signed-out boot, since no session cookie is set) rather
+        # than being caught by the public recovery screen.
+        self.page.goto(self.origin + "/oauth/callback?code=abc123&state=xyz789")
+        expect(self.page.get_by_role("button", name="Sign in", exact=True)).to_be_visible()
+        self._expect_no_launch_screen()
+        self.assertEqual(self.errors, [])
+
+    def test_oauth_callback_error_with_state_is_not_swallowed_by_recovery_screen(self):
+        self.page.goto(self.origin + "/oauth/callback?error=access_denied&state=xyz789")
+        expect(self.page.get_by_role("button", name="Sign in", exact=True)).to_be_visible()
+        self._expect_no_launch_screen()
+        self.assertEqual(self.errors, [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

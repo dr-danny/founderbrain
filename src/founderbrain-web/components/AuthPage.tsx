@@ -29,7 +29,7 @@ type AuthPageProps =
       error: string;
     };
 
-function EntryShell({
+export function EntryShell({
   kicker,
   title,
   lede,

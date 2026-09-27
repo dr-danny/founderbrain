@@ -1124,6 +1124,22 @@ select:focus-visible {
   animation: entry-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
 }
 
+/* /highlevel + /oauth/callback launch screen only: .entry-cta is a <button> everywhere
+   else, so the anchor-only layout/underline overrides stay scoped here instead of
+   changing the shared button rule above. */
+.highlevel-launch-cta {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+}
+.highlevel-launch-cta:visited {
+  color: var(--ink);
+}
+
+.highlevel-recovery-bullets {
+  margin-top: 1.15rem;
+}
+
 .entry-cta:hover {
   background: var(--ember);
   color: var(--ink);
