@@ -87,7 +87,7 @@ describe("CRM controls against disposable Postgres", () => {
         select founder_id, connection_id from fb_crm_control order by founder_id
       `,
     );
-    assert.deepEqual(visible, [{ founder_id: workspaceA, connection_id: a }]);
+    assert.deepEqual(Array.from(visible), [{ founder_id: workspaceA, connection_id: a }]);
   });
 
   it("rejects stale generations before deletion and preserves the newer reconnect", { skip }, async () => {
