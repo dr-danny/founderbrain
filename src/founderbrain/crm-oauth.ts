@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import postgres, { type TransactionSql } from "postgres";
 import { DomainError } from "./domain.ts";
 import type { Config } from "./config.ts";
-import type { PgBrainStore } from "./store.ts";
+import { PG_STORE_POOL_MAX, type PgBrainStore } from "./store.ts";
 import { openBlob, sealBlob, unwrapDataKey } from "../server/storage/crypto.ts";
 import type { GhlConnectionStatus } from "../founderbrain-shared/ghl.ts";
 
@@ -28,6 +28,13 @@ const GHL_API = "https://services.leadconnectorhq.com";
 const GHL_VERSION = "2021-07-28";
 const STATE_TTL_MS = 15 * 60 * 1000;
 const LOCK_CLASS = "founderbrain-crm";
+/**
+ * Each outer CRM operation may need a second pooled connection for refresh CAS,
+ * usage, OAuth-state consumption, or orientation. Keep two connections free for
+ * ordinary API traffic and admit only what the remaining pool can safely nest.
+ */
+export const CRM_OUTER_OPERATION_MAX = Math.max(1, Math.floor((PG_STORE_POOL_MAX - 2) / 2));
+const crmOuterAdmissions = new WeakMap<PgBrainStore, number>();
 
 type CrmTx = TransactionSql;
 type StoredConnection = {
@@ -122,14 +129,26 @@ export async function withCrmOperationLock<T>(
   workspace: string,
   operation: (tx: CrmTx) => Promise<T>,
 ): Promise<T> {
-  return store.scoped(workspace, async (tx) => {
-    const rows = await tx<{ locked: boolean }[]>`
-      select pg_try_advisory_xact_lock(hashtext(${LOCK_CLASS}), hashtext(${workspace})) as locked
-    `;
-    if (rows[0]?.locked !== true)
-      throw new DomainError(409, "crm_busy", "GoHighLevel is already updating. Try again in a moment.");
-    return operation(tx);
-  });
+  // Admission happens before store.scoped() can reserve a pooled connection.
+  // The WeakMap is per runtime store/pool and never queues callers in memory.
+  const active = crmOuterAdmissions.get(store) ?? 0;
+  if (active >= CRM_OUTER_OPERATION_MAX)
+    throw new DomainError(409, "crm_busy", "GoHighLevel is already updating. Try again in a moment.");
+  crmOuterAdmissions.set(store, active + 1);
+  try {
+    return await store.scoped(workspace, async (tx) => {
+      const rows = await tx<{ locked: boolean }[]>`
+        select pg_try_advisory_xact_lock(hashtext(${LOCK_CLASS}), hashtext(${workspace})) as locked
+      `;
+      if (rows[0]?.locked !== true)
+        throw new DomainError(409, "crm_busy", "GoHighLevel is already updating. Try again in a moment.");
+      return operation(tx);
+    });
+  } finally {
+    const remaining = (crmOuterAdmissions.get(store) ?? 1) - 1;
+    if (remaining <= 0) crmOuterAdmissions.delete(store);
+    else crmOuterAdmissions.set(store, remaining);
+  }
 }
 
 async function putBlobUnlocked(

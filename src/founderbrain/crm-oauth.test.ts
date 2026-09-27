@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { authorizeUrl, CRM_SCOPES, readOauthState, signOauthState } from "./crm-oauth.ts";
+import {
+  authorizeUrl,
+  CRM_OUTER_OPERATION_MAX,
+  CRM_SCOPES,
+  readOauthState,
+  signOauthState,
+  withCrmOperationLock,
+} from "./crm-oauth.ts";
 import type { Config } from "./config.ts";
+import type { PgBrainStore } from "./store.ts";
 
 test("oauth state round-trips the subject and rejects a truncated token", () => {
   const secret = "x".repeat(32);
@@ -24,6 +32,83 @@ test("authorize URL uses the SPA callback and never contains ghl in the redirect
   assert.equal(url.searchParams.get("client_id"), "client-id-example");
   assert.equal(url.searchParams.get("scope"), CRM_SCOPES.join(" "));
   assert.equal(url.searchParams.get("state"), "state-token");
+});
+
+
+test("CRM admission reserves pool capacity before opening outer transactions", async () => {
+  assert.equal(CRM_OUTER_OPERATION_MAX, 3);
+  const tx = (async () => [{ locked: true }]) as never;
+  const store = {
+    scoped: async (_workspace: string, fn: (transaction: never) => Promise<unknown>) => fn(tx),
+  } as unknown as PgBrainStore;
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let started = 0;
+  let allStarted!: () => void;
+  const ready = new Promise<void>((resolve) => { allStarted = resolve; });
+  const held = Array.from({ length: CRM_OUTER_OPERATION_MAX }, (_, index) =>
+    withCrmOperationLock(store, `workspace-held-${index}`, async () => {
+      started += 1;
+      if (started === CRM_OUTER_OPERATION_MAX) allStarted();
+      await gate;
+      return index;
+    }),
+  );
+  await ready;
+
+  const overflow = Array.from({ length: 5 }, (_, index) =>
+    withCrmOperationLock(store, `workspace-busy-${index}`, async () => index),
+  );
+  const ninth = withCrmOperationLock(store, "workspace-busy-extra", async () => 9);
+  const refused = await Promise.allSettled([...overflow, ninth]);
+  for (const result of refused) {
+    assert.equal(result.status, "rejected");
+    if (result.status === "rejected") {
+      assert.equal((result.reason as { code?: string }).code, "crm_busy");
+      assert.equal((result.reason as { status?: number }).status, 409);
+    }
+  }
+
+  release();
+  assert.deepEqual(await Promise.all(held), [0, 1, 2]);
+  assert.equal(
+    await withCrmOperationLock(store, "workspace-resumed", async () => "resumed"),
+    "resumed",
+  );
+
+  const marker = new Error("operation failed");
+  for (let index = 0; index < 5; index += 1) {
+    await assert.rejects(
+      withCrmOperationLock(store, `workspace-failure-${index}`, async () => { throw marker; }),
+      (error) => error === marker,
+    );
+  }
+  assert.equal(
+    await withCrmOperationLock(store, "workspace-after-failures", async () => "available"),
+    "available",
+  );
+
+  let scopedFailures = 4;
+  const flakyStore = {
+    scoped: async (_workspace: string, fn: (transaction: never) => Promise<unknown>) => {
+      if (scopedFailures > 0) {
+        scopedFailures -= 1;
+        throw marker;
+      }
+      return fn(tx);
+    },
+  } as unknown as PgBrainStore;
+  for (let index = 0; index < 4; index += 1) {
+    await assert.rejects(
+      withCrmOperationLock(flakyStore, `workspace-scoped-failure-${index}`, async () => "unused"),
+      (error) => error === marker,
+    );
+  }
+  assert.equal(
+    await withCrmOperationLock(flakyStore, "workspace-after-scoped-failures", async () => "available"),
+    "available",
+  );
 });
 
 
