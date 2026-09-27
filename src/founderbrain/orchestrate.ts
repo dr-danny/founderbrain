@@ -231,7 +231,7 @@ export async function orchestrateInvitation(
     };
     // Content-engine rules from the original repos: finished posts the founder
     // publishes, in their captured voice. Never tasks or advice to the founder.
-    let selected: ReturnType<typeof parseContentChannels> = [];
+    let selected: ReturnType<typeof parseContentChannels>;
     try {
       const parsed = JSON.parse(plan.userContent) as { context?: { contentChannels?: string } };
       selected = parseContentChannels(parsed.context?.contentChannels);

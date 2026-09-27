@@ -12,6 +12,7 @@ import {
   contentPackBlock,
   instagramHandleOk,
   pieceAsksForMedia,
+  trackSetupReady,
 } from "../../founderbrain-shared/saturday-work.ts";
 import {
   DROPPED_PREP_DELIVERY,
@@ -159,4 +160,59 @@ test("a checkbox cannot finish Saturday content or outreach", () => {
   assert.equal(pieceAsksForMedia("Body\n\nMedia: none"), false);
   assert.match(contentPackBlock(pieces, []) ?? "", /Still missing a file/);
   assert.equal(contentPackBlock(pieces, Array.from({ length: 30 }, (_, index) => index + 1)), null);
+});
+
+// Regression for a build break where orientation.ts imports trackSetupReady
+// from saturday-work.ts, but the export had been dropped. This locks the
+// restored semantics in place: b2b mirrors the same email-domain check
+// contentFieldBlock uses, independent of chapter completion. b2c is stricter
+// than contentFieldBlock on purpose — a blank handle can finish the Saturday
+// content chapter, but the separate Sunday "Instagram is a business account"
+// item stays unfinished until an actual valid handle is saved.
+test("trackSetupReady mirrors the track's field validity, not chapter completion", () => {
+  assert.equal(trackSetupReady({ track: null, contentAnswers: {}, outreachAnswers: {} }), false);
+
+  assert.equal(
+    trackSetupReady({ track: "b2b", contentAnswers: {}, outreachAnswers: {} }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2b",
+      contentAnswers: { emailDomain: "not a domain" },
+      outreachAnswers: {},
+    }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2b",
+      contentAnswers: { emailDomain: "northwind.example" },
+      outreachAnswers: {},
+    }),
+    true,
+  );
+
+  // A blank handle finishes the content chapter (contentFieldBlock treats it
+  // as optional) but does NOT satisfy the Sunday track-setup item.
+  assert.equal(
+    trackSetupReady({ track: "b2c", contentAnswers: {}, outreachAnswers: {} }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2c",
+      contentAnswers: { instagramHandle: "not a handle" },
+      outreachAnswers: {},
+    }),
+    false,
+  );
+  assert.equal(
+    trackSetupReady({
+      track: "b2c",
+      contentAnswers: { instagramHandle: "geauxride" },
+      outreachAnswers: {},
+    }),
+    true,
+  );
 });

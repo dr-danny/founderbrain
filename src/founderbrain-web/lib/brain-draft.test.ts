@@ -132,6 +132,12 @@ test("nextSaveOperation mints a new key when the draft changed", () => {
   assert.equal(brainsEqual(again.brain, edited), true);
 });
 
+// The full generate() orchestration regression (channel picker only patching
+// the local draft, saving before a job version is minted, save failure and
+// superseded-edit handling, and the duplicate-click lock) lives in
+// generate-job.test.ts against the extracted prepareGenerateJob/runExclusive
+// helpers, which is what generate() itself now calls.
+
 test("job poll wait backs off up to the cap", () => {
   let wait = JOB_POLL_INITIAL_WAIT_MS;
   wait = nextPollWaitMs(wait);
