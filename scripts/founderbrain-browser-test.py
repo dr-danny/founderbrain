@@ -428,7 +428,13 @@ class BrowserAuthTests(unittest.TestCase):
             "readiness": dict.fromkeys(["identity", "customer", "offer", "voice", "context", "output"], True),
             "verified": True, "artifact": None,
         }))
-        self.context.route(self.origin + "/api/artifact", lambda r: r.fulfill(json={"artifact": None, "stale": False}))
+        # Model the completed setup without the unrelated fixed V2-upgrade banner.
+        self.context.route(self.origin + "/api/artifact", lambda r: r.fulfill(json={
+            "artifact": {"id": "ghl-fixture-pack", "sourceVersion": 3,
+                         "text": "## Content\nSynthetic fixture.\n## Outreach\nSynthetic fixture.\n90 day plan\nSynthetic fixture.",
+                         "acceptedAt": "2026-09-27T00:00:00.000Z"},
+            "stale": False,
+        }))
         self.context.route(self.origin + "/api/orientation", lambda r: r.fulfill(json=orientation))
         self.context.route(self.origin + "/api/history", lambda r: r.fulfill(json={"versions": []}))
         self.context.route(self.origin + "/api/usage", lambda r: r.fulfill(json={
