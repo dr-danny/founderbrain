@@ -177,7 +177,9 @@
   background: rgba(247, 239, 230, 0.03);
 }
 
-/* Read-only content photos, videos and Higgsfield output on the Files screen. */
+/* Content photos, videos, Instagram media and Higgsfield output on the Files
+   screen -- a second place to manage the same media the content library
+   manages (open, upload, delete). */
 .media-zip-note {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
@@ -202,9 +204,37 @@
   color: var(--paper);
   border-color: rgba(247, 239, 230, 0.4);
 }
+.upload-badge.media-status {
+  color: var(--ember);
+  border-color: rgba(224, 137, 74, 0.5);
+}
 .media-library-note {
   margin: 0.6rem 0 0;
   font-size: 0.85rem;
+}
+.media-delete-confirm {
+  font-size: 0.8rem;
+  color: var(--paper-muted);
+  max-width: 18rem;
+}
+.media-job-list {
+  margin-top: 0.85rem;
+}
+.media-progress {
+  width: 100%;
+  max-width: 14rem;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(247, 239, 230, 0.14);
+  overflow: hidden;
+  margin: 0.25rem 0;
+}
+.media-progress span {
+  display: block;
+  height: 100%;
+  background: var(--ember);
+  border-radius: inherit;
+  transition: width 0.15s ease;
 }
 .atlanta-link {
   background: none;

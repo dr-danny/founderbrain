@@ -29,18 +29,22 @@ test("splitMediaForFiles buckets uploads and Higgsfield output separately", () =
   assert.deepEqual(result.created, [higgsfieldVideo]);
 });
 
-test("splitMediaForFiles drops anything that is not ready", () => {
+test("splitMediaForFiles keeps pending and failed items so the screen matches the library", () => {
   const pending = item({ id: "a", source: "upload", status: "pending" });
   const failed = item({ id: "b", source: "higgsfield", status: "failed" });
   const result = splitMediaForFiles([pending, failed]);
-  assert.deepEqual(result.uploaded, []);
-  assert.deepEqual(result.created, []);
+  assert.deepEqual(result.uploaded, [pending]);
+  assert.deepEqual(result.created, [failed]);
 });
 
-test("splitMediaForFiles excludes instagram-sourced media from both sections", () => {
+test("splitMediaForFiles lists Instagram media under uploaded, next to founder uploads", () => {
   const instagram = item({ id: "a", source: "instagram" });
-  const result = splitMediaForFiles([instagram]);
-  assert.deepEqual(result.uploaded, []);
+  const upload = item({ id: "b", source: "upload" });
+  const result = splitMediaForFiles([instagram, upload]);
+  assert.deepEqual(
+    result.uploaded.map((x) => x.id),
+    ["a", "b"],
+  );
   assert.deepEqual(result.created, []);
 });
 
