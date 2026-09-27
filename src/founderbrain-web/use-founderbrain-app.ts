@@ -17,8 +17,13 @@ import {
   type MissionSection,
   type RoutineDraft,
   type RoutineSettings,
+  type UploadItem,
+  type UploadsAi,
   type UsageResponse,
 } from "./types";
+import { MAX_DOWNLOAD_ALL_BYTES, dedupeFilename, formatBytes } from "./lib/uploads";
+import { isPack, splitPack } from "./pack";
+import { zipSync, strToU8 } from "fflate";
 import {
   PENDING_JOB_STORAGE_KEY,
   nextSaveOperation,
@@ -59,7 +64,9 @@ export function useFounderBrainApp() {
   const [orientation, setOrientation] = useState<OrientationState | null>(null);
   const [orientationSaving, setOrientationSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [view, setView] = useState<View>(() => window.location.pathname === "/gmail/callback" ? "gmail" : "atlanta");
+  const [view, setView] = useState<View>(() =>
+    window.location.pathname === "/gmail/callback" ? "gmail" : "atlanta",
+  );
   const [mission, setMission] = useState<Mission>("identity");
   const [changed, setChanged] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,6 +76,9 @@ export function useFounderBrainApp() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
+  const [uploads, setUploads] = useState<UploadItem[]>([]);
+  const [uploadsAi, setUploadsAi] = useState<UploadsAi>({ budgetBytes: 0, usedBytes: 0 });
+  const uploadsLoaded = useRef(false);
   // Settings are written by the routines toggle flow; the value is not rendered
   // anywhere while the feature stays draft-only (ROUTINES_ENABLED off).
   const [, setRoutineSettings] = useState<RoutineSettings | null>(null);
@@ -139,6 +149,9 @@ export function useFounderBrainApp() {
     setJobNeedsReconcile(false);
     setDeleteOpen(false);
     setDeleteText("");
+    setUploads([]);
+    setUploadsAi({ budgetBytes: 0, usedBytes: 0 });
+    uploadsLoaded.current = false;
   };
 
   useEffect(() => {
@@ -188,6 +201,7 @@ export function useFounderBrainApp() {
   useEffect(() => {
     if (api && email) void loadWorkspace();
     if (api && email && config?.routinesEnabled) void loadRoutines();
+    if (api && email && config?.uploadsEnabled) void loadUploads();
   }, [api, email]);
   // Tokens used (Danny, 2026-09-21): keep the account chip's spend line fresh
   // wherever AI can run (missions run generation, chapters run site reads).
@@ -371,6 +385,127 @@ export function useFounderBrainApp() {
     }
   }
 
+  /** Founder file uploads: list is re-fetched after every upload/delete so the
+   *  server-computed AI status (full/partial/excluded/unreadable) and the
+   *  usage line stay accurate rather than guessed client-side. */
+  async function loadUploads(options: { silent?: boolean } = {}): Promise<void> {
+    if (!api) return;
+    const epoch = sessionEpoch.current;
+    try {
+      const result = await api.listUploads();
+      if (epoch !== sessionEpoch.current) return;
+      setUploads(result.items);
+      setUploadsAi(result.ai);
+      uploadsLoaded.current = true;
+    } catch (err) {
+      // The mount-time load stays silent: the paperclip and Files screen
+      // degrade to "no files yet" rather than block the workspace. A caller
+      // that just uploaded or deleted a file asks for silent: false so it can
+      // surface the failure instead of losing it quietly.
+      if (options.silent === false) throw err;
+    }
+  }
+
+  async function uploadFile(file: File, questionKey?: string): Promise<UploadItem> {
+    if (!api) throw new Error("api_unavailable");
+    const result = await api.uploadFile(file, questionKey);
+    const item = result.item;
+    // Insert immediately: the upload itself succeeded, so the file must not
+    // vanish from the UI just because the follow-up list refresh fails (#lost-uploads).
+    setUploads((rows) => [item, ...rows.filter((row) => row.id !== item.id)]);
+    // A generated pack read from these files before the upload; the artifact
+    // is now stale until the founder regenerates.
+    setArtifactStale(true);
+    try {
+      await loadUploads({ silent: false });
+    } catch (err) {
+      // The optimistic item above is kept; only the AI usage totals may be
+      // stale until the next successful refresh. Surface it, don't swallow it.
+      setError(friendlyError(err));
+    }
+    return item;
+  }
+
+  async function deleteUploadItem(id: string): Promise<void> {
+    if (!api) throw new Error("api_unavailable");
+    await api.deleteUpload(id);
+    setUploads((rows) => rows.filter((row) => row.id !== id));
+    await loadUploads();
+    setArtifactStale(true);
+  }
+
+  async function downloadUploadItem(id: string, filename: string): Promise<void> {
+    if (!api) throw new Error("api_unavailable");
+    await api.downloadUpload(id, filename);
+  }
+
+  /** Everything the founder can download, zipped client-side with fflate's
+   *  sync API (the CSP has no worker-src, so the async/worker API is out). */
+  async function downloadAllFiles(): Promise<void> {
+    if (!api) throw new Error("api_unavailable");
+    const totalBytes = uploads.reduce((sum, item) => sum + item.sizeBytes, 0);
+    if (totalBytes > MAX_DOWNLOAD_ALL_BYTES) {
+      setError(
+        `Your uploaded files total ${formatBytes(totalBytes)}, over the ` +
+          `${formatBytes(MAX_DOWNLOAD_ALL_BYTES)} zip limit. Download large files individually ` +
+          "instead, from the list above.",
+      );
+      return;
+    }
+    const entries: Record<string, Uint8Array> = {};
+    const used = new Set<string>();
+    const addEntry = (folder: string, name: string, bytes: Uint8Array) => {
+      const path = `${folder}/${name}`;
+      const unique = dedupeFilename(used, path);
+      used.add(unique);
+      entries[unique] = bytes;
+    };
+    // One microtask between fetches so a long file list never blocks the UI thread solid.
+    const yieldToBrowser = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    for (const item of uploads) {
+      try {
+        const blob = await api.downloadUploadBlob(item.id);
+        addEntry("Uploaded by you", item.name, new Uint8Array(await blob.arrayBuffer()));
+      } catch {
+        // Skip a file that fails to fetch rather than failing the whole zip.
+      }
+      await yieldToBrowser();
+    }
+    try {
+      const md = await api.exportBlob("markdown");
+      addEntry("Created by FounderBrain", "brain.md", new Uint8Array(await md.arrayBuffer()));
+    } catch {
+      /* omit on failure */
+    }
+    try {
+      const json = await api.exportBlob("json");
+      addEntry("Created by FounderBrain", "brain.json", new Uint8Array(await json.arrayBuffer()));
+    } catch {
+      /* omit on failure */
+    }
+    if (artifactText && isPack(artifactText)) {
+      const sections = splitPack(artifactText);
+      const named: Array<[string, string]> = [
+        ["content.md", sections.content],
+        ["outreach.md", sections.outreach],
+        ["90-day-plan.md", sections.plan],
+      ];
+      for (const [name, text] of named) {
+        if (text.trim()) addEntry("Created by FounderBrain", name, strToU8(text));
+      }
+    } else if (artifactText.trim()) {
+      addEntry("Created by FounderBrain", "output.md", strToU8(artifactText));
+    }
+    const zipped = zipSync(entries, { level: 6 });
+    const blob = new Blob([zipped], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "founder-brain-files.zip";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function setDraftStatus(id: string, status: "read" | "dismissed") {
     if (!api) return;
     if (status === "dismissed") setRoutineDrafts((rows) => rows.filter((r) => r.id !== id));
@@ -484,7 +619,11 @@ export function useFounderBrainApp() {
     if (!saved) throw new Error("The imported answers have not been saved yet. Please retry.");
   }
 
-  function patch(section: Exclude<Mission, "output">, field: string, value: string | boolean | number) {
+  function patch(
+    section: Exclude<Mission, "output">,
+    field: string,
+    value: string | boolean | number,
+  ) {
     if (saving) return;
     // Background synchronization and repeated choices are not edits.
     const prior = (latestDraft.current[section] as unknown as Record<string, unknown>)[field];
@@ -697,7 +836,15 @@ export function useFounderBrainApp() {
         }
         if (outcome.kind === "failed") {
           window.sessionStorage.removeItem(jobStorage);
-          throw new Error(job.error ?? "Generation did not complete.");
+          // job.error is a plain string, not an ApiError, so it must be shown
+          // directly: friendlyError() below only passes through ApiError
+          // messages and would otherwise flatten this to a generic line,
+          // losing specific failures like "Brain changed before generation.
+          // Generate again." and "Your files changed before generation.
+          // Generate again." (#lost-job-error-text).
+          setJobNeedsReconcile(true);
+          setError(job.error || "Generation did not complete.");
+          return;
         }
         if (outcome.kind === "uncertain") {
           window.sessionStorage.removeItem(jobStorage);
@@ -750,7 +897,11 @@ export function useFounderBrainApp() {
         err instanceof ApiError
           ? ((err.details as { details?: { jobId?: unknown; status?: unknown } }).details ?? {})
           : {};
-      if (err instanceof ApiError && err.code === "job_active" && typeof activeJob.jobId === "string") {
+      if (
+        err instanceof ApiError &&
+        err.code === "job_active" &&
+        typeof activeJob.jobId === "string"
+      ) {
         if (activeJob.status === "uncertain") {
           jobOperation.current = {
             expectedVersion: state.version,
@@ -1001,6 +1152,13 @@ export function useFounderBrainApp() {
     deleteVoiceSample,
     routineDrafts,
     setDraftStatus,
+    uploads,
+    uploadsAi,
+    loadUploads,
+    uploadFile,
+    deleteUploadItem,
+    downloadUploadItem,
+    downloadAllFiles,
     ghlPush,
     regeneratePieces,
     connecting,

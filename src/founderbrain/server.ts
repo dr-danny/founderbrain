@@ -65,7 +65,7 @@ import {
   UPLOAD_TYPES,
   assignMedia,
   completeUpload,
-  createUpload,
+  createUpload as createMediaUpload,
   deleteMedia,
   listMedia,
   r2FromConfig,
@@ -78,6 +78,17 @@ import {
   higgsfieldStatus,
   refreshMedia,
 } from "./higgsfield.ts";
+import {
+  EMPTY_CORPUS_HASH,
+  MAX_UPLOAD_FILE_BYTES,
+  computeUploadContext,
+  contentDispositionHeader,
+  createUpload,
+  currentUploadAllocation,
+  deleteUpload,
+  documentBudgetBytes,
+  downloadUpload,
+} from "./uploads.ts";
 
 import {
   getGmailStatus,
@@ -294,6 +305,7 @@ export async function buildApi(
       siteImportEnabled: Boolean(config.FIRECRAWL_API_KEY),
       routinesEnabled: config.ROUTINES_ENABLED === "true",
       mediaEnabled: r2FromConfig(config) !== null,
+      uploadsEnabled: true,
     };
   });
   app.get("/api/oauth/status", async (req) => connectionStatus(store, context(req).workspace));
@@ -427,7 +439,7 @@ export async function buildApi(
         .strict(),
       req.body,
     );
-    return createUpload(config, store, context(req).workspace, body);
+    return createMediaUpload(config, store, context(req).workspace, body);
   });
   app.post("/api/media/:id/complete", async (req) => {
     const { id } = parse(mediaId, req.params);
@@ -476,6 +488,67 @@ export async function buildApi(
   app.post("/api/higgsfield/generate", async (req) => {
     const body = parse(genBody, req.body);
     return { item: await generateMedia(config, store, context(req).workspace, body) };
+  });
+  const uploadId = z.object({ id: z.string().uuid() }).strict();
+  const uploadQuery = z
+    .object({
+      filename: z.string().min(1).max(300),
+      questionKey: z
+        .string()
+        .regex(/^[a-z0-9_-]{1,64}$/)
+        .optional(),
+    })
+    .strict();
+  app.get("/api/uploads", async (req) => {
+    const ctx = await computeUploadContext(config, store, context(req).workspace);
+    return { items: ctx.items, ai: { budgetBytes: ctx.budgetBytes, usedBytes: ctx.usedBytes } };
+  });
+  // Registered in its own encapsulated child instance so the raw-bytes content
+  // type parser below applies only to this one route, never to the rest of the API.
+  // Deliberately NOT awaited: a Fastify instance is itself thenable (resolving on
+  // ready()), so `await app.register(...)` would trigger an early boot here and
+  // freeze the error-handler chain before the routes and setErrorHandler below
+  // ever register — every later route would then fall back to Fastify's own
+  // default error body instead of this file's DomainError shape.
+  app.register(async (instance) => {
+    instance.addContentTypeParser(
+      "application/octet-stream",
+      { parseAs: "buffer" },
+      (_req, body, done) => done(null, body),
+    );
+    instance.post(
+      "/api/uploads",
+      // A small margin over the per-file cap so an over-limit upload gets uploads.ts's
+      // friendly "Files can be up to 10 MB" refusal instead of a bare Fastify body-too-large.
+      { bodyLimit: MAX_UPLOAD_FILE_BYTES + 8192 },
+      async (req) => {
+        const query = parse(uploadQuery, req.query);
+        if (!Buffer.isBuffer(req.body))
+          throw new DomainError(422, "invalid_request", "Send the file as raw bytes.");
+        const workspace = context(req).workspace;
+        const { item } = await createUpload(store, workspace, {
+          filename: query.filename,
+          questionKey: query.questionKey ?? null,
+          bytes: req.body,
+        });
+        // The just-inserted row's own best guess is overwritten with its true
+        // allocation status once every upload (this one included) is considered.
+        const ctx = await computeUploadContext(config, store, workspace);
+        return { item: ctx.items.find((i) => i.id === item.id) ?? item };
+      },
+    );
+  });
+  app.get("/api/uploads/:id/download", async (req, reply) => {
+    const { id } = parse(uploadId, req.params);
+    const { name, bytes } = await downloadUpload(store, context(req).workspace, id);
+    return reply
+      .type("application/octet-stream")
+      .header("Content-Disposition", contentDispositionHeader(name))
+      .send(bytes);
+  });
+  app.delete("/api/uploads/:id", async (req) => {
+    const { id } = parse(uploadId, req.params);
+    return deleteUpload(store, context(req).workspace, id);
   });
   app.get("/api/gmail/status", async (req) =>
     getGmailStatus(config, store, context(req).workspace),
@@ -739,7 +812,17 @@ export async function buildApi(
     const workspace = context(req).workspace;
     const artifact = await jobs.artifact(workspace);
     const state = await store.read(workspace);
-    return { artifact, stale: !!artifact && artifact.sourceHash !== state.sha };
+    let stale = !!artifact && artifact.sourceHash !== state.sha;
+    if (artifact && !stale) {
+      // The Brain itself did not change, but the uploaded documents it would be
+      // generated with might have: a new file added, one removed, or one whose
+      // allocation status shifted enough to change what the AI actually reads.
+      const budget = documentBudgetBytes(config, state.brain);
+      const { allocation } = await currentUploadAllocation(store, workspace, budget);
+      const artifactHash = artifact.uploadsHash ?? EMPTY_CORPUS_HASH;
+      stale = allocation.corpusHash !== artifactHash;
+    }
+    return { artifact, stale };
   });
   app.post("/api/artifact/:id/accept", async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);

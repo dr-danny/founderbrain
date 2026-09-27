@@ -16,6 +16,7 @@ import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
 import { TypeformExitContext } from "./components/TypeformShell";
+import { UploadsContext, type UploadsApi } from "./components/UploadsContext";
 import { DeleteAccountModal } from "./components/DeleteAccountModal";
 import { PackReview } from "./components/PackReview";
 import { BuildPackModal } from "./components/BuildPackModal";
@@ -113,10 +114,12 @@ export function App() {
   // Hub continuity: every typeform screen gets the one-tap Atlanta hub pill.
   // The delete-account modal rides along so it works wherever the chip is.
   const inTypeform = (node: ReactNode) => (
-    <TypeformExitContext.Provider value={() => {
-      if (state) setPausedIntakeWorkspace(state.workspaceId);
-      setView("atlanta");
-    }}>
+    <TypeformExitContext.Provider
+      value={() => {
+        if (state) setPausedIntakeWorkspace(state.workspaceId);
+        setView("atlanta");
+      }}
+    >
       {node}
       {reviewOpen && packDraft ? (
         <PackReview
@@ -164,7 +167,9 @@ export function App() {
       ) : null}
       {showV2 ? (
         <div className="v2-banner" role="region" aria-label="Update to V2">
-          <p>Your saved Brain has not been run through the 90 day plan, content, and outreach yet.</p>
+          <p>
+            Your saved Brain has not been run through the 90 day plan, content, and outreach yet.
+          </p>
           <button
             className="entry-cta"
             type="button"
@@ -196,7 +201,11 @@ export function App() {
   );
 
   if (window.location.pathname === "/privacy") {
-    return <main className="public-privacy"><PrivacyDisclosure onBack={() => window.location.assign("/")} /></main>;
+    return (
+      <main className="public-privacy">
+        <PrivacyDisclosure onBack={() => window.location.assign("/")} />
+      </main>
+    );
   }
   if (!config) {
     return <AuthPage kind="boot" message={error || "Opening your FounderBrain…"} />;
@@ -229,58 +238,89 @@ export function App() {
   }
 
   // Signed-in views without the full TopBar still get the account chip top right.
-  const accountChip = email ? <AccountChip email={email} usage={app.usage} onSignOut={() => void app.signOut()} onDeleteAccount={() => setDeleteOpen(true)} /> : null;
+  const accountChip = email ? (
+    <AccountChip
+      email={email}
+      usage={app.usage}
+      onSignOut={() => void app.signOut()}
+      onDeleteAccount={() => setDeleteOpen(true)}
+    />
+  ) : null;
+  // Uploads context: lets any VoiceField's paperclip reach the uploads API
+  // without threading upload props through every screen between here and there.
+  const uploadsApi: UploadsApi = {
+    enabled: Boolean(config.uploadsEnabled),
+    items: app.uploads,
+    ai: app.uploadsAi,
+    upload: (file, questionKey) => app.uploadFile(file, questionKey),
+    remove: (id) => app.deleteUploadItem(id),
+  };
   if (view === "gmail" && app.api) {
-    return <>{accountChip}<GmailStudio api={app.api} onBack={() => setView("atlanta")} />{deleteOpen ? <DeleteAccountModal email={email ?? ""} onClose={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void app.deleteAccountNow(); }} /> : null}</>;
+    return (
+      <>
+        {accountChip}
+        <GmailStudio api={app.api} onBack={() => setView("atlanta")} />
+        {deleteOpen ? (
+          <DeleteAccountModal
+            email={email ?? ""}
+            onClose={() => setDeleteOpen(false)}
+            onConfirm={() => {
+              setDeleteOpen(false);
+              void app.deleteAccountNow();
+            }}
+          />
+        ) : null}
+      </>
+    );
   }
   const needsIntake = !firstLoginComplete || !guideIsComplete(draft, orientation.track);
   if (needsIntake && pausedIntakeWorkspace !== state.workspaceId) {
     return inTypeform(
-      <>
-      {accountChip}
-      <OrientationFlow
-        workspaceKey={state.workspaceId}
-        screen={orientation.firstLoginScreen}
-        saving={orientationSaving || app.saving}
-        error={error}
-        welcomeDone={firstLoginComplete}
-        brain={draft}
-        track={orientation.track}
-        siteImportEnabled={Boolean(config.siteImportEnabled)}
-        onNamed={(name) => app.patch("identity", "name", name)}
-        onAdvance={async (next) => {
-          await app.saveOrientation({ firstLoginScreen: next });
-        }}
-        onComplete={() => app.completeFirstLogin()}
-        onDecline={() => void app.signOut()}
-        onFill={async (section, field, value) => {
-          return app.commitField(section, field, value);
-        }}
-        onApplyIntake={async (proposal) => {
-          await app.applyIntake(proposal);
-        }}
-        onTrack={async (value) => {
-          // Missions fork on the saved Brain, chapters on orientation. Persist
-          // both before advancing, and return the receipt for review routing.
-          const brain = await app.commitField("identity", "track", value);
-          await app.saveOrientation({ track: value });
-          return brain;
-        }}
-        onImport={(url) => app.importSite(url)}
-        onTranscribe={(blob, seconds) =>
-          app.transcribeVoice(blob, seconds).then((result) => result.text)
-        }
-      />
-      {conflict ? (
-        <ConflictDialog
-          conflict={conflict}
-          draft={draft}
-          closeRef={closeConflict}
-          onKeepDraft={app.keepMyDraft}
-          onLoadServer={app.loadServerConflict}
+      <UploadsContext.Provider value={uploadsApi}>
+        {accountChip}
+        <OrientationFlow
+          workspaceKey={state.workspaceId}
+          screen={orientation.firstLoginScreen}
+          saving={orientationSaving || app.saving}
+          error={error}
+          welcomeDone={firstLoginComplete}
+          brain={draft}
+          track={orientation.track}
+          siteImportEnabled={Boolean(config.siteImportEnabled)}
+          onNamed={(name) => app.patch("identity", "name", name)}
+          onAdvance={async (next) => {
+            await app.saveOrientation({ firstLoginScreen: next });
+          }}
+          onComplete={() => app.completeFirstLogin()}
+          onDecline={() => void app.signOut()}
+          onFill={async (section, field, value) => {
+            return app.commitField(section, field, value);
+          }}
+          onApplyIntake={async (proposal) => {
+            await app.applyIntake(proposal);
+          }}
+          onTrack={async (value) => {
+            // Missions fork on the saved Brain, chapters on orientation. Persist
+            // both before advancing, and return the receipt for review routing.
+            const brain = await app.commitField("identity", "track", value);
+            await app.saveOrientation({ track: value });
+            return brain;
+          }}
+          onImport={(url) => app.importSite(url)}
+          onTranscribe={(blob, seconds) =>
+            app.transcribeVoice(blob, seconds).then((result) => result.text)
+          }
         />
-      ) : null}
-      </>
+        {conflict ? (
+          <ConflictDialog
+            conflict={conflict}
+            draft={draft}
+            closeRef={closeConflict}
+            onKeepDraft={app.keepMyDraft}
+            onLoadServer={app.loadServerConflict}
+          />
+        ) : null}
+      </UploadsContext.Provider>,
     );
   }
 
@@ -315,7 +355,7 @@ export function App() {
           }}
           onFinished={() => setView("atlanta")}
         />
-      </>
+      </>,
     );
   }
 
@@ -332,7 +372,7 @@ export function App() {
           }}
           onFinished={() => setView("atlanta")}
         />
-      </>
+      </>,
     );
   }
 
@@ -341,29 +381,29 @@ export function App() {
       <>
         {accountChip}
         <GhlChapter
-        orientation={orientation}
-        saving={orientationSaving}
-        error={error}
-        connectEnabled={Boolean(config.crmConnectEnabled)}
-        connecting={app.connecting}
-        onConnect={() => app.startConnect()}
-        loadUsage={() => app.getUsage()}
-        packAccepted={packAccepted}
-        packReady={packDraft}
-        onReviewPack={() => setReviewOpen(true)}
-        onGhlPush={() => app.ghlPush()}
-        onPatch={async (patch) => {
-          await app.saveOrientation(patch);
-        }}
-        onFinished={() => setView("atlanta")}
+          orientation={orientation}
+          saving={orientationSaving}
+          error={error}
+          connectEnabled={Boolean(config.crmConnectEnabled)}
+          connecting={app.connecting}
+          onConnect={() => app.startConnect()}
+          loadUsage={() => app.getUsage()}
+          packAccepted={packAccepted}
+          packReady={packDraft}
+          onReviewPack={() => setReviewOpen(true)}
+          onGhlPush={() => app.ghlPush()}
+          onPatch={async (patch) => {
+            await app.saveOrientation(patch);
+          }}
+          onFinished={() => setView("atlanta")}
         />
-      </>
+      </>,
     );
   }
 
   if (view === "missions") {
     return inTypeform(
-      <>
+      <UploadsContext.Provider value={uploadsApi}>
         {accountChip}
         {conflict ? (
           <ConflictDialog
@@ -429,14 +469,14 @@ export function App() {
           onReconcile={() => void app.reconcileOutput()}
           onAccept={() => void app.acceptOutput()}
         />
-      </>
+      </UploadsContext.Provider>,
     );
   }
 
   // Files and downloads: the same immersive glass stage, wired to the chip modal.
   if (view === "brain") {
     return inTypeform(
-      <>
+      <UploadsContext.Provider value={uploadsApi}>
         {accountChip}
         {notice ? (
           <p className="mission-toast notice" role="status">
@@ -466,8 +506,21 @@ export function App() {
           onDownload={app.download}
           onHome={() => setView("atlanta")}
           onPrivacy={() => setView("privacy")}
+          artifactText={app.artifactText}
+          uploadsEnabled={Boolean(config.uploadsEnabled)}
+          uploads={app.uploads}
+          uploadsAi={app.uploadsAi}
+          onUpload={async (files) => {
+            if (!files) return;
+            for (const file of Array.from(files)) {
+              await app.uploadFile(file);
+            }
+          }}
+          onUploadDelete={(id) => app.deleteUploadItem(id)}
+          onUploadDownload={(id, filename) => app.downloadUploadItem(id, filename)}
+          onDownloadAll={() => app.downloadAllFiles()}
         />
-      </>
+      </UploadsContext.Provider>,
     );
   }
 
@@ -532,7 +585,7 @@ export function App() {
             onLoadServer={app.loadServerConflict}
           />
         ) : null}
-      </>
+      </>,
     );
   }
 

@@ -55,7 +55,6 @@ function brainChangedSections(brain: Brain, previous: Brain | null): SummarySect
   );
 }
 
-
 type FounderRow = {
   version: number | string | bigint;
   wrapped_key: Uint8Array;
@@ -502,7 +501,10 @@ export class PgBrainStore {
             track: brain.identity.track,
             hybrid: brain.identity.hybrid,
             approved: SUMMARY_SECTIONS.filter((section) => brain[section].approved),
-            changed: brainChangedSections(brain, index + 1 < brains.length ? brains[index + 1]! : null),
+            changed: brainChangedSections(
+              brain,
+              index + 1 < brains.length ? brains[index + 1]! : null,
+            ),
           };
         });
       });
@@ -599,6 +601,12 @@ export class PgBrainStore {
         const orientationSchema = await tx`select to_regclass('public.fb_orientation') as present`;
         if (orientationSchema[0]?.present) {
           await tx`delete from fb_orientation where founder_id = ${workspaceId}`;
+        }
+        // Uploads reference ge_blob (original and extracted-text bytes); drop them
+        // before the blob wipe below or that delete would fail its foreign key.
+        const uploadSchema = await tx`select to_regclass('public.fb_upload') as present`;
+        if (uploadSchema[0]?.present) {
+          await tx`delete from fb_upload where founder_id = ${workspaceId}`;
         }
         await tx`delete from fb_receipt where founder_id = ${workspaceId}`;
         await tx`delete from ge_file_version where founder_id = ${workspaceId}`;

@@ -1,12 +1,48 @@
 /**
- * Files and downloads (Danny, 2026-09-21): the same cinematic glass stage as
- * the hub. Exports, a readable version history with field-by-field compare,
- * and restore. Deletion lives in the account chip's branded modal.
+ * Files and downloads (Danny, 2026-09-21; uploads added 2026-09-26): the same
+ * cinematic glass stage as the hub. Two sections -- what the founder uploaded,
+ * and what FounderBrain produced -- a "Download all" zip, then the unchanged
+ * version history with field-by-field compare and restore.
  */
-import type { BrainState, HistoryItem } from "../types";
+import { useRef, useState } from "react";
+import "../uploads.css";
+import type { BrainState, HistoryItem, UploadItem, UploadsAi } from "../types";
 import { sectionFounderNames, stamp } from "../mission-copy";
+import { questionKeyTitles } from "../guide-intake";
+import {
+  ALLOWED_UPLOAD_EXTENSIONS,
+  MAX_UPLOAD_BYTES,
+  formatBytes,
+  humanizeQuestionKey,
+  isAllowedUploadExtension,
+} from "../lib/uploads";
+import { isPack, splitPack } from "../pack";
 import { BrainDiff } from "./BrainDiff";
 import { BrandMark } from "./BrandMark";
+
+const UPLOAD_ACCEPT = ALLOWED_UPLOAD_EXTENSIONS.map((ext) => `.${ext}`).join(",");
+
+const AI_BADGE_LABEL: Record<UploadItem["ai"], string> = {
+  full: "Read by AI",
+  partial: "Partly read by AI",
+  excluded: "Not read — over the AI limit",
+  unreadable: "No readable text (scanned PDF)",
+};
+
+function questionLabel(questionKey: string | null): string | null {
+  if (!questionKey) return null;
+  return questionKeyTitles[questionKey] ?? humanizeQuestionKey(questionKey);
+}
+
+function downloadText(filename: string, text: string) {
+  const blob = new Blob([text], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function BrainPanel({
   state,
@@ -17,6 +53,14 @@ export function BrainPanel({
   onDownload,
   onHome,
   onPrivacy,
+  artifactText,
+  uploadsEnabled,
+  uploads,
+  uploadsAi,
+  onUpload,
+  onUploadDelete,
+  onUploadDownload,
+  onDownloadAll,
 }: {
   state: BrainState;
   history: HistoryItem[];
@@ -26,8 +70,61 @@ export function BrainPanel({
   onDownload: (format: "json" | "markdown") => void;
   onHome: () => void;
   onPrivacy: () => void;
+  artifactText: string;
+  uploadsEnabled: boolean;
+  uploads: UploadItem[];
+  uploadsAi: UploadsAi;
+  onUpload: (files: FileList | null) => Promise<void>;
+  onUploadDelete: (id: string) => Promise<void>;
+  onUploadDownload: (id: string, filename: string) => Promise<void>;
+  onDownloadAll: () => Promise<void>;
 }) {
   const versions = [...history].sort((a, b) => b.version - a.version);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [zipping, setZipping] = useState(false);
+
+  async function handleFiles(fileList: FileList | null) {
+    if (!fileList || !fileList.length) return;
+    setUploadError("");
+    for (const file of Array.from(fileList)) {
+      if (!isAllowedUploadExtension(file.name)) {
+        setUploadError(`${file.name}: that file type is not supported here.`);
+        continue;
+      }
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setUploadError(`${file.name}: files over ${formatBytes(MAX_UPLOAD_BYTES)} are too large.`);
+        continue;
+      }
+    }
+    const good = Array.from(fileList).filter(
+      (file) => isAllowedUploadExtension(file.name) && file.size <= MAX_UPLOAD_BYTES,
+    );
+    if (!good.length) return;
+    setUploadBusy(true);
+    try {
+      const dt = new DataTransfer();
+      good.forEach((file) => dt.items.add(file));
+      await onUpload(dt.files);
+    } catch (err) {
+      setUploadError(err instanceof Error && err.message ? err.message : "Upload failed.");
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  const pack = isPack(artifactText) ? splitPack(artifactText) : null;
+  const packSections: Array<{ key: string; title: string; text: string; filename: string }> = pack
+    ? [
+        { key: "content", title: "Content", text: pack.content, filename: "content.md" },
+        { key: "outreach", title: "Outreach", text: pack.outreach, filename: "outreach.md" },
+        { key: "plan", title: "90 day plan", text: pack.plan, filename: "90-day-plan.md" },
+      ].filter((section) => section.text.trim())
+    : [];
+
   return (
     <main className="entry-stage typeform-stage atlanta-stage brain-stage">
       <div className="entry-media" aria-hidden="true">
@@ -55,28 +152,197 @@ export function BrainPanel({
         </h1>
         <div className="typeform-body in atlanta-body">
           <p className="atlanta-lede">
-            Everything your work produced lives here: your Brain as markdown or JSON, and every
-            saved version. Nothing was ever published or sent to customers.
+            Everything you uploaded and everything FounderBrain created lives here, plus every saved
+            version of your Brain. Nothing was ever published or sent to customers.
           </p>
 
           <div className="atlanta-actions">
             <button className="entry-cta" type="button" onClick={onHome}>
               Back to Atlanta
             </button>
-            <button className="atlanta-secondary" type="button" onClick={() => onDownload("markdown")}>
-              Download Brain as markdown
-            </button>
-            <button className="atlanta-secondary" type="button" onClick={() => onDownload("json")}>
-              Download Brain as JSON
-            </button>
             <button className="atlanta-secondary" type="button" onClick={onPrivacy}>
               Privacy and data use
             </button>
+            {uploadsEnabled ? (
+              <button
+                className="atlanta-secondary"
+                type="button"
+                disabled={zipping}
+                onClick={() => {
+                  setZipping(true);
+                  void onDownloadAll().finally(() => setZipping(false));
+                }}
+              >
+                {zipping ? "Zipping…" : "Download all"}
+              </button>
+            ) : null}
           </div>
+
+          {uploadsEnabled ? (
+            <section className="atlanta-day">
+              <h2>Uploaded by you</h2>
+              <p>
+                Files you attached to a question, or added here. The AI can read text from these
+                when you generate.
+              </p>
+              <input
+                ref={inputRef}
+                type="file"
+                className="visually-hidden"
+                accept={UPLOAD_ACCEPT}
+                multiple
+                onChange={(event) => {
+                  void handleFiles(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+              <div className="atlanta-actions">
+                <button
+                  className="atlanta-secondary"
+                  type="button"
+                  disabled={uploadBusy}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  {uploadBusy ? "Uploading…" : "Upload files"}
+                </button>
+              </div>
+              {uploadError ? (
+                <p className="entry-error" role="alert">
+                  {uploadError}
+                </p>
+              ) : null}
+              <p className="upload-usage-line">
+                The AI reads up to {formatBytes(uploadsAi.budgetBytes)} of your files per
+                generation; {formatBytes(uploadsAi.usedBytes)} in use.
+              </p>
+              {uploads.length === 0 ? (
+                <p className="atlanta-muted">No files uploaded yet.</p>
+              ) : (
+                <ul className="upload-list">
+                  {uploads.map((item) => {
+                    const label = questionLabel(item.questionKey);
+                    return (
+                      <li className="upload-row" key={item.id}>
+                        <div className="upload-row-meta">
+                          <span className="upload-row-name">{item.name}</span>
+                          <span className="upload-row-detail">
+                            {item.ext.toUpperCase()} · {formatBytes(item.sizeBytes)} ·{" "}
+                            {stamp(item.createdAt)}
+                            {label ? ` · Attached to "${label}"` : ""}
+                          </span>
+                          <span className={`upload-badge ${item.ai}`}>
+                            {AI_BADGE_LABEL[item.ai]}
+                          </span>
+                        </div>
+                        <div className="upload-row-actions">
+                          <button
+                            type="button"
+                            className="atlanta-version-btn"
+                            disabled={busyId === item.id}
+                            onClick={() => {
+                              setBusyId(item.id);
+                              void onUploadDownload(item.id, item.name).finally(() =>
+                                setBusyId(null),
+                              );
+                            }}
+                          >
+                            Download
+                          </button>
+                          {confirmId === item.id ? (
+                            <>
+                              <button
+                                type="button"
+                                className="atlanta-version-btn primary"
+                                disabled={busyId === item.id}
+                                onClick={() => {
+                                  setBusyId(item.id);
+                                  void onUploadDelete(item.id).finally(() => {
+                                    setBusyId(null);
+                                    setConfirmId(null);
+                                  });
+                                }}
+                              >
+                                Confirm delete
+                              </button>
+                              <button
+                                type="button"
+                                className="atlanta-version-btn"
+                                onClick={() => setConfirmId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="atlanta-version-btn"
+                              onClick={() => setConfirmId(item.id)}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
+          <section className="atlanta-day">
+            <h2>Created by FounderBrain</h2>
+            <p>Your Brain and the generated pack, each downloadable on its own.</p>
+            <ul className="upload-created-list">
+              <li>
+                <span>Brain as markdown</span>
+                <button
+                  className="atlanta-version-btn"
+                  type="button"
+                  onClick={() => onDownload("markdown")}
+                >
+                  Download
+                </button>
+              </li>
+              <li>
+                <span>Brain as JSON</span>
+                <button
+                  className="atlanta-version-btn"
+                  type="button"
+                  onClick={() => onDownload("json")}
+                >
+                  Download
+                </button>
+              </li>
+              {packSections.length ? (
+                packSections.map((section) => (
+                  <li key={section.key}>
+                    <span>{section.title}</span>
+                    <button
+                      className="atlanta-version-btn"
+                      type="button"
+                      onClick={() => downloadText(section.filename, section.text)}
+                    >
+                      Download
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li>
+                  <span className="atlanta-muted">
+                    No generated pack yet. Generate one from a mission's output screen.
+                  </span>
+                </li>
+              )}
+            </ul>
+          </section>
 
           <section className="atlanta-day">
             <h2>Saved versions</h2>
-            <p>Pick any version to compare it field by field with the one in use, then restore it if it is the one you want.</p>
+            <p>
+              Pick any version to compare it field by field with the one in use, then restore it if
+              it is the one you want.
+            </p>
             {versions.length === 0 ? (
               <p className="atlanta-muted">Loading your saves…</p>
             ) : (
@@ -110,7 +376,12 @@ export function BrainPanel({
                               : item.changed.length === 0
                                 ? "Same content as the version before it"
                                 : `Changed: ${item.changed
-                                    .map((key) => sectionFounderNames[key as keyof typeof sectionFounderNames])
+                                    .map(
+                                      (key) =>
+                                        sectionFounderNames[
+                                          key as keyof typeof sectionFounderNames
+                                        ],
+                                    )
                                     .join(", ")}`}
                         </small>
                       </div>
