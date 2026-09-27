@@ -522,6 +522,9 @@ export function App() {
           onUploadDelete={(id) => app.deleteUploadItem(id)}
           onUploadDownload={(id, filename) => app.downloadUploadItem(id, filename)}
           onDownloadAll={() => app.downloadAllFiles()}
+          mediaEnabled={Boolean(config.mediaEnabled)}
+          mediaApi={config.mediaEnabled ? app.api : null}
+          onOpenLibrary={() => setView("content")}
         />
       </UploadsContext.Provider>,
     );
@@ -575,9 +578,10 @@ export function App() {
             // The business-profile card is labeled as one item but covers Identity,
             // Customer, and Offer. Opening it always at Identity replayed Mission 1
             // after that mission was already approved.
-            const mission = target === "mission-identity"
-              ? profileResumeMission(state.readiness)
-              : target.replace("mission-", "") as (typeof missions)[number];
+            const mission =
+              target === "mission-identity"
+                ? profileResumeMission(state.readiness)
+                : (target.replace("mission-", "") as (typeof missions)[number]);
             setMission(mission);
             setView("missions");
           }}

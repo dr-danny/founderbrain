@@ -4,9 +4,10 @@
  * and what FounderBrain produced -- a "Download all" zip, then the unchanged
  * version history with field-by-field compare and restore.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "../uploads.css";
-import type { BrainState, HistoryItem, UploadItem, UploadsAi } from "../types";
+import type { BrainState, HistoryItem, MediaItem, UploadItem, UploadsAi } from "../types";
+import type { FounderBrainApi } from "../api";
 import { sectionFounderNames, stamp } from "../mission-copy";
 import { questionKeyTitles } from "../guide-intake";
 import {
@@ -16,6 +17,7 @@ import {
   humanizeQuestionKey,
   isAllowedUploadExtension,
 } from "../lib/uploads";
+import { splitMediaForFiles } from "../lib/media-files";
 import { isPack, splitPack } from "../pack";
 import { BrainDiff } from "./BrainDiff";
 import { BrandMark } from "./BrandMark";
@@ -32,6 +34,47 @@ const AI_BADGE_LABEL: Record<UploadItem["ai"], string> = {
 function questionLabel(questionKey: string | null): string | null {
   if (!questionKey) return null;
   return questionKeyTitles[questionKey] ?? humanizeQuestionKey(questionKey);
+}
+
+function mediaFileName(item: MediaItem): string {
+  return (
+    item.name ||
+    (item.source === "higgsfield" ? `Higgsfield ${item.kind}` : `Uploaded ${item.kind}`)
+  );
+}
+
+/** Read-only row for a piece of Danny's media on the Files screen. The url is a
+ *  short-lived presigned link from the private bucket, so it can't be an
+ *  <a download> across origins -- it opens in a new tab instead. */
+function MediaRow({ item }: { item: MediaItem }) {
+  return (
+    <li className="upload-row media-row" key={item.id}>
+      {item.kind === "image" && item.url ? (
+        <img className="media-row-thumb" src={item.url} alt="" loading="lazy" />
+      ) : null}
+      <div className="upload-row-meta">
+        <span className="upload-row-name">{mediaFileName(item)}</span>
+        <span className="upload-row-detail">
+          {formatBytes(item.sizeBytes ?? 0)} · {stamp(item.createdAt)}
+        </span>
+        <span className={`upload-badge media-kind-${item.kind}`}>
+          {item.kind === "image" ? "Photo" : "Video"}
+        </span>
+      </div>
+      <div className="upload-row-actions">
+        {item.url ? (
+          <a
+            className="atlanta-version-btn"
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open
+          </a>
+        ) : null}
+      </div>
+    </li>
+  );
 }
 
 function downloadText(filename: string, text: string) {
@@ -61,6 +104,9 @@ export function BrainPanel({
   onUploadDelete,
   onUploadDownload,
   onDownloadAll,
+  mediaEnabled,
+  mediaApi,
+  onOpenLibrary,
 }: {
   state: BrainState;
   history: HistoryItem[];
@@ -78,6 +124,11 @@ export function BrainPanel({
   onUploadDelete: (id: string) => Promise<void>;
   onUploadDownload: (id: string, filename: string) => Promise<void>;
   onDownloadAll: () => Promise<void>;
+  /** Founder photos/videos and Higgsfield output live in Danny's media bucket
+   *  (R2). Read-only here -- managing them stays in the content library. */
+  mediaEnabled: boolean;
+  mediaApi: FounderBrainApi | null;
+  onOpenLibrary: () => void;
 }) {
   const versions = [...history].sort((a, b) => b.version - a.version);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +137,28 @@ export function BrainPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [zipping, setZipping] = useState(false);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+
+  useEffect(() => {
+    if (!mediaApi) {
+      setMediaItems([]);
+      return;
+    }
+    let cancelled = false;
+    void mediaApi
+      .media()
+      .then((res) => {
+        if (!cancelled) setMediaItems(res.items);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaApi]);
+
+  const { uploaded: uploadedMedia, created: createdMedia } = mediaEnabled
+    ? splitMediaForFiles(mediaItems)
+    : { uploaded: [], created: [] };
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || !fileList.length) return;
@@ -177,47 +250,58 @@ export function BrainPanel({
               </button>
             ) : null}
           </div>
+          {uploadsEnabled && mediaEnabled ? (
+            <p className="atlanta-muted media-zip-note">
+              Photos and videos download individually below -- they aren't part of the zip.
+            </p>
+          ) : null}
 
-          {uploadsEnabled ? (
+          {uploadsEnabled || mediaEnabled ? (
             <section className="atlanta-day">
               <h2>Uploaded by you</h2>
               <p>
                 Files you attached to a question, or added here. The AI can read text from these
                 when you generate.
               </p>
-              <input
-                ref={inputRef}
-                type="file"
-                className="visually-hidden"
-                accept={UPLOAD_ACCEPT}
-                multiple
-                onChange={(event) => {
-                  void handleFiles(event.target.files);
-                  event.target.value = "";
-                }}
-              />
-              <div className="atlanta-actions">
-                <button
-                  className="atlanta-secondary"
-                  type="button"
-                  disabled={uploadBusy}
-                  onClick={() => inputRef.current?.click()}
-                >
-                  {uploadBusy ? "Uploading…" : "Upload files"}
-                </button>
-              </div>
-              {uploadError ? (
+              {uploadsEnabled ? (
+                <>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    className="visually-hidden"
+                    accept={UPLOAD_ACCEPT}
+                    multiple
+                    onChange={(event) => {
+                      void handleFiles(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                  <div className="atlanta-actions">
+                    <button
+                      className="atlanta-secondary"
+                      type="button"
+                      disabled={uploadBusy}
+                      onClick={() => inputRef.current?.click()}
+                    >
+                      {uploadBusy ? "Uploading…" : "Upload files"}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+              {uploadsEnabled && uploadError ? (
                 <p className="entry-error" role="alert">
                   {uploadError}
                 </p>
               ) : null}
-              <p className="upload-usage-line">
-                The AI reads up to {formatBytes(uploadsAi.budgetBytes)} of your files per
-                generation; {formatBytes(uploadsAi.usedBytes)} in use.
-              </p>
-              {uploads.length === 0 ? (
+              {uploadsEnabled ? (
+                <p className="upload-usage-line">
+                  The AI reads up to {formatBytes(uploadsAi.budgetBytes)} of your files per
+                  generation; {formatBytes(uploadsAi.usedBytes)} in use.
+                </p>
+              ) : null}
+              {uploadsEnabled && uploads.length === 0 ? (
                 <p className="atlanta-muted">No files uploaded yet.</p>
-              ) : (
+              ) : uploadsEnabled ? (
                 <ul className="upload-list">
                   {uploads.map((item) => {
                     const label = questionLabel(item.questionKey);
@@ -286,13 +370,51 @@ export function BrainPanel({
                     );
                   })}
                 </ul>
-              )}
+              ) : null}
+              {mediaEnabled ? (
+                uploadedMedia.length ? (
+                  <ul className="upload-list media-list">
+                    {uploadedMedia.map((item) => (
+                      <MediaRow key={item.id} item={item} />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="atlanta-muted">No content photos or videos yet.</p>
+                )
+              ) : null}
+              {mediaEnabled ? (
+                <p className="atlanta-muted media-library-note">
+                  Manage your photos and videos in{" "}
+                  <button type="button" className="atlanta-link" onClick={onOpenLibrary}>
+                    your content library
+                  </button>
+                  .
+                </p>
+              ) : null}
             </section>
           ) : null}
 
           <section className="atlanta-day">
             <h2>Created by FounderBrain</h2>
             <p>Your Brain and the generated pack, each downloadable on its own.</p>
+            {mediaEnabled ? (
+              createdMedia.length ? (
+                <>
+                  <ul className="upload-list media-list">
+                    {createdMedia.map((item) => (
+                      <MediaRow key={item.id} item={item} />
+                    ))}
+                  </ul>
+                  <p className="atlanta-muted media-library-note">
+                    Manage in{" "}
+                    <button type="button" className="atlanta-link" onClick={onOpenLibrary}>
+                      your content library
+                    </button>
+                    .
+                  </p>
+                </>
+              ) : null
+            ) : null}
             <ul className="upload-created-list">
               <li>
                 <span>Brain as markdown</span>

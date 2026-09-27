@@ -176,3 +176,53 @@
   border-radius: 10px;
   background: rgba(247, 239, 230, 0.03);
 }
+
+/* Read-only content photos, videos and Higgsfield output on the Files screen. */
+.media-zip-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+.media-list {
+  margin-top: 0.85rem;
+}
+.media-row {
+  align-items: center;
+}
+.media-row-thumb {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(247, 239, 230, 0.18);
+  background: rgba(247, 239, 230, 0.05);
+}
+.upload-badge.media-kind-image,
+.upload-badge.media-kind-video {
+  color: var(--paper);
+  border-color: rgba(247, 239, 230, 0.4);
+}
+.media-library-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+}
+.atlanta-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--ember);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.atlanta-link:hover,
+.atlanta-link:focus-visible {
+  color: var(--paper);
+}
+
+@media (max-width: 480px) {
+  .media-row {
+    flex-wrap: wrap;
+  }
+}
