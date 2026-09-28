@@ -587,7 +587,11 @@ class BrowserAuthTests(unittest.TestCase):
         auth = [u for u in seen if u.startswith(AUTH_ORIGIN + "/")]
         self.assertEqual(backend, [], "a public recovery screen must never call the API")
         self.assertEqual(auth, [], "a public recovery screen must never touch Hexclave auth")
-        self.assertEqual(self.auth_requests, [], "no cross-origin auth traffic should start at all")
+        # The shared HTML loads Google Fonts before React mounts. Fonts are presentation
+        # assets, not auth traffic; reject every other unexpected external origin.
+        external = [u for u in seen if not u.startswith(self.origin)
+                    and urlparse(u).hostname not in ("fonts.googleapis.com", "fonts.gstatic.com")]
+        self.assertEqual(external, [], "no external auth or application traffic should start")
 
     LAUNCH_HEADING = "Open FounderBrain."
 
@@ -602,7 +606,7 @@ class BrowserAuthTests(unittest.TestCase):
     def _expect_no_launch_screen(self):
         expect(self.page.get_by_role("heading", name=self.LAUNCH_HEADING, exact=True)).to_have_count(0)
 
-    def test_highlevel_launch_route_shows_launch_screen_with_no_auth_or_network(self):
+    def test_highlevel_launch_route_shows_launch_screen_without_auth_or_api_calls(self):
         seen = self._no_backend_requests()
         self.page.goto(self.origin + "/highlevel")
         link = self._expect_launch_screen()
