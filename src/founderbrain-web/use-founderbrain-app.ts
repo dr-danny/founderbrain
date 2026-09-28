@@ -50,6 +50,7 @@ import {
 } from "./lib/job-poll";
 import { type Mission } from "./mission-copy";
 import { type View } from "./components/MissionRail";
+import { type UsableOauthCallback } from "./lib/oauth-callback";
 import {
   emptyOrientationState,
   isFirstLoginComplete,
@@ -57,7 +58,7 @@ import {
   type OrientationState,
 } from "../founderbrain-shared/orientation";
 
-export function useFounderBrainApp() {
+export function useFounderBrainApp(initialOauthCallback: UsableOauthCallback | null = null) {
   const [config, setConfig] = useState<Config | null>(null);
   // Sign-in state is four things: which mode we are in (config), whether Hexclave has a
   // session for this browser (session: undefined while asking, null when signed out),
@@ -437,14 +438,18 @@ export function useFounderBrainApp() {
 
   useEffect(() => {
     if (!api || !email || oauthHandled.current) return;
+    // The path marker still gates this: main.tsx only ever populates
+    // `initialOauthCallback` when it saw this exact path pre-boot, but this effect
+    // keeps checking it directly so it never fires from stale/rehydrated state.
     if (window.location.pathname !== "/oauth/callback") return;
     oauthHandled.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    const oauthState = params.get("state");
-    const denied = params.has("error")
-      ? (params.get("error") || "access_denied").slice(0, 200)
-      : null;
+    // The query string was already stripped by main.tsx before this component (and
+    // the Hexclave SDK it constructs) ever mounted. Read the captured classification
+    // from memory instead of window.location.search, which is clean by now.
+    const code = initialOauthCallback?.kind === "code" ? initialOauthCallback.code : null;
+    const oauthState = initialOauthCallback?.state ?? null;
+    const denied =
+      initialOauthCallback?.kind === "error" ? initialOauthCallback.error.slice(0, 200) : null;
     window.history.replaceState({}, "", "/");
     setView("ghl");
     if (!oauthState || (!denied && !code)) {
@@ -486,7 +491,7 @@ export function useFounderBrainApp() {
         }
       }
     })();
-  }, [api, email]);
+  }, [api, email, initialOauthCallback]);
 
   async function startConnect() {
     if (!api || connectOperation.current || disconnectOperation.current) return;
