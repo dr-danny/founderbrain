@@ -30,6 +30,7 @@ import { assertSafeRole } from "./migrations.ts";
 
 const BRAIN_PATH = "brain.json";
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const PG_STORE_POOL_MAX = 8;
 
 /** Sections summarized per version in /api/history (mission sections of the Brain). */
 const SUMMARY_SECTIONS = ["identity", "customer", "offer", "voice", "context"] as const;
@@ -143,7 +144,7 @@ export class PgBrainStore {
     if (!databaseUrl) throw new Error("FounderBrain database URL is required");
     this.production = production;
     this.sql = postgres(databaseUrl, {
-      max: 8,
+      max: PG_STORE_POOL_MAX,
       onnotice: () => undefined,
       connection: { application_name: "founderbrain-runtime" },
     });

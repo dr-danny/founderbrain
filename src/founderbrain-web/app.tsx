@@ -389,7 +389,25 @@ export function App() {
           error={error}
           connectEnabled={Boolean(config.crmConnectEnabled)}
           connecting={app.connecting}
+          disconnecting={app.disconnecting}
+          connection={app.ghlConnection}
+          statusVerified={app.ghlStatusVerified}
+          statusLoading={app.ghlStatusLoading}
+          statusError={app.ghlStatusError}
+          connectionGeneration={app.ghlConnectionGeneration}
+          bookingLinks={app.ghlBookingLinks}
+          bookingLoading={app.ghlBookingLoading}
+          bookingError={app.ghlBookingError}
+          linkSavingKey={app.ghlLinkSavingKey}
           onConnect={() => app.startConnect()}
+          onRefreshStatus={async () => {
+            await app.refreshGhlStatus({ announce: true });
+          }}
+          onDisconnect={async () => Boolean(await app.disconnectGhl())}
+          onLoadBookingLinks={async () => {
+            await app.loadGhlBookingLinks();
+          }}
+          onSaveBookingLink={(input) => app.saveGhlBookingLink(input)}
           loadUsage={() => app.getUsage()}
           packAccepted={packAccepted}
           packReady={packDraft}
