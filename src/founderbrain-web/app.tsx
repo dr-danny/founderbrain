@@ -16,6 +16,7 @@ import { PrivacyDisclosure } from "./components/PrivacyDisclosure";
 import { OrientationFlow } from "./components/OrientationFlow";
 import { ContentChapter, GhlChapter, OutreachChapter } from "./components/ChapterFlows";
 import { TypeformExitContext } from "./components/TypeformShell";
+import { UploadsContext, type UploadsApi } from "./components/UploadsContext";
 import { DeleteAccountModal } from "./components/DeleteAccountModal";
 import { PackReview } from "./components/PackReview";
 import { BuildPackModal } from "./components/BuildPackModal";
@@ -246,6 +247,15 @@ export function App() {
       onDeleteAccount={() => setDeleteOpen(true)}
     />
   ) : null;
+  // Uploads context: lets any VoiceField's paperclip reach the uploads API
+  // without threading upload props through every screen between here and there.
+  const uploadsApi: UploadsApi = {
+    enabled: Boolean(config.uploadsEnabled),
+    items: app.uploads,
+    ai: app.uploadsAi,
+    upload: (file, questionKey) => app.uploadFile(file, questionKey),
+    remove: (id) => app.deleteUploadItem(id),
+  };
   if (view === "gmail" && app.api) {
     return (
       <>
@@ -267,7 +277,7 @@ export function App() {
   const needsIntake = !firstLoginComplete || !guideIsComplete(draft, orientation.track);
   if (needsIntake && pausedIntakeWorkspace !== state.workspaceId) {
     return inTypeform(
-      <>
+      <UploadsContext.Provider value={uploadsApi}>
         {accountChip}
         <OrientationFlow
           workspaceKey={state.workspaceId}
@@ -311,7 +321,7 @@ export function App() {
             onLoadServer={app.loadServerConflict}
           />
         ) : null}
-      </>,
+      </UploadsContext.Provider>,
     );
   }
 
@@ -414,7 +424,7 @@ export function App() {
 
   if (view === "missions") {
     return inTypeform(
-      <>
+      <UploadsContext.Provider value={uploadsApi}>
         {accountChip}
         {conflict ? (
           <ConflictDialog
@@ -480,14 +490,14 @@ export function App() {
           onReconcile={() => void app.reconcileOutput()}
           onAccept={() => void app.acceptOutput()}
         />
-      </>,
+      </UploadsContext.Provider>,
     );
   }
 
   // Files and downloads: the same immersive glass stage, wired to the chip modal.
   if (view === "brain") {
     return inTypeform(
-      <>
+      <UploadsContext.Provider value={uploadsApi}>
         {accountChip}
         {notice ? (
           <p className="mission-toast notice" role="status">
@@ -517,8 +527,24 @@ export function App() {
           onDownload={app.download}
           onHome={() => setView("atlanta")}
           onPrivacy={() => setView("privacy")}
+          artifactText={app.artifactText}
+          uploadsEnabled={Boolean(config.uploadsEnabled)}
+          uploads={app.uploads}
+          uploadsAi={app.uploadsAi}
+          onUpload={async (files) => {
+            if (!files) return;
+            for (const file of Array.from(files)) {
+              await app.uploadFile(file);
+            }
+          }}
+          onUploadDelete={(id) => app.deleteUploadItem(id)}
+          onUploadDownload={(id, filename) => app.downloadUploadItem(id, filename)}
+          onDownloadAll={() => app.downloadAllFiles()}
+          mediaEnabled={Boolean(config.mediaEnabled)}
+          mediaApi={config.mediaEnabled ? app.api : null}
+          onOpenLibrary={() => setView("content")}
         />
-      </>,
+      </UploadsContext.Provider>,
     );
   }
 
